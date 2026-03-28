@@ -11,6 +11,7 @@ import { nanoid } from "nanoid";
 type ChatMessage = {
   role: "bot" | "customer";
   content: string;
+  quickReplies?: string[];
   createdAt?: Date | string;
 };
 
@@ -62,14 +63,24 @@ export default function ChatBot() {
     onSuccess: (data) => {
       setMessages((prev) => [
         ...prev,
-        { role: "bot", content: data.response, createdAt: new Date() },
+        {
+          role: "bot",
+          content: data.response,
+          quickReplies: data.quickReplies || [],
+          createdAt: new Date(),
+        },
       ]);
       setIsLoading(false);
     },
     onError: () => {
       setMessages((prev) => [
         ...prev,
-        { role: "bot", content: "Sorry, I'm having trouble right now. Please try again!", createdAt: new Date() },
+        {
+          role: "bot",
+          content: "Sorry, I'm having trouble right now. Please try again!",
+          quickReplies: ["Try again", "Start over"],
+          createdAt: new Date(),
+        },
       ]);
       setIsLoading(false);
     },
@@ -105,19 +116,31 @@ export default function ChatBot() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
-  const handleSend = () => {
-    const trimmed = input.trim();
+  const handleSend = (text?: string) => {
+    const trimmed = (text || input).trim();
     if (!trimmed || isLoading) return;
 
-    setMessages((prev) => [
-      ...prev,
-      { role: "customer", content: trimmed, createdAt: new Date() },
-    ]);
+    // Clear quick replies from the last bot message when user responds
+    setMessages((prev) => {
+      const updated = [...prev];
+      // Remove quick replies from the last bot message since user has responded
+      for (let i = updated.length - 1; i >= 0; i--) {
+        if (updated[i].role === "bot" && updated[i].quickReplies?.length) {
+          updated[i] = { ...updated[i], quickReplies: [] };
+          break;
+        }
+      }
+      return [...updated, { role: "customer", content: trimmed, createdAt: new Date() }];
+    });
+
     setInput("");
     setIsLoading(true);
-
     sendMsg.mutate({ sessionId, message: trimmed });
     textareaRef.current?.focus();
+  };
+
+  const handleQuickReply = (reply: string) => {
+    handleSend(reply);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -130,13 +153,21 @@ export default function ChatBot() {
   const brandColor = agencyInfo?.color || "#F97316";
   const agencyName = agencyInfo?.name || "AB SOLAR";
 
-  // Quick reply suggestions
-  const quickReplies = messages.length <= 1 ? [
+  // Initial quick replies shown before first user message
+  const initialQuickReplies = messages.length <= 1 && !isLoading ? [
     "I want to reduce my electricity bill",
     "How much does solar cost?",
     "Tell me about government subsidies",
     "I pay ₹3000/month in electricity",
   ] : [];
+
+  // Get the last bot message's quick replies (only show for the very last bot message)
+  const lastBotMsgIndex = (() => {
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].role === "bot") return i;
+    }
+    return -1;
+  })();
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950 flex flex-col">
@@ -184,36 +215,68 @@ export default function ChatBot() {
 
             {/* Messages */}
             {messages.map((msg, i) => (
-              <div
-                key={i}
-                className={`flex gap-3 animate-slide-up ${msg.role === "customer" ? "justify-end" : "justify-start"}`}
-              >
-                {msg.role === "bot" && (
+              <div key={i}>
+                {/* Message bubble */}
+                <div
+                  className={`flex gap-3 animate-slide-up ${msg.role === "customer" ? "justify-end" : "justify-start"}`}
+                >
+                  {msg.role === "bot" && (
+                    <div
+                      className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 mt-1"
+                      style={{ background: `${brandColor}20` }}
+                    >
+                      <Sun className="w-4 h-4" style={{ color: brandColor }} />
+                    </div>
+                  )}
                   <div
-                    className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 mt-1"
-                    style={{ background: `${brandColor}20` }}
+                    className={`max-w-[85%] md:max-w-[75%] rounded-2xl px-4 py-3 ${
+                      msg.role === "customer"
+                        ? "text-white rounded-br-md"
+                        : "bg-white/[0.07] text-gray-100 border border-white/10 rounded-bl-md"
+                    }`}
+                    style={msg.role === "customer" ? {
+                      background: `linear-gradient(135deg, ${brandColor}, ${brandColor}cc)`,
+                    } : undefined}
                   >
-                    <Sun className="w-4 h-4" style={{ color: brandColor }} />
+                    {msg.role === "bot" ? (
+                      <div className="prose prose-sm prose-invert max-w-none [&_p]:my-1 [&_ul]:my-1 [&_li]:my-0.5">
+                        <Streamdown>{msg.content}</Streamdown>
+                      </div>
+                    ) : (
+                      <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Quick reply buttons - shown below the last bot message only */}
+                {msg.role === "bot" && i === lastBotMsgIndex && msg.quickReplies && msg.quickReplies.length > 0 && !isLoading && (
+                  <div className="flex flex-wrap gap-2 mt-3 ml-11 animate-fade-in">
+                    {msg.quickReplies.map((reply, j) => (
+                      <button
+                        key={j}
+                        onClick={() => handleQuickReply(reply)}
+                        className="group relative px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 hover:scale-[1.03] active:scale-[0.97]"
+                        style={{
+                          background: `linear-gradient(135deg, ${brandColor}15, ${brandColor}08)`,
+                          border: `1px solid ${brandColor}40`,
+                          color: brandColor,
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.background = `linear-gradient(135deg, ${brandColor}30, ${brandColor}18)`;
+                          e.currentTarget.style.borderColor = `${brandColor}70`;
+                          e.currentTarget.style.boxShadow = `0 0 20px ${brandColor}15`;
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.background = `linear-gradient(135deg, ${brandColor}15, ${brandColor}08)`;
+                          e.currentTarget.style.borderColor = `${brandColor}40`;
+                          e.currentTarget.style.boxShadow = 'none';
+                        }}
+                      >
+                        {reply}
+                      </button>
+                    ))}
                   </div>
                 )}
-                <div
-                  className={`max-w-[85%] md:max-w-[75%] rounded-2xl px-4 py-3 ${
-                    msg.role === "customer"
-                      ? "text-white rounded-br-md"
-                      : "bg-white/[0.07] text-gray-100 border border-white/10 rounded-bl-md"
-                  }`}
-                  style={msg.role === "customer" ? {
-                    background: `linear-gradient(135deg, ${brandColor}, ${brandColor}cc)`,
-                  } : undefined}
-                >
-                  {msg.role === "bot" ? (
-                    <div className="prose prose-sm prose-invert max-w-none [&_p]:my-1 [&_ul]:my-1 [&_li]:my-0.5">
-                      <Streamdown>{msg.content}</Streamdown>
-                    </div>
-                  ) : (
-                    <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
-                  )}
-                </div>
               </div>
             ))}
 
@@ -236,25 +299,29 @@ export default function ChatBot() {
               </div>
             )}
 
-            {/* Quick replies */}
-            {quickReplies.length > 0 && !isLoading && (
-              <div className="flex flex-wrap gap-2 pt-2 animate-fade-in">
-                {quickReplies.map((reply, i) => (
+            {/* Initial quick replies - before first user message */}
+            {initialQuickReplies.length > 0 && (
+              <div className="flex flex-wrap gap-2 pt-2 ml-11 animate-fade-in">
+                {initialQuickReplies.map((reply, i) => (
                   <button
                     key={i}
-                    onClick={() => {
-                      setInput(reply);
-                      setTimeout(() => {
-                        setMessages((prev) => [
-                          ...prev,
-                          { role: "customer", content: reply, createdAt: new Date() },
-                        ]);
-                        setInput("");
-                        setIsLoading(true);
-                        sendMsg.mutate({ sessionId, message: reply });
-                      }, 50);
+                    onClick={() => handleQuickReply(reply)}
+                    className="px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 hover:scale-[1.03] active:scale-[0.97]"
+                    style={{
+                      background: `linear-gradient(135deg, ${brandColor}15, ${brandColor}08)`,
+                      border: `1px solid ${brandColor}40`,
+                      color: brandColor,
                     }}
-                    className="px-3.5 py-2 rounded-xl text-xs font-medium bg-white/[0.06] border border-white/10 text-gray-300 hover:bg-white/[0.1] hover:border-white/20 transition-all"
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = `linear-gradient(135deg, ${brandColor}30, ${brandColor}18)`;
+                      e.currentTarget.style.borderColor = `${brandColor}70`;
+                      e.currentTarget.style.boxShadow = `0 0 20px ${brandColor}15`;
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = `linear-gradient(135deg, ${brandColor}15, ${brandColor}08)`;
+                      e.currentTarget.style.borderColor = `${brandColor}40`;
+                      e.currentTarget.style.boxShadow = 'none';
+                    }}
                   >
                     {reply}
                   </button>
@@ -290,7 +357,7 @@ export default function ChatBot() {
               disabled={isLoading || startConv.isPending}
             />
             <Button
-              onClick={handleSend}
+              onClick={() => handleSend()}
               disabled={!input.trim() || isLoading}
               className="h-[44px] w-[44px] rounded-xl shrink-0"
               style={{ background: `linear-gradient(135deg, ${brandColor}, ${brandColor}cc)` }}

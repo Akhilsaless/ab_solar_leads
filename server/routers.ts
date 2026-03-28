@@ -422,7 +422,24 @@ export const appRouter = router({
           }
         }
 
-        return { response: aiContent };
+        // Parse quick replies from AI response
+        const qrRegex = new RegExp('\\[QUICK_REPLIES\\][\\s\\S]*?\\[/QUICK_REPLIES\\]');
+        const qrContentRegex = new RegExp('\\[QUICK_REPLIES\\]\\s*\\n?([\\s\\S]+?)\\n?\\s*\\[/QUICK_REPLIES\\]');
+        const quickReplyMatch = aiContent.match(qrContentRegex);
+        let quickReplies: string[] = [];
+        let cleanContent = aiContent;
+        
+        if (quickReplyMatch) {
+          try {
+            quickReplies = JSON.parse(quickReplyMatch[1].trim());
+          } catch {
+            quickReplies = [];
+          }
+          // Remove the quick replies block from the displayed message
+          cleanContent = aiContent.replace(qrRegex, '').trim();
+        }
+
+        return { response: cleanContent, quickReplies };
       }),
 
     // Get conversation history
@@ -1006,7 +1023,25 @@ IMPORTANT: When you have enough info (state + monthly bill), calculate and prese
 - Net cost after subsidy
 - Monthly savings
 - Payback period
-- 25-year total savings`;
+- 25-year total savings
+
+QUICK REPLY BUTTONS:
+At the END of EVERY response, you MUST include a JSON block with 2-4 quick reply button options that the customer can tap instead of typing. These should be contextually relevant to what you just asked or said. Format them as:
+
+[QUICK_REPLIES]
+["Option 1", "Option 2", "Option 3"]
+[/QUICK_REPLIES]
+
+Examples by stage:
+- After greeting/asking state: ["Maharashtra", "Karnataka", "Tamil Nadu", "Delhi"]
+- After asking bill amount: ["₹1000-2000", "₹2000-4000", "₹4000-7000", "₹7000+"]
+- After asking about roof: ["Yes, I own the house", "Rented house", "Commercial building"]
+- After giving estimate: ["Sounds great!", "That's expensive", "Tell me about subsidy", "What's the warranty?"]
+- After handling objection: ["I'm interested", "Need to think", "Share my details", "More questions"]
+- When collecting contact: ["Sure, here's my number", "I'll share my email", "Call me later"]
+- After estimate given: ["Book site visit", "Share with family", "Compare with grid", "What's next?"]
+
+ALWAYS include quick replies - they make the conversation faster and easier for the customer. Make buttons short (2-5 words max) and directly relevant to the current conversation stage.`;
 }
 
 // ===== DATA EXTRACTION FROM CONVERSATION =====

@@ -77,3 +77,14 @@
 
 ## Bug Fixes
 - [x] Fix "agency not found" error after login - agency.update now auto-creates agency if not found
+
+## Quick Reply Buttons (COMPLETED)
+- [x] Add quick reply button data structure to chat messages
+- [x] Update AI system prompt to include [QUICK_REPLIES] tags in every response
+- [x] Render quick reply buttons below bot messages in ChatBot UI
+- [x] Handle button taps to send the selected option as user message
+- [x] Context-aware buttons (state, bill, roof, estimate, objection, contact stages)
+- [x] Smooth animations with hover glow effects and brand-colored styling
+- [x] Buttons disappear after customer responds
+- [x] Initial quick replies for first-time visitors
+- [x] Mobile-friendly tappable design
