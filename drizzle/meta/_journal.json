@@ -1,5 +1,34 @@
 {
   "version": "7",
   "dialect": "mysql",
-  "entries": []
+  "entries": [
+    {
+      "idx": 0,
+      "version": "5",
+      "when": 1774673236972,
+      "tag": "0000_wooden_zuras",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "5",
+      "when": 1774673367867,
+      "tag": "0001_dizzy_war_machine",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1774674038418,
+      "tag": "0002_milky_omega_flight",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "5",
+      "when": 1774674071222,
+      "tag": "0003_marvelous_scourge",
+      "breakpoints": true
+    }
+  ]
 }
