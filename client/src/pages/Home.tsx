@@ -1,291 +1,360 @@
-import { useState, useEffect } from "react";
+import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Zap, Sun, DollarSign, TrendingUp, Send, X, MessageCircle } from "lucide-react";
+import { getLoginUrl } from "@/const";
 import { trpc } from "@/lib/trpc";
-import { toast } from "sonner";
+import {
+  BarChart3, Users, Megaphone, FileText, Upload, Search,
+  Shield, Tag, TrendingUp, ArrowUpRight, ArrowDownRight,
+  Zap, Mail, MessageSquare, Phone, Globe
+} from "lucide-react";
+import { useLocation } from "wouter";
+import { motion } from "framer-motion";
+import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
+
+const CHART_COLORS = ["#e8a735", "#4ade80", "#60a5fa", "#f472b6", "#a78bfa"];
 
 export default function Home() {
-  const [visitorId] = useState(() => `visitor-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`);
-  const [showChat, setShowChat] = useState(false);
-  const [conversationId, setConversationId] = useState<number | null>(null);
-  const [messages, setMessages] = useState<Array<{ role: string; content: string }>>([]);
-  const [inputValue, setInputValue] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
+  const { user, loading } = useAuth();
+  const [, setLocation] = useLocation();
 
-  const getOrCreateConversation = trpc.chat.getOrCreate.useMutation();
-  const sendMessage = trpc.chat.sendMessage.useMutation();
-
-  // Initialize chat
-  useEffect(() => {
-    if (showChat && !conversationId) {
-      getOrCreateConversation.mutate({ visitorId }, {
-        onSuccess: (data) => {
-          setConversationId(data.conversation.id);
-          setMessages(data.messages.map((m: any) => ({ role: m.role, content: m.content })));
-          
-          // Send initial greeting
-          if (data.messages.length === 0) {
-            sendInitialGreeting(data.conversation.id);
-          }
-        },
-      });
-    }
-  }, [showChat]);
-
-  const sendInitialGreeting = (convId: number) => {
-    setIsLoading(true);
-    sendMessage.mutate(
-      {
-        conversationId: convId,
-        visitorId,
-        message: "Hi, I'm interested in learning about solar energy for my home.",
-      },
-      {
-        onSuccess: (data) => {
-          setMessages((prev) => [
-            ...prev,
-            { role: "user", content: "Hi, I'm interested in learning about solar energy for my home." },
-            { role: "assistant", content: data.message },
-          ]);
-          setIsLoading(false);
-        },
-      }
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-10 h-10 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+          <p className="text-muted-foreground text-sm">Loading...</p>
+        </div>
+      </div>
     );
-  };
+  }
 
-  const handleSendMessage = () => {
-    if (!inputValue.trim() || !conversationId) return;
+  if (!user) {
+    return <LandingPage />;
+  }
 
-    const userMessage = inputValue;
-    setInputValue("");
-    setIsLoading(true);
+  return <DashboardHome />;
+}
 
-    setMessages((prev) => [...prev, { role: "user", content: userMessage }]);
-
-    sendMessage.mutate(
-      {
-        conversationId,
-        visitorId,
-        message: userMessage,
-      },
-      {
-        onSuccess: (data) => {
-          setMessages((prev) => [...prev, { role: "assistant", content: data.message }]);
-          setIsLoading(false);
-        },
-        onError: () => {
-          toast.error("Failed to send message");
-          setIsLoading(false);
-        },
-      }
-    );
-  };
-
+function LandingPage() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-orange-50">
-      {/* Header */}
-      <header className="border-b border-border bg-white/80 backdrop-blur-sm sticky top-0 z-40">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
+    <div className="min-h-screen bg-background">
+      {/* Nav */}
+      <nav className="fixed top-0 left-0 right-0 z-50 border-b border-border/50 bg-background/80 backdrop-blur-xl">
+        <div className="container flex items-center justify-between h-16">
           <div className="flex items-center gap-2">
-            <Sun className="w-8 h-8 text-orange-500" />
-            <span className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-orange-500 bg-clip-text text-transparent">
-              AB SOLAR
-            </span>
-          </div>
-          <nav className="hidden md:flex items-center gap-8">
-            <a href="#features" className="text-sm font-medium hover:text-primary transition">Features</a>
-            <a href="#benefits" className="text-sm font-medium hover:text-primary transition">Benefits</a>
-            <a href="#faq" className="text-sm font-medium hover:text-primary transition">FAQ</a>
-          </nav>
-        </div>
-      </header>
-
-      {/* Hero Section */}
-      <section className="container mx-auto px-4 py-20 md:py-32">
-        <div className="grid md:grid-cols-2 gap-12 items-center">
-          <div className="space-y-8">
-            <div className="space-y-4">
-              <h1 className="text-5xl md:text-6xl font-bold leading-tight">
-                Go <span className="bg-gradient-to-r from-blue-600 to-orange-500 bg-clip-text text-transparent">Solar</span> Today
-              </h1>
-              <p className="text-xl text-muted-foreground">
-                Join thousands of homeowners saving money with solar energy. Get your personalized quote in minutes and discover how much you can save.
-              </p>
+            <div className="w-8 h-8 rounded-lg solar-gradient flex items-center justify-center">
+              <Zap className="w-4 h-4 text-black" />
             </div>
-
-            <div className="space-y-3">
-              <div className="flex items-center gap-3">
-                <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center">
-                  <Zap className="w-4 h-4 text-blue-600" />
-                </div>
-                <span className="text-lg font-medium">Free solar assessment</span>
-              </div>
-              <div className="flex items-center gap-3">
-                <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center">
-                  <DollarSign className="w-4 h-4 text-blue-600" />
-                </div>
-                <span className="text-lg font-medium">No installation costs</span>
-              </div>
-              <div className="flex items-center gap-3">
-                <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center">
-                  <TrendingUp className="w-4 h-4 text-blue-600" />
-                </div>
-                <span className="text-lg font-medium">Save up to 30% on energy</span>
-              </div>
-            </div>
-
-            <Button
-              onClick={() => setShowChat(true)}
-              size="lg"
-              className="btn-primary gap-2 text-lg h-14 px-8"
-            >
-              <MessageCircle className="w-5 h-5" />
-              Chat with AI Agent
-            </Button>
+            <span className="font-bold text-lg">AB SOLAR</span>
           </div>
-
-          {/* Hero Visual */}
-          <div className="relative">
-            <div className="absolute inset-0 bg-gradient-to-br from-blue-200 to-orange-200 rounded-3xl blur-3xl opacity-30"></div>
-            <Card className="card-elevated p-8 relative backdrop-blur-sm border-2 border-blue-100">
-              <div className="flex flex-col items-center justify-center py-16 space-y-6">
-                <div className="w-24 h-24 rounded-full bg-gradient-to-br from-blue-400 to-orange-400 flex items-center justify-center animate-pulse">
-                  <Sun className="w-12 h-12 text-white" />
-                </div>
-                <h3 className="text-2xl font-bold text-center">Clean Energy For Your Home</h3>
-                <p className="text-center text-muted-foreground">Powered by advanced solar technology</p>
-              </div>
-            </Card>
-          </div>
+          <Button
+            onClick={() => { window.location.href = getLoginUrl(); }}
+            className="solar-gradient text-black font-semibold hover:opacity-90 transition-opacity"
+          >
+            Get Started
+          </Button>
         </div>
-      </section>
+      </nav>
 
-      {/* Features Section */}
-      <section id="features" className="bg-white py-20">
-        <div className="container mx-auto px-4">
-          <h2 className="text-4xl font-bold text-center mb-16">Why Choose AB SOLAR?</h2>
-          <div className="grid md:grid-cols-3 gap-8">
-            {[
-              {
-                icon: Zap,
-                title: "Instant Assessment",
-                description: "Get a personalized solar assessment in minutes using our AI agent",
-              },
-              {
-                icon: DollarSign,
-                title: "Maximum Savings",
-                description: "Save up to 30% on your annual energy costs with solar",
-              },
-              {
-                icon: TrendingUp,
-                title: "Expert Support",
-                description: "Our team guides you through every step of the process",
-              },
-            ].map((feature, idx) => {
-              const Icon = feature.icon;
-              return (
-                <Card key={idx} className="card-elevated p-8">
-                  <Icon className="w-12 h-12 text-orange-500 mb-4" />
-                  <h3 className="text-xl font-bold mb-2">{feature.title}</h3>
-                  <p className="text-muted-foreground">{feature.description}</p>
-                </Card>
-              );
-            })}
-          </div>
-        </div>
-      </section>
-
-      {/* Chat Widget */}
-      {showChat && (
-        <div className="fixed bottom-6 right-6 w-96 h-[600px] bg-white rounded-2xl shadow-2xl border border-border flex flex-col z-50 animate-in fade-in slide-in-from-bottom-4">
-          {/* Chat Header */}
-          <div className="bg-gradient-to-r from-blue-600 to-orange-500 text-white p-4 rounded-t-2xl flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <MessageCircle className="w-5 h-5" />
-              <div>
-                <h3 className="font-bold">AB SOLAR Agent</h3>
-                <p className="text-sm opacity-90">Always here to help</p>
-              </div>
+      {/* Hero */}
+      <section className="pt-32 pb-20 px-4">
+        <div className="container max-w-5xl mx-auto text-center">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6 }}
+          >
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-primary/30 bg-primary/5 text-primary text-sm font-medium mb-6">
+              <Zap className="w-3.5 h-3.5" />
+              AI-Powered Lead Outreach Platform
             </div>
-            <button
-              onClick={() => setShowChat(false)}
-              className="hover:bg-white/20 p-1 rounded transition"
-            >
-              <X className="w-5 h-5" />
-            </button>
-          </div>
-
-          {/* Messages */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-4">
-            {messages.map((msg, idx) => (
-              <div
-                key={idx}
-                className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
+            <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold tracking-tight mb-6">
+              Convert More Solar Leads
+              <br />
+              <span className="text-gradient">With Intelligent Outreach</span>
+            </h1>
+            <p className="text-lg text-muted-foreground max-w-2xl mx-auto mb-10">
+              Import leads, scrape data from public sources, and automate multi-channel
+              outreach via Email, SMS, WhatsApp, and Phone. Built for solar agencies
+              that want to close more deals.
+            </p>
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+              <Button
+                size="lg"
+                onClick={() => { window.location.href = getLoginUrl(); }}
+                className="solar-gradient text-black font-semibold px-8 hover:opacity-90 transition-opacity"
               >
-                <div
-                  className={`max-w-xs px-4 py-2 rounded-lg ${
-                    msg.role === "user"
-                      ? "bg-blue-600 text-white rounded-br-none"
-                      : "bg-gray-100 text-gray-900 rounded-bl-none"
-                  }`}
-                >
-                  <p className="text-sm">{msg.content}</p>
-                </div>
-              </div>
-            ))}
-            {isLoading && (
-              <div className="flex justify-start">
-                <div className="bg-gray-100 px-4 py-2 rounded-lg rounded-bl-none">
-                  <div className="flex gap-2">
-                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: "0.2s" }}></div>
-                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: "0.4s" }}></div>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
+                Start Free Trial
+              </Button>
+              <Button size="lg" variant="outline" className="px-8">
+                Watch Demo
+              </Button>
+            </div>
+          </motion.div>
+        </div>
+      </section>
 
-          {/* Input */}
-          <div className="border-t border-border p-4 rounded-b-2xl flex gap-2">
-            <Input
-              placeholder="Type your message..."
-              value={inputValue}
-              onChange={(e) => setInputValue(e.target.value)}
-              onKeyPress={(e) => e.key === "Enter" && handleSendMessage()}
-              disabled={isLoading}
-              className="flex-1"
-            />
-            <Button
-              onClick={handleSendMessage}
-              disabled={isLoading || !inputValue.trim()}
-              size="sm"
-              className="btn-primary"
-            >
-              <Send className="w-4 h-4" />
-            </Button>
+      {/* Features */}
+      <section className="py-20 border-t border-border/50">
+        <div className="container max-w-6xl mx-auto">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl font-bold mb-4">Everything You Need to Close Solar Deals</h2>
+            <p className="text-muted-foreground max-w-xl mx-auto">
+              A complete lead management and outreach platform designed specifically for solar agencies.
+            </p>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {[
+              { icon: Upload, title: "CSV/Excel Import", desc: "Bulk import leads from spreadsheets with automatic duplicate detection and data validation." },
+              { icon: Globe, title: "Data Scraping", desc: "AI-powered lead generation from public property databases and real estate sources." },
+              { icon: Mail, title: "Email Outreach", desc: "Send personalized email campaigns with dynamic variables and A/B testing." },
+              { icon: MessageSquare, title: "SMS & WhatsApp", desc: "Multi-channel messaging with templates, scheduling, and delivery tracking." },
+              { icon: Phone, title: "Call Tracking", desc: "Log calls, track outcomes, and manage follow-up sequences automatically." },
+              { icon: BarChart3, title: "Analytics & ROI", desc: "Track conversion rates, campaign performance, and return on investment in real-time." },
+            ].map((feature, i) => (
+              <motion.div
+                key={feature.title}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: i * 0.1 }}
+                className="stat-card p-6 group"
+              >
+                <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center mb-4 group-hover:bg-primary/20 transition-colors">
+                  <feature.icon className="w-5 h-5 text-primary" />
+                </div>
+                <h3 className="font-semibold text-lg mb-2">{feature.title}</h3>
+                <p className="text-sm text-muted-foreground leading-relaxed">{feature.desc}</p>
+              </motion.div>
+            ))}
           </div>
         </div>
-      )}
+      </section>
 
-      {/* Floating Chat Button */}
-      {!showChat && (
-        <button
-          onClick={() => setShowChat(true)}
-          className="fixed bottom-6 right-6 w-14 h-14 bg-gradient-to-r from-blue-600 to-orange-500 text-white rounded-full shadow-lg hover:shadow-xl transition-all hover:scale-110 flex items-center justify-center z-40 animate-pulse"
-        >
-          <MessageCircle className="w-6 h-6" />
-        </button>
-      )}
+      {/* CTA */}
+      <section className="py-20 border-t border-border/50">
+        <div className="container max-w-3xl mx-auto text-center">
+          <h2 className="text-3xl font-bold mb-4">Ready to Scale Your Solar Business?</h2>
+          <p className="text-muted-foreground mb-8">
+            Join agencies that are converting 3x more leads with AB SOLAR's intelligent outreach platform.
+          </p>
+          <Button
+            size="lg"
+            onClick={() => { window.location.href = getLoginUrl(); }}
+            className="solar-gradient text-black font-semibold px-10 hover:opacity-90"
+          >
+            Get Started Now
+          </Button>
+        </div>
+      </section>
 
       {/* Footer */}
-      <footer className="bg-gray-900 text-white py-8 mt-20">
-        <div className="container mx-auto px-4 text-center">
-          <p className="text-gray-400">© 2026 AB SOLAR. All rights reserved.</p>
+      <footer className="border-t border-border/50 py-8">
+        <div className="container flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="w-6 h-6 rounded solar-gradient flex items-center justify-center">
+              <Zap className="w-3 h-3 text-black" />
+            </div>
+            <span className="text-sm text-muted-foreground">AB SOLAR</span>
+          </div>
+          <p className="text-xs text-muted-foreground">Built for solar agencies</p>
         </div>
       </footer>
+    </div>
+  );
+}
+
+function DashboardHome() {
+  const stats = trpc.leads.stats.useQuery();
+  const [, setLocation] = useLocation();
+
+  const statusData = stats.data?.byStatus
+    ? Object.entries(stats.data.byStatus).map(([name, value]) => ({ name, value }))
+    : [];
+
+  const sourceData = stats.data?.bySource
+    ? Object.entries(stats.data.bySource).map(([name, value]) => ({ name, value }))
+    : [];
+
+  // Mock trend data for the area chart
+  const trendData = [
+    { month: "Jan", leads: 12 }, { month: "Feb", leads: 19 },
+    { month: "Mar", leads: 28 }, { month: "Apr", leads: 35 },
+    { month: "May", leads: 42 }, { month: "Jun", leads: 58 },
+  ];
+
+  const total = stats.data?.total || 0;
+  const converted = stats.data?.byStatus?.converted || 0;
+  const conversionRate = total > 0 ? ((converted / total) * 100).toFixed(1) : "0";
+
+  return (
+    <div className="space-y-6 animate-fade-in">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold">Dashboard</h1>
+          <p className="text-muted-foreground text-sm mt-1">Overview of your lead generation performance</p>
+        </div>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={() => setLocation("/leads/import")}>
+            <Upload className="w-4 h-4 mr-2" /> Import
+          </Button>
+          <Button size="sm" className="solar-gradient text-black" onClick={() => setLocation("/leads")}>
+            <Users className="w-4 h-4 mr-2" /> View Leads
+          </Button>
+        </div>
+      </div>
+
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <StatCard
+          title="Total Leads"
+          value={total.toString()}
+          icon={Users}
+          trend="+12%"
+          trendUp={true}
+        />
+        <StatCard
+          title="Conversion Rate"
+          value={`${conversionRate}%`}
+          icon={TrendingUp}
+          trend="+3.2%"
+          trendUp={true}
+        />
+        <StatCard
+          title="Qualified"
+          value={(stats.data?.byStatus?.qualified || 0).toString()}
+          icon={Shield}
+          trend="+8%"
+          trendUp={true}
+        />
+        <StatCard
+          title="New This Week"
+          value={(stats.data?.byStatus?.new || 0).toString()}
+          icon={Zap}
+          trend="+15%"
+          trendUp={true}
+        />
+      </div>
+
+      {/* Charts Row */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        {/* Lead Trend Chart */}
+        <div className="lg:col-span-2 stat-card">
+          <h3 className="font-semibold mb-4">Lead Growth Trend</h3>
+          <div className="h-[240px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={trendData}>
+                <defs>
+                  <linearGradient id="colorLeads" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#e8a735" stopOpacity={0.3} />
+                    <stop offset="95%" stopColor="#e8a735" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <XAxis dataKey="month" stroke="#555" fontSize={12} tickLine={false} axisLine={false} />
+                <YAxis stroke="#555" fontSize={12} tickLine={false} axisLine={false} />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: "oklch(0.155 0.005 260)",
+                    border: "1px solid oklch(0.24 0.005 260)",
+                    borderRadius: "8px",
+                    color: "#fff",
+                  }}
+                />
+                <Area type="monotone" dataKey="leads" stroke="#e8a735" fill="url(#colorLeads)" strokeWidth={2} />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        {/* Status Distribution */}
+        <div className="stat-card">
+          <h3 className="font-semibold mb-4">Lead Status</h3>
+          {statusData.length > 0 ? (
+            <div className="h-[200px] flex items-center justify-center">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={statusData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={50}
+                    outerRadius={80}
+                    dataKey="value"
+                    paddingAngle={3}
+                  >
+                    {statusData.map((_, i) => (
+                      <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: "oklch(0.155 0.005 260)",
+                      border: "1px solid oklch(0.24 0.005 260)",
+                      borderRadius: "8px",
+                      color: "#fff",
+                    }}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          ) : (
+            <div className="h-[200px] flex items-center justify-center text-muted-foreground text-sm">
+              No lead data yet
+            </div>
+          )}
+          <div className="flex flex-wrap gap-2 mt-2">
+            {statusData.map((item, i) => (
+              <div key={item.name} className="flex items-center gap-1.5 text-xs">
+                <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: CHART_COLORS[i % CHART_COLORS.length] }} />
+                <span className="text-muted-foreground capitalize">{item.name}: {item.value}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Quick Actions */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {[
+          { icon: Upload, title: "Import Leads", desc: "Upload CSV/Excel files", path: "/leads/import", color: "text-blue-400" },
+          { icon: Search, title: "Scrape Data", desc: "Find leads from sources", path: "/scrape", color: "text-green-400" },
+          { icon: Megaphone, title: "New Campaign", desc: "Create outreach campaign", path: "/campaigns/new", color: "text-purple-400" },
+          { icon: FileText, title: "Templates", desc: "Manage message templates", path: "/templates", color: "text-orange-400" },
+        ].map((action) => (
+          <button
+            key={action.title}
+            onClick={() => setLocation(action.path)}
+            className="stat-card text-left group cursor-pointer"
+          >
+            <action.icon className={`w-5 h-5 ${action.color} mb-3`} />
+            <h4 className="font-medium text-sm">{action.title}</h4>
+            <p className="text-xs text-muted-foreground mt-1">{action.desc}</p>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function StatCard({ title, value, icon: Icon, trend, trendUp }: {
+  title: string;
+  value: string;
+  icon: any;
+  trend: string;
+  trendUp: boolean;
+}) {
+  return (
+    <div className="stat-card">
+      <div className="flex items-center justify-between mb-3">
+        <span className="text-sm text-muted-foreground">{title}</span>
+        <Icon className="w-4 h-4 text-muted-foreground" />
+      </div>
+      <div className="flex items-end gap-2">
+        <span className="text-2xl font-bold">{value}</span>
+        <span className={`text-xs font-medium flex items-center gap-0.5 mb-1 ${trendUp ? "text-green-400" : "text-red-400"}`}>
+          {trendUp ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
+          {trend}
+        </span>
+      </div>
     </div>
   );
 }
