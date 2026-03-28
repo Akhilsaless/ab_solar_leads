@@ -91,7 +91,26 @@ export const appRouter = router({
       .mutation(async ({ input, ctx }) => {
         if (!ctx.user) throw new Error("Not authenticated");
         const agency = await db.getAgencyByUserId(ctx.user.id);
-        if (!agency) throw new Error("Agency not found");
+        if (!agency) {
+          // Auto-create agency if it doesn't exist yet
+          const slug = (input.agencyName || ctx.user.name || "agency")
+            .toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+          const id = await db.createAgency({
+            userId: ctx.user.id,
+            agencyName: input.agencyName || ctx.user.name || "My Agency",
+            agencySlug: slug + "-" + Date.now().toString(36),
+            phone: input.phone,
+            email: input.email || ctx.user.email || "",
+            city: input.city,
+            state: input.state,
+            brandColor: input.brandColor,
+            botGreeting: input.botGreeting,
+            botTone: input.botTone,
+            installationChargePerKw: input.installationChargePerKw,
+            marginPercent: input.marginPercent,
+          });
+          return { success: true, created: true, id };
+        }
         await db.updateAgency(agency.id, input);
         return { success: true };
       }),

@@ -74,3 +74,6 @@
 - [x] Subscription management in agency settings
 - [x] Trial expiry handling and upgrade prompts
 - [x] Stripe webhook handler for payment events
+
+## Bug Fixes
+- [x] Fix "agency not found" error after login - agency.update now auto-creates agency if not found

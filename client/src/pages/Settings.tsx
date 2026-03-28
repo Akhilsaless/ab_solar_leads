@@ -9,8 +9,12 @@ import { toast } from "sonner";
 export default function Settings() {
   const { user } = useAuth();
   const { data: agency, isLoading } = trpc.agency.get.useQuery();
+  const utils = trpc.useUtils();
   const updateAgency = trpc.agency.update.useMutation({
-    onSuccess: () => toast.success("Settings saved!"),
+    onSuccess: () => {
+      toast.success("Settings saved!");
+      utils.agency.get.invalidate();
+    },
     onError: (err: any) => toast.error(err.message),
   });
 
