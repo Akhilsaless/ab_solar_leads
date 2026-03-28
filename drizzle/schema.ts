@@ -323,3 +323,57 @@ export const dncList = mysqlTable("dncList2", {
 });
 
 export type DncEntry = typeof dncList.$inferSelect;
+
+/**
+ * Subscriptions - agency subscription tracking (Stripe-backed)
+ */
+export const subscriptions = mysqlTable("subscriptions", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  agencyId: int("agencyId"),
+  stripeCustomerId: varchar("stripeCustomerId", { length: 255 }),
+  stripeSubscriptionId: varchar("stripeSubscriptionId", { length: 255 }),
+  plan: mysqlEnum("plan", ["starter", "professional", "enterprise"]).notNull(),
+  billingCycle: mysqlEnum("billingCycle", ["monthly", "yearly"]).default("monthly").notNull(),
+  status: mysqlEnum("status", ["trialing", "active", "past_due", "canceled", "expired"]).default("trialing").notNull(),
+  trialEndsAt: timestamp("trialEndsAt"),
+  currentPeriodStart: timestamp("currentPeriodStart"),
+  currentPeriodEnd: timestamp("currentPeriodEnd"),
+  cancelAtPeriodEnd: boolean("cancelAtPeriodEnd").default(false),
+  conversationsUsed: int("conversationsUsed").default(0),
+  scrapesUsed: int("scrapesUsed").default(0),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type Subscription = typeof subscriptions.$inferSelect;
+
+/**
+ * Scraped businesses - results from Google Maps / directory scraping
+ */
+export const scrapedBusinesses = mysqlTable("scrapedBusinesses", {
+  id: int("id").autoincrement().primaryKey(),
+  agencyId: int("agencyId").notNull(),
+  scrapeJobId: int("scrapeJobId"),
+  businessName: varchar("businessName", { length: 300 }).notNull(),
+  businessType: varchar("businessType", { length: 100 }),
+  businessSize: mysqlEnum("businessSize", ["small", "medium", "large"]).default("medium"),
+  ownerName: varchar("ownerName", { length: 200 }),
+  phone: varchar("phone", { length: 50 }),
+  email: varchar("email", { length: 320 }),
+  website: text("website"),
+  address: text("address"),
+  city: varchar("city", { length: 100 }),
+  state: varchar("state", { length: 100 }),
+  pincode: varchar("pincode", { length: 10 }),
+  latitude: varchar("latitude", { length: 20 }),
+  longitude: varchar("longitude", { length: 20 }),
+  rating: decimal("rating", { precision: 3, scale: 1 }),
+  reviewCount: int("reviewCount"),
+  placeId: varchar("placeId", { length: 200 }),
+  source: varchar("source", { length: 50 }).default("google_maps"),
+  isImported: boolean("isImported").default(false),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type ScrapedBusiness = typeof scrapedBusinesses.$inferSelect;

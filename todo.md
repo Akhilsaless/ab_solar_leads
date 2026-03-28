@@ -52,3 +52,25 @@
 - [x] Subsidy lookup tests (state-wise calculations)
 - [x] Lead scoring and extraction tests
 - [x] Message personalization tests
+
+## Business Scraper (NEW)
+- [x] Google Maps Places API integration for business search
+- [x] Search by business type (factories, hotels, hospitals, schools, warehouses, offices, malls, cold storage, etc.)
+- [x] Search by location (city/district/state)
+- [x] Categorize businesses by size (Large, Medium, Small)
+- [x] Extract owner/contact details when available
+- [x] Auto-add scraped businesses as leads
+- [x] Scraper UI with business type dropdown, location input, size filter
+- [x] Results table with business name, type, size, owner, phone, address
+- [x] Bulk import scraped results to leads
+- [x] Scraper & subscription tests (31 tests)
+
+## Subscription System (NEW)
+- [x] Subscription plans table (Free Trial 3 days, Starter, Professional, Enterprise)
+- [x] Stripe payment integration for INR billing
+- [x] Pricing page with plan comparison and yearly/monthly toggle
+- [x] Agency subscription status tracking
+- [x] Feature gating based on subscription tier
+- [x] Subscription management in agency settings
+- [x] Trial expiry handling and upgrade prompts
+- [x] Stripe webhook handler for payment events

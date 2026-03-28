@@ -23,7 +23,7 @@ import { getLoginUrl } from "@/const";
 import { useIsMobile } from "@/hooks/useMobile";
 import {
   LayoutDashboard, Users, MessageSquare, Sun, BarChart3,
-  MapPin, Settings, LogOut, PanelLeft, Zap, BookOpen
+  MapPin, Settings, LogOut, PanelLeft, Zap, BookOpen, Search, CreditCard
 } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
@@ -34,9 +34,11 @@ const menuItems = [
   { icon: LayoutDashboard, label: "Dashboard", path: "/" },
   { icon: MessageSquare, label: "Conversations", path: "/conversations" },
   { icon: Users, label: "Leads", path: "/leads" },
+  { icon: Search, label: "Business Scraper", path: "/scraper" },
   { icon: Sun, label: "Products", path: "/products" },
   { icon: BookOpen, label: "Subsidies", path: "/subsidies" },
   { icon: BarChart3, label: "Analytics", path: "/analytics" },
+  { icon: CreditCard, label: "Pricing & Plans", path: "/pricing" },
   { icon: Settings, label: "Settings", path: "/settings" },
 ];
 

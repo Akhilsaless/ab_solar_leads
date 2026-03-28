@@ -4,7 +4,7 @@ import {
   InsertUser, users, agencyConfig, panelProducts, inverterProducts,
   conversations, chatMsgs, stateSubsidies, leads, leadActivity,
   campaigns, messageTemplates, outreachMessages, campaignSteps,
-  scrapeJobs, tags, dncList
+  scrapeJobs, tags, dncList, subscriptions, scrapedBusinesses
 } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
@@ -318,4 +318,114 @@ export async function addLeadActivity(data: typeof leadActivity.$inferInsert) {
   const db = await getDb();
   if (!db) return;
   await db.insert(leadActivity).values(data);
+}
+
+// ==================== SUBSCRIPTIONS ====================
+
+export async function getSubscriptionByUserId(userId: number) {
+  const db = await getDb();
+  if (!db) return null;
+  const result = await db.select().from(subscriptions).where(eq(subscriptions.userId, userId)).limit(1);
+  return result[0] || null;
+}
+
+export async function getSubscriptionByAgencyId(agencyId: number) {
+  const db = await getDb();
+  if (!db) return null;
+  const result = await db.select().from(subscriptions).where(eq(subscriptions.agencyId, agencyId)).limit(1);
+  return result[0] || null;
+}
+
+export async function createSubscription(data: {
+  userId: number; agencyId?: number; plan: "starter" | "professional" | "enterprise";
+  billingCycle?: "monthly" | "yearly"; status?: string;
+  stripeCustomerId?: string; stripeSubscriptionId?: string;
+  trialEndsAt?: Date; currentPeriodStart?: Date; currentPeriodEnd?: Date;
+}) {
+  const db = await getDb();
+  if (!db) return null;
+  const result = await db.insert(subscriptions).values(data as any);
+  return result[0].insertId;
+}
+
+export async function updateSubscription(id: number, data: Partial<typeof subscriptions.$inferInsert>) {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(subscriptions).set(data).where(eq(subscriptions.id, id));
+}
+
+export async function updateSubscriptionByStripeId(stripeSubId: string, data: Partial<typeof subscriptions.$inferInsert>) {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(subscriptions).set(data).where(eq(subscriptions.stripeSubscriptionId, stripeSubId));
+}
+
+export async function incrementUsage(userId: number, field: "conversationsUsed" | "scrapesUsed") {
+  const db = await getDb();
+  if (!db) return;
+  if (field === "conversationsUsed") {
+    await db.execute(sql`UPDATE subscriptions SET conversationsUsed = conversationsUsed + 1 WHERE userId = ${userId}`);
+  } else {
+    await db.execute(sql`UPDATE subscriptions SET scrapesUsed = scrapesUsed + 1 WHERE userId = ${userId}`);
+  }
+}
+
+// ==================== SCRAPED BUSINESSES ====================
+
+export async function createScrapedBusiness(data: typeof scrapedBusinesses.$inferInsert) {
+  const db = await getDb();
+  if (!db) return null;
+  const result = await db.insert(scrapedBusinesses).values(data);
+  return result[0].insertId;
+}
+
+export async function createScrapedBusinessesBulk(dataArr: Array<typeof scrapedBusinesses.$inferInsert>) {
+  const db = await getDb();
+  if (!db) return 0;
+  if (dataArr.length === 0) return 0;
+  await db.insert(scrapedBusinesses).values(dataArr);
+  return dataArr.length;
+}
+
+export async function getScrapedBusinessesByAgency(agencyId: number, filters?: { businessType?: string; businessSize?: string; city?: string; state?: string; }) {
+  const db = await getDb();
+  if (!db) return [];
+  const conditions = [eq(scrapedBusinesses.agencyId, agencyId)];
+  if (filters?.businessType) conditions.push(eq(scrapedBusinesses.businessType, filters.businessType));
+  if (filters?.businessSize) conditions.push(eq(scrapedBusinesses.businessSize, filters.businessSize as any));
+  if (filters?.city) conditions.push(like(scrapedBusinesses.city, `%${filters.city}%`));
+  if (filters?.state) conditions.push(like(scrapedBusinesses.state, `%${filters.state}%`));
+  return db.select().from(scrapedBusinesses).where(and(...conditions)).orderBy(desc(scrapedBusinesses.createdAt)).limit(500);
+}
+
+export async function getScrapedBusinessById(id: number) {
+  const db = await getDb();
+  if (!db) return null;
+  const result = await db.select().from(scrapedBusinesses).where(eq(scrapedBusinesses.id, id)).limit(1);
+  return result[0] || null;
+}
+
+export async function markBusinessImported(id: number) {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(scrapedBusinesses).set({ isImported: true }).where(eq(scrapedBusinesses.id, id));
+}
+
+export async function createScrapeJob(data: { source: string; query?: string; createdBy?: number; }) {
+  const db = await getDb();
+  if (!db) return null;
+  const result = await db.insert(scrapeJobs).values(data as any);
+  return result[0].insertId;
+}
+
+export async function updateScrapeJob(id: number, data: Partial<typeof scrapeJobs.$inferInsert>) {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(scrapeJobs).set(data).where(eq(scrapeJobs.id, id));
+}
+
+export async function getScrapeJobsByAgency(userId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(scrapeJobs).where(eq(scrapeJobs.createdBy, userId)).orderBy(desc(scrapeJobs.createdAt)).limit(50);
 }

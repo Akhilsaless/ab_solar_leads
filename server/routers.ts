@@ -5,6 +5,9 @@ import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
 import { z } from "zod";
 import { invokeLLM } from "./_core/llm";
 import { notifyOwner } from "./_core/notification";
+import { makeRequest, PlacesSearchResult, PlaceDetailsResult } from "./_core/map";
+import { getStripe } from "./stripe-handler";
+import { PLANS, TRIAL_DAYS } from "./stripe-products";
 import * as db from "./db";
 
 export const appRouter = router({
@@ -527,6 +530,248 @@ export const appRouter = router({
         return estimate;
       }),
   }),
+
+  // ===== SUBSCRIPTION & BILLING =====
+  subscription: router({
+    current: protectedProcedure.query(async ({ ctx }) => {
+      if (!ctx.user) return null;
+      const sub = await db.getSubscriptionByUserId(ctx.user.id);
+      if (!sub) return null;
+      const planDetails = PLANS[sub.plan as keyof typeof PLANS];
+      return { ...sub, planDetails };
+    }),
+
+    plans: publicProcedure.query(() => {
+      return Object.entries(PLANS).map(([key, plan]) => ({
+        key,
+        ...plan,
+      }));
+    }),
+
+    startTrial: protectedProcedure
+      .input(z.object({ plan: z.enum(["starter", "professional", "enterprise"]) }))
+      .mutation(async ({ input, ctx }) => {
+        if (!ctx.user) throw new Error("Not authenticated");
+        const existing = await db.getSubscriptionByUserId(ctx.user.id);
+        if (existing) throw new Error("Already have a subscription");
+        const agency = await db.getAgencyByUserId(ctx.user.id);
+        const trialEnd = new Date();
+        trialEnd.setDate(trialEnd.getDate() + TRIAL_DAYS);
+        const id = await db.createSubscription({
+          userId: ctx.user.id,
+          agencyId: agency?.id,
+          plan: input.plan,
+          status: "trialing",
+          trialEndsAt: trialEnd,
+          currentPeriodStart: new Date(),
+          currentPeriodEnd: trialEnd,
+        });
+        return { success: true, id, trialEndsAt: trialEnd };
+      }),
+
+    createCheckout: protectedProcedure
+      .input(z.object({
+        plan: z.enum(["starter", "professional", "enterprise"]),
+        billingCycle: z.enum(["monthly", "yearly"]),
+        origin: z.string(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        if (!ctx.user) throw new Error("Not authenticated");
+        const stripeClient = getStripe();
+        if (!stripeClient) throw new Error("Stripe not configured");
+        const planData = PLANS[input.plan];
+        const amount = input.billingCycle === "monthly" ? planData.priceMonthly : planData.priceYearly;
+        const session = await stripeClient.checkout.sessions.create({
+          mode: "subscription",
+          payment_method_types: ["card"],
+          customer_email: ctx.user.email || undefined,
+          client_reference_id: ctx.user.id.toString(),
+          metadata: {
+            user_id: ctx.user.id.toString(),
+            plan: input.plan,
+            billing_cycle: input.billingCycle,
+            customer_email: ctx.user.email || "",
+            customer_name: ctx.user.name || "",
+          },
+          line_items: [{
+            price_data: {
+              currency: "inr",
+              product_data: {
+                name: `AB SOLAR ${planData.name} Plan`,
+                description: planData.description,
+              },
+              unit_amount: amount * 100,
+              recurring: {
+                interval: input.billingCycle === "monthly" ? "month" : "year",
+              },
+            },
+            quantity: 1,
+          }],
+          allow_promotion_codes: true,
+          success_url: `${input.origin}/settings?payment=success`,
+          cancel_url: `${input.origin}/pricing?payment=canceled`,
+        });
+        return { url: session.url };
+      }),
+  }),
+
+  // ===== BUSINESS SCRAPER =====
+  scraper: router({
+    search: protectedProcedure
+      .input(z.object({
+        businessType: z.string(),
+        location: z.string(),
+        state: z.string().optional(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        if (!ctx.user) throw new Error("Not authenticated");
+        const agency = await db.getAgencyByUserId(ctx.user.id);
+        if (!agency) throw new Error("Agency not found");
+
+        // Create a scrape job
+        const jobId = await db.createScrapeJob({
+          source: "google_maps",
+          query: `${input.businessType} in ${input.location}${input.state ? `, ${input.state}` : ""}`,
+          createdBy: ctx.user.id,
+        });
+
+        try {
+          // Search Google Maps for businesses
+          const query = `${input.businessType} in ${input.location}${input.state ? `, ${input.state}` : ""}${input.state ? ", India" : ", India"}`;
+          const searchResult = await makeRequest<PlacesSearchResult>(
+            "/maps/api/place/textsearch/json",
+            { query, region: "in" }
+          );
+
+          if (!searchResult.results || searchResult.results.length === 0) {
+            if (jobId) await db.updateScrapeJob(jobId, { status: "completed" as any, totalFound: 0, completedAt: new Date() });
+            return { businesses: [], total: 0, jobId };
+          }
+
+          const businesses: any[] = [];
+
+          // Get details for each result (up to 20)
+          for (const place of searchResult.results.slice(0, 20)) {
+            try {
+              const details = await makeRequest<PlaceDetailsResult>(
+                "/maps/api/place/details/json",
+                { place_id: place.place_id, fields: "name,formatted_address,formatted_phone_number,international_phone_number,website,rating,user_ratings_total,geometry,types" }
+              );
+
+              const d = details.result as any;
+              const businessSize = classifyBusinessSize(d.user_ratings_total || 0, d.types || []);
+
+              const biz = {
+                agencyId: agency.id,
+                scrapeJobId: jobId,
+                businessName: d.name || place.name,
+                businessType: input.businessType,
+                businessSize,
+                phone: d.formatted_phone_number || d.international_phone_number || null,
+                website: d.website || null,
+                address: d.formatted_address || place.formatted_address,
+                city: extractCity(d.formatted_address || place.formatted_address),
+                state: input.state || extractState(d.formatted_address || place.formatted_address),
+                latitude: d.geometry?.location?.lat?.toString() || place.geometry?.location?.lat?.toString(),
+                longitude: d.geometry?.location?.lng?.toString() || place.geometry?.location?.lng?.toString(),
+                rating: d.rating?.toString() || null,
+                reviewCount: d.user_ratings_total || 0,
+                placeId: place.place_id,
+                source: "google_maps",
+              };
+
+              businesses.push(biz);
+            } catch (e) {
+              // Skip failed detail lookups
+              businesses.push({
+                agencyId: agency.id,
+                scrapeJobId: jobId,
+                businessName: place.name,
+                businessType: input.businessType,
+                businessSize: "medium",
+                address: place.formatted_address,
+                city: extractCity(place.formatted_address),
+                state: input.state || extractState(place.formatted_address),
+                latitude: place.geometry?.location?.lat?.toString(),
+                longitude: place.geometry?.location?.lng?.toString(),
+                rating: place.rating?.toString() || null,
+                reviewCount: place.user_ratings_total || 0,
+                placeId: place.place_id,
+                source: "google_maps",
+              });
+            }
+          }
+
+          // Bulk insert
+          if (businesses.length > 0) {
+            await db.createScrapedBusinessesBulk(businesses as any);
+          }
+
+          if (jobId) {
+            await db.updateScrapeJob(jobId, {
+              status: "completed" as any,
+              totalFound: businesses.length,
+              totalImported: businesses.length,
+              completedAt: new Date(),
+            });
+          }
+
+          return { businesses, total: businesses.length, jobId };
+        } catch (err: any) {
+          if (jobId) {
+            await db.updateScrapeJob(jobId, {
+              status: "failed" as any,
+              errorMessage: err.message,
+              completedAt: new Date(),
+            });
+          }
+          throw new Error(`Scraping failed: ${err.message}`);
+        }
+      }),
+
+    results: protectedProcedure
+      .input(z.object({
+        businessType: z.string().optional(),
+        businessSize: z.string().optional(),
+        city: z.string().optional(),
+        state: z.string().optional(),
+      }).optional())
+      .query(async ({ input, ctx }) => {
+        if (!ctx.user) return [];
+        const agency = await db.getAgencyByUserId(ctx.user.id);
+        if (!agency) return [];
+        return await db.getScrapedBusinessesByAgency(agency.id, input || {});
+      }),
+
+    importAsLead: protectedProcedure
+      .input(z.object({ businessId: z.number() }))
+      .mutation(async ({ input, ctx }) => {
+        if (!ctx.user) throw new Error("Not authenticated");
+        const biz = await db.getScrapedBusinessById(input.businessId);
+        if (!biz) throw new Error("Business not found");
+
+        // Create a lead from the scraped business
+        const leadId = await db.createLeadFromConversation({
+          firstName: biz.ownerName?.split(" ")[0] || biz.businessName,
+          lastName: biz.ownerName?.split(" ").slice(1).join(" ") || "",
+          phone: biz.phone || undefined,
+          email: biz.email || undefined,
+          city: biz.city || undefined,
+          state: biz.state || undefined,
+          propertyAddress: biz.address || undefined,
+          source: "scraper",
+          notes: `Scraped from Google Maps. Business: ${biz.businessName} (${biz.businessType}). Size: ${biz.businessSize}. Rating: ${biz.rating}/5 (${biz.reviewCount} reviews).`,
+        });
+
+        await db.markBusinessImported(input.businessId);
+        return { success: true, leadId };
+      }),
+
+    jobs: protectedProcedure.query(async ({ ctx }) => {
+      if (!ctx.user) return [];
+      return await db.getScrapeJobsByAgency(ctx.user.id);
+    }),
+  }),
 });
 
 export type AppRouter = typeof appRouter;
@@ -818,4 +1063,50 @@ function getPriority(score: number): "low" | "medium" | "high" | "urgent" {
   if (score >= 60) return "high";
   if (score >= 40) return "medium";
   return "low";
+}
+
+// ===== BUSINESS SCRAPER HELPERS =====
+function extractCity(address: string): string {
+  if (!address) return "";
+  // Indian addresses typically have city before state
+  const parts = address.split(",").map(p => p.trim());
+  // Try to find city (usually 2nd or 3rd from end)
+  if (parts.length >= 3) return parts[parts.length - 3];
+  if (parts.length >= 2) return parts[parts.length - 2];
+  return parts[0] || "";
+}
+
+function extractState(address: string): string {
+  if (!address) return "";
+  const parts = address.split(",").map(p => p.trim());
+  // State is typically 2nd from end (before country/pincode)
+  const INDIAN_STATES = [
+    "Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chhattisgarh",
+    "Goa", "Gujarat", "Haryana", "Himachal Pradesh", "Jharkhand",
+    "Karnataka", "Kerala", "Madhya Pradesh", "Maharashtra", "Manipur",
+    "Meghalaya", "Mizoram", "Nagaland", "Odisha", "Punjab",
+    "Rajasthan", "Sikkim", "Tamil Nadu", "Telangana", "Tripura",
+    "Uttar Pradesh", "Uttarakhand", "West Bengal", "Delhi",
+    "Chandigarh", "Puducherry", "Jammu and Kashmir", "Ladakh",
+  ];
+  for (const part of parts) {
+    for (const state of INDIAN_STATES) {
+      if (part.toLowerCase().includes(state.toLowerCase())) return state;
+    }
+  }
+  if (parts.length >= 2) return parts[parts.length - 2];
+  return "";
+}
+
+function classifyBusinessSize(reviewCount: number, types: string[]): "small" | "medium" | "large" {
+  // Large businesses: hospitals, malls, factories, universities
+  const largeTypes = ["hospital", "university", "shopping_mall", "department_store", "stadium", "airport"];
+  const mediumTypes = ["hotel", "school", "gym", "restaurant", "supermarket", "warehouse"];
+  
+  if (types.some(t => largeTypes.some(lt => t.includes(lt)))) return "large";
+  if (types.some(t => mediumTypes.some(mt => t.includes(mt)))) return "medium";
+  
+  if (reviewCount > 500) return "large";
+  if (reviewCount > 100) return "medium";
+  return "small";
 }

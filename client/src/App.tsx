@@ -10,6 +10,8 @@ import Analytics from "@/pages/Analytics";
 import Subsidies from "@/pages/Subsidies";
 import Settings from "@/pages/Settings";
 import ChatBot from "@/pages/ChatBot";
+import BusinessScraper from "@/pages/BusinessScraper";
+import Pricing from "@/pages/Pricing";
 import DashboardLayout from "@/components/DashboardLayout";
 import { Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
@@ -26,7 +28,9 @@ function AuthenticatedRoutes() {
         <Route path="/conversations/:id" component={ConversationDetail} />
         <Route path="/products" component={Products} />
         <Route path="/analytics" component={Analytics} />
+        <Route path="/scraper" component={BusinessScraper} />
         <Route path="/subsidies" component={Subsidies} />
+        <Route path="/pricing" component={Pricing} />
         <Route path="/settings" component={Settings} />
         <Route component={NotFound} />
       </Switch>
@@ -41,6 +45,9 @@ function Router() {
     <Switch>
       {/* Public chat route - accessible without login */}
       <Route path="/chat/:slug" component={ChatBot} />
+
+      {/* Public pricing page */}
+      <Route path="/pricing" component={Pricing} />
 
       {/* Everything else */}
       <Route>
