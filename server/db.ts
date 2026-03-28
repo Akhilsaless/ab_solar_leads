@@ -1,6 +1,6 @@
-import { eq } from "drizzle-orm";
+import { eq, desc, and, gte, lte, like, inArray } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, users } from "../drizzle/schema";
+import { InsertUser, users, leads, leadNotes, leadTimeline, followUpEmails, serviceCoverageAreas } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -89,4 +89,188 @@ export async function getUserByOpenId(openId: string) {
   return result.length > 0 ? result[0] : undefined;
 }
 
-// TODO: add feature queries here as your schema grows.
+// Lead queries
+export async function createLead(data: typeof leads.$inferInsert) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  const result = await db.insert(leads).values(data);
+  return result;
+}
+
+export async function getLeadById(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  const result = await db.select().from(leads).where(eq(leads.id, id)).limit(1);
+  return result[0];
+}
+
+export async function getLeads(filters?: {
+  status?: string;
+  priority?: string;
+  source?: string;
+  search?: string;
+  limit?: number;
+  offset?: number;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  const conditions = [];
+  
+  if (filters?.status) {
+    conditions.push(eq(leads.status, filters.status as any));
+  }
+  if (filters?.priority) {
+    conditions.push(eq(leads.priority, filters.priority as any));
+  }
+  if (filters?.source) {
+    conditions.push(eq(leads.source, filters.source));
+  }
+  if (filters?.search) {
+    conditions.push(
+      like(leads.firstName, `%${filters.search}%`)
+    );
+  }
+  
+  let query: any = db.select().from(leads);
+  
+  if (conditions.length > 0) {
+    query = query.where(and(...conditions));
+  }
+  
+  query = query.orderBy(desc(leads.createdAt));
+  
+  if (filters?.limit) {
+    query = query.limit(filters.limit);
+  }
+  if (filters?.offset) {
+    query = query.offset(filters.offset);
+  }
+  
+  return query.execute();
+}
+
+export async function updateLead(id: number, data: Partial<typeof leads.$inferInsert>) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  return db.update(leads).set({
+    ...data,
+    updatedAt: new Date(),
+  }).where(eq(leads.id, id));
+}
+
+export async function getLeadStats() {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  const result = await db.select().from(leads);
+  
+  const stats = {
+    total: result.length,
+    byStatus: {
+      new: result.filter(l => l.status === 'new').length,
+      contacted: result.filter(l => l.status === 'contacted').length,
+      qualified: result.filter(l => l.status === 'qualified').length,
+      converted: result.filter(l => l.status === 'converted').length,
+      rejected: result.filter(l => l.status === 'rejected').length,
+    },
+    byPriority: {
+      low: result.filter(l => l.priority === 'low').length,
+      medium: result.filter(l => l.priority === 'medium').length,
+      high: result.filter(l => l.priority === 'high').length,
+    },
+    totalSavings: result.reduce((sum, l) => sum + (Number(l.estimatedSavings) || 0), 0),
+    avgScore: Math.round(result.reduce((sum, l) => sum + (l.leadScore || 0), 0) / result.length),
+  };
+  
+  return stats;
+}
+
+// Lead Notes queries
+export async function addLeadNote(leadId: number, userId: number, content: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  return db.insert(leadNotes).values({ leadId, userId, content });
+}
+
+export async function getLeadNotes(leadId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  return db.select().from(leadNotes)
+    .where(eq(leadNotes.leadId, leadId))
+    .orderBy(desc(leadNotes.createdAt));
+}
+
+// Lead Timeline queries
+export async function addTimelineEvent(data: typeof leadTimeline.$inferInsert) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  return db.insert(leadTimeline).values(data);
+}
+
+export async function getLeadTimeline(leadId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  return db.select().from(leadTimeline)
+    .where(eq(leadTimeline.leadId, leadId))
+    .orderBy(desc(leadTimeline.createdAt));
+}
+
+// Follow-up Email queries
+export async function createFollowUpEmail(data: typeof followUpEmails.$inferInsert) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  return db.insert(followUpEmails).values(data);
+}
+
+export async function getScheduledEmails() {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  return db.select().from(followUpEmails)
+    .where(eq(followUpEmails.status, 'scheduled' as any))
+    .orderBy(followUpEmails.scheduledAt);
+}
+
+export async function updateFollowUpEmail(id: number, data: Partial<typeof followUpEmails.$inferInsert>) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  return db.update(followUpEmails).set({
+    ...data,
+    updatedAt: new Date(),
+  }).where(eq(followUpEmails.id, id));
+}
+
+export async function getLeadFollowUps(leadId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  return db.select().from(followUpEmails)
+    .where(eq(followUpEmails.leadId, leadId))
+    .orderBy(desc(followUpEmails.createdAt));
+}
+
+// Service Coverage Area queries
+export async function getServiceCoverageAreas() {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  return db.select().from(serviceCoverageAreas)
+    .where(eq(serviceCoverageAreas.isActive, true));
+}
+
+export async function addServiceCoverageArea(data: typeof serviceCoverageAreas.$inferInsert) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  return db.insert(serviceCoverageAreas).values(data);
+}
