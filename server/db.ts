@@ -1,6 +1,11 @@
-import { eq, desc, sql, and, or, like } from "drizzle-orm";
+import { eq, desc, sql, and, or, like, asc, count } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, users, leads, leadActivity, campaigns, messageTemplates, outreachMessages, campaignSteps, scrapeJobs, tags, dncList } from "../drizzle/schema";
+import {
+  InsertUser, users, agencyConfig, panelProducts, inverterProducts,
+  conversations, chatMsgs, stateSubsidies, leads, leadActivity,
+  campaigns, messageTemplates, outreachMessages, campaignSteps,
+  scrapeJobs, tags, dncList
+} from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -50,255 +55,267 @@ export async function getUserByOpenId(openId: string) {
   return result.length > 0 ? result[0] : undefined;
 }
 
-// ===== LEAD HELPERS =====
-export async function createLead(data: any) {
+// ==================== AGENCY CONFIG ====================
+
+export async function getAgencyByUserId(userId: number) {
   const db = await getDb();
-  if (!db) throw new Error("Database not available");
-  const result = await db.insert(leads).values(data);
-  return result;
+  if (!db) return null;
+  const result = await db.select().from(agencyConfig).where(eq(agencyConfig.userId, userId)).limit(1);
+  return result[0] || null;
 }
 
-export async function createLeads(dataArr: any[]) {
+export async function getAgencyBySlug(slug: string) {
   const db = await getDb();
-  if (!db) throw new Error("Database not available");
-  if (dataArr.length === 0) return;
-  await db.insert(leads).values(dataArr);
+  if (!db) return null;
+  const result = await db.select().from(agencyConfig).where(eq(agencyConfig.agencySlug, slug)).limit(1);
+  return result[0] || null;
 }
 
-export async function getLead(leadId: number) {
+export async function getAgencyById(id: number) {
   const db = await getDb();
-  if (!db) throw new Error("Database not available");
-  const result = await db.select().from(leads).where(eq(leads.id, leadId)).limit(1);
-  return result[0];
+  if (!db) return null;
+  const result = await db.select().from(agencyConfig).where(eq(agencyConfig.id, id)).limit(1);
+  return result[0] || null;
 }
 
-export async function getLeads(filters?: { status?: string; priority?: string; search?: string }) {
+export async function createAgency(data: {
+  userId: number; agencyName: string; agencySlug: string;
+  phone?: string; email?: string; city?: string; state?: string;
+  brandColor?: string; botGreeting?: string; botTone?: string;
+  installationChargePerKw?: string; marginPercent?: string;
+}) {
   const db = await getDb();
-  if (!db) throw new Error("Database not available");
-  const conditions: any[] = [];
-  if (filters?.status) conditions.push(eq(leads.status, filters.status as any));
-  if (filters?.priority) conditions.push(eq(leads.priority, filters.priority as any));
+  if (!db) return null;
+  const result = await db.insert(agencyConfig).values(data);
+  return result[0].insertId;
+}
+
+export async function updateAgency(id: number, data: Partial<typeof agencyConfig.$inferInsert>) {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(agencyConfig).set(data).where(eq(agencyConfig.id, id));
+}
+
+// ==================== PANEL PRODUCTS ====================
+
+export async function getPanelsByAgency(agencyId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(panelProducts).where(and(eq(panelProducts.agencyId, agencyId), eq(panelProducts.isActive, true)));
+}
+
+export async function createPanel(data: typeof panelProducts.$inferInsert) {
+  const db = await getDb();
+  if (!db) return null;
+  const result = await db.insert(panelProducts).values(data);
+  return result[0].insertId;
+}
+
+export async function updatePanel(id: number, data: Partial<typeof panelProducts.$inferInsert>) {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(panelProducts).set(data).where(eq(panelProducts.id, id));
+}
+
+export async function deletePanel(id: number) {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(panelProducts).set({ isActive: false }).where(eq(panelProducts.id, id));
+}
+
+// ==================== INVERTER PRODUCTS ====================
+
+export async function getInvertersByAgency(agencyId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(inverterProducts).where(and(eq(inverterProducts.agencyId, agencyId), eq(inverterProducts.isActive, true)));
+}
+
+export async function createInverter(data: typeof inverterProducts.$inferInsert) {
+  const db = await getDb();
+  if (!db) return null;
+  const result = await db.insert(inverterProducts).values(data);
+  return result[0].insertId;
+}
+
+export async function updateInverter(id: number, data: Partial<typeof inverterProducts.$inferInsert>) {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(inverterProducts).set(data).where(eq(inverterProducts.id, id));
+}
+
+export async function deleteInverter(id: number) {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(inverterProducts).set({ isActive: false }).where(eq(inverterProducts.id, id));
+}
+
+// ==================== CONVERSATIONS ====================
+
+export async function createConversation(data: { agencyId: number; sessionId: string; source?: string; utmSource?: string; utmMedium?: string; utmCampaign?: string; }) {
+  const db = await getDb();
+  if (!db) return null;
+  const result = await db.insert(conversations).values(data);
+  return result[0].insertId;
+}
+
+export async function getConversation(sessionId: string) {
+  const db = await getDb();
+  if (!db) return null;
+  const result = await db.select().from(conversations).where(eq(conversations.sessionId, sessionId)).limit(1);
+  return result[0] || null;
+}
+
+export async function getConversationById(id: number) {
+  const db = await getDb();
+  if (!db) return null;
+  const result = await db.select().from(conversations).where(eq(conversations.id, id)).limit(1);
+  return result[0] || null;
+}
+
+export async function updateConversation(sessionId: string, data: Partial<typeof conversations.$inferInsert>) {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(conversations).set(data).where(eq(conversations.sessionId, sessionId));
+}
+
+export async function getConversationsByAgency(agencyId: number, limit = 50) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(conversations).where(eq(conversations.agencyId, agencyId)).orderBy(desc(conversations.createdAt)).limit(limit);
+}
+
+export async function getConversationStats(agencyId: number) {
+  const db = await getDb();
+  if (!db) return { total: 0, active: 0, leadsCaptured: 0, estimatesGiven: 0, converted: 0, dropped: 0 };
+  const result = await db.select({
+    status: conversations.status,
+    count: count(),
+  }).from(conversations).where(eq(conversations.agencyId, agencyId)).groupBy(conversations.status);
+
+  const stats = { total: 0, active: 0, leadsCaptured: 0, estimatesGiven: 0, converted: 0, dropped: 0 };
+  for (const row of result) {
+    const c = Number(row.count);
+    stats.total += c;
+    if (row.status === 'active') stats.active = c;
+    if (row.status === 'lead_captured') stats.leadsCaptured = c;
+    if (row.status === 'estimate_given') stats.estimatesGiven = c;
+    if (row.status === 'converted') stats.converted = c;
+    if (row.status === 'dropped') stats.dropped = c;
+  }
+  return stats;
+}
+
+// ==================== CHAT MESSAGES ====================
+
+export async function addChatMessage(data: { conversationId: number; role: "bot" | "customer"; content: string; messageType?: string; metadata?: unknown; }) {
+  const db = await getDb();
+  if (!db) return null;
+  const result = await db.insert(chatMsgs).values(data);
+  // Increment message count
+  await db.execute(sql`UPDATE conversations3 SET messageCount = messageCount + 1 WHERE id = ${data.conversationId}`);
+  return result[0].insertId;
+}
+
+export async function getChatMessages(conversationId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(chatMsgs).where(eq(chatMsgs.conversationId, conversationId)).orderBy(asc(chatMsgs.createdAt));
+}
+
+// ==================== STATE SUBSIDIES ====================
+
+export async function getAllSubsidies() {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(stateSubsidies).orderBy(asc(stateSubsidies.stateName));
+}
+
+export async function getSubsidyByState(stateName: string) {
+  const db = await getDb();
+  if (!db) return null;
+  const result = await db.select().from(stateSubsidies)
+    .where(or(
+      like(stateSubsidies.stateName, `%${stateName}%`),
+      eq(stateSubsidies.stateCode, stateName.toUpperCase())
+    )).limit(1);
+  return result[0] || null;
+}
+
+// ==================== LEADS (from conversations) ====================
+
+export async function createLeadFromConversation(data: {
+  firstName: string; lastName: string; email?: string; phone?: string;
+  propertyAddress?: string; city?: string; state?: string;
+  monthlyEnergyBill?: string; estimatedSavings?: string;
+  source?: string; leadScore?: number; priority?: "low" | "medium" | "high" | "urgent";
+  conversationId?: number; notes?: string;
+}) {
+  const db = await getDb();
+  if (!db) return null;
+  const result = await db.insert(leads).values({
+    ...data,
+    status: "new",
+  });
+  return result[0].insertId;
+}
+
+export async function getLeadsByAgency(agencyId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  // Get leads that have a conversationId linked to this agency
+  const result = await db.execute(sql`
+    SELECT l.* FROM leads2 l
+    INNER JOIN conversations3 c ON l.conversationId = c.id
+    WHERE c.agencyId = ${agencyId}
+    ORDER BY l.createdAt DESC
+    LIMIT 200
+  `);
+  return (result as any)[0] || [];
+}
+
+export async function getLeads(filters?: { status?: string; search?: string; }) {
+  const db = await getDb();
+  if (!db) return [];
+  const conditions = [];
+  if (filters?.status && filters.status !== 'all') {
+    conditions.push(eq(leads.status, filters.status as any));
+  }
   if (filters?.search) {
-    conditions.push(
-      or(
-        like(leads.firstName, `%${filters.search}%`),
-        like(leads.lastName, `%${filters.search}%`),
-        like(leads.email, `%${filters.search}%`),
-        like(leads.phone, `%${filters.search}%`)
-      )
-    );
+    conditions.push(or(
+      like(leads.firstName, `%${filters.search}%`),
+      like(leads.lastName, `%${filters.search}%`),
+      like(leads.email, `%${filters.search}%`),
+      like(leads.phone, `%${filters.search}%`)
+    ));
   }
   if (conditions.length > 0) {
-    return await db.select().from(leads).where(and(...conditions)).orderBy(desc(leads.createdAt));
+    return db.select().from(leads).where(and(...conditions)).orderBy(desc(leads.createdAt)).limit(200);
   }
-  return await db.select().from(leads).orderBy(desc(leads.createdAt));
+  return db.select().from(leads).orderBy(desc(leads.createdAt)).limit(200);
 }
 
-export async function updateLead(leadId: number, data: any) {
+export async function getLeadById(id: number) {
   const db = await getDb();
-  if (!db) throw new Error("Database not available");
-  await db.update(leads).set(data).where(eq(leads.id, leadId));
+  if (!db) return null;
+  const result = await db.select().from(leads).where(eq(leads.id, id)).limit(1);
+  return result[0] || null;
 }
 
-export async function deleteLead(leadId: number) {
+export async function updateLead(id: number, data: Partial<typeof leads.$inferInsert>) {
   const db = await getDb();
-  if (!db) throw new Error("Database not available");
-  await db.delete(leads).where(eq(leads.id, leadId));
+  if (!db) return;
+  await db.update(leads).set(data).where(eq(leads.id, id));
 }
 
-export async function getLeadStats() {
+export async function getLeadActivity(leadId: number) {
   const db = await getDb();
-  if (!db) throw new Error("Database not available");
-  const allLeads = await db.select().from(leads);
-  const total = allLeads.length;
-  const byStatus: Record<string, number> = {};
-  const byPriority: Record<string, number> = {};
-  const bySource: Record<string, number> = {};
-  allLeads.forEach((l: any) => {
-    byStatus[l.status] = (byStatus[l.status] || 0) + 1;
-    byPriority[l.priority] = (byPriority[l.priority] || 0) + 1;
-    const src = l.source || "unknown";
-    bySource[src] = (bySource[src] || 0) + 1;
-  });
-  return { total, byStatus, byPriority, bySource };
+  if (!db) return [];
+  return db.select().from(leadActivity).where(eq(leadActivity.leadId, leadId)).orderBy(desc(leadActivity.createdAt));
 }
 
-// ===== ACTIVITY HELPERS =====
-export async function addActivity(leadId: number, activityType: any, description?: string, userId?: number, metadata?: any) {
+export async function addLeadActivity(data: typeof leadActivity.$inferInsert) {
   const db = await getDb();
-  if (!db) throw new Error("Database not available");
-  await db.insert(leadActivity).values({ leadId, activityType, description, userId, metadata });
-}
-
-export async function getLeadActivities(leadId: number) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-  return await db.select().from(leadActivity).where(eq(leadActivity.leadId, leadId)).orderBy(desc(leadActivity.createdAt));
-}
-
-// ===== CAMPAIGN HELPERS =====
-export async function createCampaign(data: any) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-  return await db.insert(campaigns).values(data);
-}
-
-export async function getCampaigns() {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-  return await db.select().from(campaigns).orderBy(desc(campaigns.createdAt));
-}
-
-export async function getCampaign(campaignId: number) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-  const result = await db.select().from(campaigns).where(eq(campaigns.id, campaignId)).limit(1);
-  return result[0];
-}
-
-export async function updateCampaign(campaignId: number, data: any) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-  await db.update(campaigns).set(data).where(eq(campaigns.id, campaignId));
-}
-
-// ===== TEMPLATE HELPERS =====
-export async function createTemplate(data: any) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-  return await db.insert(messageTemplates).values(data);
-}
-
-export async function getTemplates(channel?: string) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-  if (channel) {
-    return await db.select().from(messageTemplates).where(eq(messageTemplates.channel, channel as any)).orderBy(desc(messageTemplates.createdAt));
-  }
-  return await db.select().from(messageTemplates).orderBy(desc(messageTemplates.createdAt));
-}
-
-export async function getTemplate(templateId: number) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-  const result = await db.select().from(messageTemplates).where(eq(messageTemplates.id, templateId)).limit(1);
-  return result[0];
-}
-
-export async function updateTemplate(templateId: number, data: any) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-  await db.update(messageTemplates).set(data).where(eq(messageTemplates.id, templateId));
-}
-
-export async function deleteTemplate(templateId: number) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-  await db.delete(messageTemplates).where(eq(messageTemplates.id, templateId));
-}
-
-// ===== OUTREACH MESSAGE HELPERS =====
-export async function createOutreachMessage(data: any) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-  return await db.insert(outreachMessages).values(data);
-}
-
-export async function getOutreachMessages(filters?: { leadId?: number; campaignId?: number }) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-  if (filters?.leadId) {
-    return await db.select().from(outreachMessages).where(eq(outreachMessages.leadId, filters.leadId)).orderBy(desc(outreachMessages.createdAt));
-  }
-  if (filters?.campaignId) {
-    return await db.select().from(outreachMessages).where(eq(outreachMessages.campaignId, filters.campaignId)).orderBy(desc(outreachMessages.createdAt));
-  }
-  return await db.select().from(outreachMessages).orderBy(desc(outreachMessages.createdAt));
-}
-
-export async function updateOutreachMessage(messageId: number, data: any) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-  await db.update(outreachMessages).set(data).where(eq(outreachMessages.id, messageId));
-}
-
-// ===== CAMPAIGN STEPS =====
-export async function createCampaignStep(data: any) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-  return await db.insert(campaignSteps).values(data);
-}
-
-export async function getCampaignSteps(campaignId: number) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-  return await db.select().from(campaignSteps).where(eq(campaignSteps.campaignId, campaignId));
-}
-
-// ===== SCRAPE JOBS =====
-export async function createScrapeJob(data: any) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-  return await db.insert(scrapeJobs).values(data);
-}
-
-export async function getScrapeJobs() {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-  return await db.select().from(scrapeJobs).orderBy(desc(scrapeJobs.createdAt));
-}
-
-export async function updateScrapeJob(jobId: number, data: any) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-  await db.update(scrapeJobs).set(data).where(eq(scrapeJobs.id, jobId));
-}
-
-// ===== TAGS =====
-export async function createTag(name: string, color?: string) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-  return await db.insert(tags).values({ name, color: color || "#3B82F6" });
-}
-
-export async function getTags() {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-  return await db.select().from(tags);
-}
-
-export async function deleteTag(tagId: number) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-  await db.delete(tags).where(eq(tags.id, tagId));
-}
-
-// ===== DNC LIST =====
-export async function addToDnc(email?: string, phone?: string, reason?: string, addedBy?: number) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-  await db.insert(dncList).values({ email, phone, reason, addedBy });
-}
-
-export async function getDncList() {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-  return await db.select().from(dncList).orderBy(desc(dncList.createdAt));
-}
-
-export async function checkDnc(email?: string, phone?: string) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-  const conditions: any[] = [];
-  if (email) conditions.push(eq(dncList.email, email));
-  if (phone) conditions.push(eq(dncList.phone, phone));
-  if (conditions.length === 0) return false;
-  const result = await db.select().from(dncList).where(or(...conditions)).limit(1);
-  return result.length > 0;
-}
-
-export async function removeDnc(id: number) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-  await db.delete(dncList).where(eq(dncList.id, id));
+  if (!db) return;
+  await db.insert(leadActivity).values(data);
 }

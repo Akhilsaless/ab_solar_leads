@@ -1,74 +1,54 @@
-# AB SOLAR Lead Outreach Platform - TODO
+# AB SOLAR AI Sales Bot Platform - TODO
 
-## Data Management
-- [x] CSV/Excel file upload for lead import
-- [x] Lead data parsing and validation
-- [x] Web scraping engine for property data sources
-- [x] Manual lead entry form
-- [x] Bulk lead import with duplicate detection
-- [ ] Lead export to CSV
-- [x] Do-not-contact list management
+## Database & Schema
+- [x] Agency profiles table (name, branding, chat link slug, subscription status)
+- [x] Panel products table (brand, model, wattage, price per watt, agency-specific)
+- [x] Inverter products table (brand, model, capacity, price, agency-specific)
+- [x] Indian state subsidies table (state, subsidy tiers, DISCOM schemes)
+- [x] Conversations table (customer session, agency link, messages, status)
+- [x] Chat messages table (role, content, timestamps, extracted data)
+- [x] Captured leads table (name, phone, address, city, state, usage, system recommendation)
 
-## Lead CRM
-- [x] Lead management dashboard with table view
-- [x] Lead detail view with full contact info
-- [x] Lead status workflow (new → contacted → qualified → converted → lost)
-- [x] Lead scoring algorithm (0-100)
-- [x] Lead priority assignment (high/medium/low)
-- [x] Lead notes and activity timeline
-- [x] Lead search and filtering
-- [x] Lead tagging system
-- [ ] Bulk lead actions (assign, tag, delete)
+## AI Sales Bot (Core)
+- [x] LLM-powered conversational agent with human-like personality
+- [x] Auto-start chat when customer lands on page (no forms, direct conversation)
+- [x] Electricity usage assessment (monthly bill, units, appliances)
+- [x] Solar system sizing calculator (kW requirement based on usage)
+- [x] Panel count and inverter capacity recommendation
+- [x] State-specific subsidy lookup (PM Surya Ghar + state DISCOM schemes)
+- [x] Complete cost estimate with subsidy deduction
+- [x] ROI calculation (payback period, 25-year savings comparison)
+- [x] Objection handling (cost concerns, reliability, maintenance)
+- [x] Lead capture during natural conversation (name, phone, address)
+- [x] Uses agency-specific panel brands, inverter models, and pricing
 
-## Multi-Channel Outreach
-- [x] Email outreach with templates
-- [x] SMS outreach with templates
-- [x] WhatsApp outreach with templates
-- [x] Phone call tracking (click-to-dial)
-- [x] Message personalization with dynamic fields
-- [ ] Outreach scheduling (send later)
-- [x] Outreach history per lead
+## Customer Chat Interface
+- [x] Full-screen chat UI (ad landing page - no website, just chat)
+- [x] Agency branding on chat page (logo, name, colors)
+- [x] Mobile-first responsive design
+- [x] Typing indicators and smooth message animations
+- [x] Quick reply buttons for common responses
+- [x] Solar savings visualization within chat
+- [x] System recommendation card within chat
 
-## Campaign Management
-- [x] Campaign creation wizard
-- [x] Campaign templates library
-- [x] Multi-step campaign sequences
-- [x] A/B testing for messages
-- [ ] Campaign scheduling
-- [x] Campaign pause/resume/stop
-- [x] Campaign analytics (sent/delivered/opened/responded)
+## Agency Admin Dashboard
+- [x] Agency login and profile management
+- [x] Product catalog management (add/edit panels, inverters, pricing)
+- [x] Installation charges configuration
+- [x] Unique chat link generation for ads
+- [x] Lead management table with conversation transcripts
+- [x] Lead status tracking and follow-up
+- [x] Analytics (conversations, conversion rate, popular products)
+- [x] Bot personality/tone customization
 
-## Analytics & Reporting
-- [x] Dashboard with key metrics (total leads, conversion rate, response rate)
-- [x] Campaign performance charts
-- [x] Channel effectiveness comparison
-- [x] Lead source attribution
-- [x] ROI tracking and calculations
-- [ ] Team performance metrics
-- [ ] Date range filtering
-- [ ] Export reports
+## Indian Solar Subsidies Database
+- [x] PM Surya Ghar Muft Bijli Yojana tiers (1-3kW subsidies)
+- [x] State-wise DISCOM subsidy data (all 32 major Indian states/UTs)
+- [x] Net metering policy information per state
+- [x] Subsidy calculation engine based on system size and state
 
-## Design & UX
-- [x] Professional dark dashboard theme
-- [x] Responsive design for laptop and mobile web
-- [x] Sidebar navigation with collapsible menu
-- [x] Smooth animations and transitions
-- [x] Loading states and skeletons
-- [x] Empty states with CTAs
-- [x] Toast notifications for actions
-
-## Database & Backend
-- [x] Leads table schema
-- [x] Campaigns table schema
-- [x] Outreach messages table schema
-- [x] Message templates table schema
-- [x] Campaign sequences table schema
-- [x] DNC list table schema
-- [x] Tags table schema
-- [x] tRPC procedures for all operations
-
-## Testing & Deployment
-- [x] Unit tests for lead scoring
-- [x] Unit tests for data parsing
-- [x] Unit tests for campaign logic
-- [x] Final checkpoint and deployment
+## Testing
+- [x] Solar calculator tests (system sizing, cost estimation)
+- [x] Subsidy lookup tests (state-wise calculations)
+- [x] Lead scoring and extraction tests
+- [x] Message personalization tests

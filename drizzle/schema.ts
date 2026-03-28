@@ -1,7 +1,7 @@
 import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, decimal, boolean, json } from "drizzle-orm/mysql-core";
 
 /**
- * Core user table backing auth flow.
+ * Core user table backing auth flow (agency owners/admins).
  */
 export const users = mysqlTable("users", {
   id: int("id").autoincrement().primaryKey(),
@@ -19,8 +19,145 @@ export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 
 /**
- * Leads - core CRM entity
+ * Agency configuration - each agency subscriber gets their own config
  */
+export const agencyConfig = mysqlTable("agencyConfig3", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  agencyName: varchar("agencyName", { length: 255 }).notNull(),
+  agencySlug: varchar("agencySlug", { length: 100 }).notNull().unique(),
+  logoUrl: text("logoUrl"),
+  brandColor: varchar("brandColor", { length: 20 }).default("#F97316"),
+  phone: varchar("phone", { length: 30 }),
+  email: varchar("email", { length: 320 }),
+  website: text("website"),
+  address: text("address"),
+  city: varchar("city", { length: 100 }),
+  state: varchar("state", { length: 100 }),
+  installationChargePerKw: decimal("installationChargePerKw", { precision: 10, scale: 2 }).default("8000"),
+  marginPercent: decimal("marginPercent", { precision: 5, scale: 2 }).default("15"),
+  botGreeting: text("botGreeting"),
+  botTone: varchar("botTone", { length: 50 }).default("friendly"),
+  isActive: boolean("isActive").default(true),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type AgencyConfig = typeof agencyConfig.$inferSelect;
+
+/**
+ * Panel products - agency-specific solar panel catalog
+ */
+export const panelProducts = mysqlTable("panelProducts3", {
+  id: int("id").autoincrement().primaryKey(),
+  agencyId: int("agencyId").notNull(),
+  brand: varchar("brand", { length: 100 }).notNull(),
+  model: varchar("model", { length: 200 }).notNull(),
+  wattage: int("wattage").notNull(),
+  pricePerPanel: decimal("pricePerPanel", { precision: 10, scale: 2 }).notNull(),
+  efficiency: decimal("efficiency", { precision: 5, scale: 2 }),
+  panelType: varchar("panelType", { length: 50 }).default("monocrystalline"),
+  warranty: int("warranty").default(25),
+  isActive: boolean("isActive").default(true),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type PanelProduct = typeof panelProducts.$inferSelect;
+
+/**
+ * Inverter products - agency-specific inverter catalog
+ */
+export const inverterProducts = mysqlTable("inverterProducts3", {
+  id: int("id").autoincrement().primaryKey(),
+  agencyId: int("agencyId").notNull(),
+  brand: varchar("brand", { length: 100 }).notNull(),
+  model: varchar("model", { length: 200 }).notNull(),
+  capacityKw: decimal("capacityKw", { precision: 6, scale: 2 }).notNull(),
+  price: decimal("price", { precision: 10, scale: 2 }).notNull(),
+  inverterType: varchar("inverterType", { length: 50 }).default("string"),
+  warranty: int("warranty").default(10),
+  isActive: boolean("isActive").default(true),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type InverterProduct = typeof inverterProducts.$inferSelect;
+
+/**
+ * Chat conversations - each customer session
+ */
+export const conversations = mysqlTable("conversations3", {
+  id: int("id").autoincrement().primaryKey(),
+  agencyId: int("agencyId").notNull(),
+  sessionId: varchar("sessionId", { length: 100 }).notNull().unique(),
+  customerName: varchar("customerName", { length: 200 }),
+  customerPhone: varchar("customerPhone", { length: 30 }),
+  customerEmail: varchar("customerEmail", { length: 320 }),
+  customerCity: varchar("customerCity", { length: 100 }),
+  customerState: varchar("customerState", { length: 100 }),
+  customerAddress: text("customerAddress"),
+  monthlyBill: decimal("monthlyBill", { precision: 10, scale: 2 }),
+  monthlyUnits: int("monthlyUnits"),
+  recommendedKw: decimal("recommendedKw", { precision: 6, scale: 2 }),
+  recommendedPanels: int("recommendedPanels"),
+  estimatedCost: decimal("estimatedCost", { precision: 12, scale: 2 }),
+  subsidyAmount: decimal("subsidyAmount", { precision: 10, scale: 2 }),
+  netCost: decimal("netCost", { precision: 12, scale: 2 }),
+  estimatedSavingsMonthly: decimal("estimatedSavingsMonthly", { precision: 10, scale: 2 }),
+  paybackYears: decimal("paybackYears", { precision: 4, scale: 1 }),
+  status: mysqlEnum("status", ["active", "lead_captured", "estimate_given", "converted", "dropped"]).default("active").notNull(),
+  leadScore: int("leadScore").default(0),
+  messageCount: int("messageCount").default(0),
+  source: varchar("source", { length: 100 }).default("ad_click"),
+  utmSource: varchar("utmSource", { length: 100 }),
+  utmMedium: varchar("utmMedium", { length: 100 }),
+  utmCampaign: varchar("utmCampaign", { length: 200 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type Conversation = typeof conversations.$inferSelect;
+
+/**
+ * Chat messages - individual messages in a conversation
+ */
+export const chatMsgs = mysqlTable("chatMsgs3", {
+  id: int("id").autoincrement().primaryKey(),
+  conversationId: int("conversationId").notNull(),
+  role: mysqlEnum("role", ["bot", "customer"]).notNull(),
+  content: text("content").notNull(),
+  messageType: varchar("messageType", { length: 50 }).default("text"),
+  metadata: json("metadata"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type ChatMsg = typeof chatMsgs.$inferSelect;
+
+/**
+ * Indian state subsidies - pre-populated reference data
+ */
+export const stateSubsidies = mysqlTable("stateSubsidies3", {
+  id: int("id").autoincrement().primaryKey(),
+  stateName: varchar("stateName", { length: 100 }).notNull(),
+  stateCode: varchar("stateCode", { length: 10 }).notNull(),
+  centralSubsidy1kw: decimal("centralSubsidy1kw", { precision: 10, scale: 2 }).default("30000"),
+  centralSubsidy2kw: decimal("centralSubsidy2kw", { precision: 10, scale: 2 }).default("60000"),
+  centralSubsidy3kw: decimal("centralSubsidy3kw", { precision: 10, scale: 2 }).default("78000"),
+  centralSubsidyAbove3kw: decimal("centralSubsidyAbove3kw", { precision: 10, scale: 2 }).default("78000"),
+  stateAdditionalPerKw: decimal("stateAdditionalPerKw", { precision: 10, scale: 2 }).default("0"),
+  stateMaxAdditional: decimal("stateMaxAdditional", { precision: 10, scale: 2 }).default("0"),
+  avgElectricityRate: decimal("avgElectricityRate", { precision: 6, scale: 2 }).default("7.50"),
+  discomName: varchar("discomName", { length: 200 }),
+  netMeteringAvailable: boolean("netMeteringAvailable").default(true),
+  specialNotes: text("specialNotes"),
+  avgSunHours: decimal("avgSunHours", { precision: 4, scale: 1 }).default("4.5"),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type StateSubsidy = typeof stateSubsidies.$inferSelect;
+
+// Keep existing tables for backward compatibility
 export const leads = mysqlTable("leads2", {
   id: int("id").autoincrement().primaryKey(),
   firstName: varchar("firstName", { length: 100 }).notNull(),
@@ -50,6 +187,7 @@ export const leads = mysqlTable("leads2", {
   isDnc: boolean("isDnc").default(false),
   notes: text("notes"),
   lastContactedAt: timestamp("lastContactedAt"),
+  conversationId: int("conversationId"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
@@ -57,9 +195,6 @@ export const leads = mysqlTable("leads2", {
 export type Lead = typeof leads.$inferSelect;
 export type InsertLead = typeof leads.$inferInsert;
 
-/**
- * Lead activity timeline
- */
 export const leadActivity = mysqlTable("leadActivity2", {
   id: int("id").autoincrement().primaryKey(),
   leadId: int("leadId").notNull(),
@@ -76,9 +211,6 @@ export const leadActivity = mysqlTable("leadActivity2", {
 
 export type LeadActivityEvent = typeof leadActivity.$inferSelect;
 
-/**
- * Campaigns - outreach campaign management
- */
 export const campaigns = mysqlTable("campaigns2", {
   id: int("id").autoincrement().primaryKey(),
   name: varchar("name", { length: 255 }).notNull(),
@@ -102,9 +234,6 @@ export const campaigns = mysqlTable("campaigns2", {
 
 export type Campaign = typeof campaigns.$inferSelect;
 
-/**
- * Message templates
- */
 export const messageTemplates = mysqlTable("messageTemplates2", {
   id: int("id").autoincrement().primaryKey(),
   name: varchar("name", { length: 255 }).notNull(),
@@ -121,9 +250,6 @@ export const messageTemplates = mysqlTable("messageTemplates2", {
 
 export type MessageTemplate = typeof messageTemplates.$inferSelect;
 
-/**
- * Outreach messages - individual messages sent to leads
- */
 export const outreachMessages = mysqlTable("outreachMessages2", {
   id: int("id").autoincrement().primaryKey(),
   leadId: int("leadId").notNull(),
@@ -146,9 +272,6 @@ export const outreachMessages = mysqlTable("outreachMessages2", {
 
 export type OutreachMessage = typeof outreachMessages.$inferSelect;
 
-/**
- * Campaign sequences - multi-step follow-up sequences
- */
 export const campaignSteps = mysqlTable("campaignSteps2", {
   id: int("id").autoincrement().primaryKey(),
   campaignId: int("campaignId").notNull(),
@@ -166,9 +289,6 @@ export const campaignSteps = mysqlTable("campaignSteps2", {
 
 export type CampaignStep = typeof campaignSteps.$inferSelect;
 
-/**
- * Scrape jobs - track web scraping tasks
- */
 export const scrapeJobs = mysqlTable("scrapeJobs2", {
   id: int("id").autoincrement().primaryKey(),
   source: varchar("source", { length: 100 }).notNull(),
@@ -184,9 +304,6 @@ export const scrapeJobs = mysqlTable("scrapeJobs2", {
 
 export type ScrapeJob = typeof scrapeJobs.$inferSelect;
 
-/**
- * Tags for lead categorization
- */
 export const tags = mysqlTable("tags2", {
   id: int("id").autoincrement().primaryKey(),
   name: varchar("name", { length: 100 }).notNull(),
@@ -196,9 +313,6 @@ export const tags = mysqlTable("tags2", {
 
 export type Tag = typeof tags.$inferSelect;
 
-/**
- * DNC (Do Not Contact) list
- */
 export const dncList = mysqlTable("dncList2", {
   id: int("id").autoincrement().primaryKey(),
   email: varchar("email", { length: 320 }),

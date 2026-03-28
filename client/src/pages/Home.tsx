@@ -1,360 +1,401 @@
 import { useAuth } from "@/_core/hooks/useAuth";
-import { Button } from "@/components/ui/button";
-import { getLoginUrl } from "@/const";
 import { trpc } from "@/lib/trpc";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
-  BarChart3, Users, Megaphone, FileText, Upload, Search,
-  Shield, Tag, TrendingUp, ArrowUpRight, ArrowDownRight,
-  Zap, Mail, MessageSquare, Phone, Globe
+  MessageSquare, Users, TrendingUp, Zap, ArrowRight,
+  Copy, ExternalLink, Sun, IndianRupee, Clock
 } from "lucide-react";
+import { useState } from "react";
 import { useLocation } from "wouter";
-import { motion } from "framer-motion";
-import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
-
-const CHART_COLORS = ["#e8a735", "#4ade80", "#60a5fa", "#f472b6", "#a78bfa"];
+import { toast } from "sonner";
 
 export default function Home() {
-  const { user, loading } = useAuth();
+  const { user } = useAuth();
   const [, setLocation] = useLocation();
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="flex flex-col items-center gap-4">
-          <div className="w-10 h-10 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-          <p className="text-muted-foreground text-sm">Loading...</p>
-        </div>
-      </div>
-    );
+  const { data: agency, isLoading: agencyLoading } = trpc.agency.get.useQuery();
+  const { data: convStats } = trpc.conversations.stats.useQuery();
+  const { data: conversations } = trpc.conversations.list.useQuery();
+  const { data: leads } = trpc.leads.list.useQuery();
+
+  // If no agency configured yet, show setup
+  if (!agencyLoading && !agency) {
+    return <AgencySetup />;
   }
 
-  if (!user) {
-    return <LandingPage />;
-  }
-
-  return <DashboardHome />;
-}
-
-function LandingPage() {
-  return (
-    <div className="min-h-screen bg-background">
-      {/* Nav */}
-      <nav className="fixed top-0 left-0 right-0 z-50 border-b border-border/50 bg-background/80 backdrop-blur-xl">
-        <div className="container flex items-center justify-between h-16">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg solar-gradient flex items-center justify-center">
-              <Zap className="w-4 h-4 text-black" />
-            </div>
-            <span className="font-bold text-lg">AB SOLAR</span>
-          </div>
-          <Button
-            onClick={() => { window.location.href = getLoginUrl(); }}
-            className="solar-gradient text-black font-semibold hover:opacity-90 transition-opacity"
-          >
-            Get Started
-          </Button>
-        </div>
-      </nav>
-
-      {/* Hero */}
-      <section className="pt-32 pb-20 px-4">
-        <div className="container max-w-5xl mx-auto text-center">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
-          >
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-primary/30 bg-primary/5 text-primary text-sm font-medium mb-6">
-              <Zap className="w-3.5 h-3.5" />
-              AI-Powered Lead Outreach Platform
-            </div>
-            <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold tracking-tight mb-6">
-              Convert More Solar Leads
-              <br />
-              <span className="text-gradient">With Intelligent Outreach</span>
-            </h1>
-            <p className="text-lg text-muted-foreground max-w-2xl mx-auto mb-10">
-              Import leads, scrape data from public sources, and automate multi-channel
-              outreach via Email, SMS, WhatsApp, and Phone. Built for solar agencies
-              that want to close more deals.
-            </p>
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-              <Button
-                size="lg"
-                onClick={() => { window.location.href = getLoginUrl(); }}
-                className="solar-gradient text-black font-semibold px-8 hover:opacity-90 transition-opacity"
-              >
-                Start Free Trial
-              </Button>
-              <Button size="lg" variant="outline" className="px-8">
-                Watch Demo
-              </Button>
-            </div>
-          </motion.div>
-        </div>
-      </section>
-
-      {/* Features */}
-      <section className="py-20 border-t border-border/50">
-        <div className="container max-w-6xl mx-auto">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl font-bold mb-4">Everything You Need to Close Solar Deals</h2>
-            <p className="text-muted-foreground max-w-xl mx-auto">
-              A complete lead management and outreach platform designed specifically for solar agencies.
-            </p>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {[
-              { icon: Upload, title: "CSV/Excel Import", desc: "Bulk import leads from spreadsheets with automatic duplicate detection and data validation." },
-              { icon: Globe, title: "Data Scraping", desc: "AI-powered lead generation from public property databases and real estate sources." },
-              { icon: Mail, title: "Email Outreach", desc: "Send personalized email campaigns with dynamic variables and A/B testing." },
-              { icon: MessageSquare, title: "SMS & WhatsApp", desc: "Multi-channel messaging with templates, scheduling, and delivery tracking." },
-              { icon: Phone, title: "Call Tracking", desc: "Log calls, track outcomes, and manage follow-up sequences automatically." },
-              { icon: BarChart3, title: "Analytics & ROI", desc: "Track conversion rates, campaign performance, and return on investment in real-time." },
-            ].map((feature, i) => (
-              <motion.div
-                key={feature.title}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.1 }}
-                className="stat-card p-6 group"
-              >
-                <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center mb-4 group-hover:bg-primary/20 transition-colors">
-                  <feature.icon className="w-5 h-5 text-primary" />
-                </div>
-                <h3 className="font-semibold text-lg mb-2">{feature.title}</h3>
-                <p className="text-sm text-muted-foreground leading-relaxed">{feature.desc}</p>
-              </motion.div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* CTA */}
-      <section className="py-20 border-t border-border/50">
-        <div className="container max-w-3xl mx-auto text-center">
-          <h2 className="text-3xl font-bold mb-4">Ready to Scale Your Solar Business?</h2>
-          <p className="text-muted-foreground mb-8">
-            Join agencies that are converting 3x more leads with AB SOLAR's intelligent outreach platform.
-          </p>
-          <Button
-            size="lg"
-            onClick={() => { window.location.href = getLoginUrl(); }}
-            className="solar-gradient text-black font-semibold px-10 hover:opacity-90"
-          >
-            Get Started Now
-          </Button>
-        </div>
-      </section>
-
-      {/* Footer */}
-      <footer className="border-t border-border/50 py-8">
-        <div className="container flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="w-6 h-6 rounded solar-gradient flex items-center justify-center">
-              <Zap className="w-3 h-3 text-black" />
-            </div>
-            <span className="text-sm text-muted-foreground">AB SOLAR</span>
-          </div>
-          <p className="text-xs text-muted-foreground">Built for solar agencies</p>
-        </div>
-      </footer>
-    </div>
-  );
-}
-
-function DashboardHome() {
-  const stats = trpc.leads.stats.useQuery();
-  const [, setLocation] = useLocation();
-
-  const statusData = stats.data?.byStatus
-    ? Object.entries(stats.data.byStatus).map(([name, value]) => ({ name, value }))
-    : [];
-
-  const sourceData = stats.data?.bySource
-    ? Object.entries(stats.data.bySource).map(([name, value]) => ({ name, value }))
-    : [];
-
-  // Mock trend data for the area chart
-  const trendData = [
-    { month: "Jan", leads: 12 }, { month: "Feb", leads: 19 },
-    { month: "Mar", leads: 28 }, { month: "Apr", leads: 35 },
-    { month: "May", leads: 42 }, { month: "Jun", leads: 58 },
-  ];
-
-  const total = stats.data?.total || 0;
-  const converted = stats.data?.byStatus?.converted || 0;
-  const conversionRate = total > 0 ? ((converted / total) * 100).toFixed(1) : "0";
+  const chatLink = agency ? `${window.location.origin}/chat/${agency.agencySlug}` : "";
+  const recentConversations = (conversations || []).slice(0, 5);
+  const recentLeads = (leads || []).slice(0, 5);
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <div className="flex items-center justify-between">
+      {/* Welcome Header */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold">Dashboard</h1>
-          <p className="text-muted-foreground text-sm mt-1">Overview of your lead generation performance</p>
+          <h1 className="text-2xl font-bold tracking-tight">
+            Welcome back, {user?.name?.split(" ")[0] || "there"} 👋
+          </h1>
+          <p className="text-muted-foreground mt-1">
+            Here's what's happening with your AI sales bot
+          </p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={() => setLocation("/leads/import")}>
-            <Upload className="w-4 h-4 mr-2" /> Import
-          </Button>
-          <Button size="sm" className="solar-gradient text-black" onClick={() => setLocation("/leads")}>
-            <Users className="w-4 h-4 mr-2" /> View Leads
-          </Button>
-        </div>
-      </div>
-
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard
-          title="Total Leads"
-          value={total.toString()}
-          icon={Users}
-          trend="+12%"
-          trendUp={true}
-        />
-        <StatCard
-          title="Conversion Rate"
-          value={`${conversionRate}%`}
-          icon={TrendingUp}
-          trend="+3.2%"
-          trendUp={true}
-        />
-        <StatCard
-          title="Qualified"
-          value={(stats.data?.byStatus?.qualified || 0).toString()}
-          icon={Shield}
-          trend="+8%"
-          trendUp={true}
-        />
-        <StatCard
-          title="New This Week"
-          value={(stats.data?.byStatus?.new || 0).toString()}
-          icon={Zap}
-          trend="+15%"
-          trendUp={true}
-        />
-      </div>
-
-      {/* Charts Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {/* Lead Trend Chart */}
-        <div className="lg:col-span-2 stat-card">
-          <h3 className="font-semibold mb-4">Lead Growth Trend</h3>
-          <div className="h-[240px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={trendData}>
-                <defs>
-                  <linearGradient id="colorLeads" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#e8a735" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="#e8a735" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <XAxis dataKey="month" stroke="#555" fontSize={12} tickLine={false} axisLine={false} />
-                <YAxis stroke="#555" fontSize={12} tickLine={false} axisLine={false} />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: "oklch(0.155 0.005 260)",
-                    border: "1px solid oklch(0.24 0.005 260)",
-                    borderRadius: "8px",
-                    color: "#fff",
-                  }}
-                />
-                <Area type="monotone" dataKey="leads" stroke="#e8a735" fill="url(#colorLeads)" strokeWidth={2} />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-        {/* Status Distribution */}
-        <div className="stat-card">
-          <h3 className="font-semibold mb-4">Lead Status</h3>
-          {statusData.length > 0 ? (
-            <div className="h-[200px] flex items-center justify-center">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={statusData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={50}
-                    outerRadius={80}
-                    dataKey="value"
-                    paddingAngle={3}
-                  >
-                    {statusData.map((_, i) => (
-                      <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: "oklch(0.155 0.005 260)",
-                      border: "1px solid oklch(0.24 0.005 260)",
-                      borderRadius: "8px",
-                      color: "#fff",
-                    }}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-          ) : (
-            <div className="h-[200px] flex items-center justify-center text-muted-foreground text-sm">
-              No lead data yet
-            </div>
-          )}
-          <div className="flex flex-wrap gap-2 mt-2">
-            {statusData.map((item, i) => (
-              <div key={item.name} className="flex items-center gap-1.5 text-xs">
-                <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: CHART_COLORS[i % CHART_COLORS.length] }} />
-                <span className="text-muted-foreground capitalize">{item.name}: {item.value}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Quick Actions */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {[
-          { icon: Upload, title: "Import Leads", desc: "Upload CSV/Excel files", path: "/leads/import", color: "text-blue-400" },
-          { icon: Search, title: "Scrape Data", desc: "Find leads from sources", path: "/scrape", color: "text-green-400" },
-          { icon: Megaphone, title: "New Campaign", desc: "Create outreach campaign", path: "/campaigns/new", color: "text-purple-400" },
-          { icon: FileText, title: "Templates", desc: "Manage message templates", path: "/templates", color: "text-orange-400" },
-        ].map((action) => (
-          <button
-            key={action.title}
-            onClick={() => setLocation(action.path)}
-            className="stat-card text-left group cursor-pointer"
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              navigator.clipboard.writeText(chatLink);
+              toast.success("Chat link copied!");
+            }}
+            className="gap-2"
           >
-            <action.icon className={`w-5 h-5 ${action.color} mb-3`} />
-            <h4 className="font-medium text-sm">{action.title}</h4>
-            <p className="text-xs text-muted-foreground mt-1">{action.desc}</p>
-          </button>
-        ))}
+            <Copy className="w-3.5 h-3.5" />
+            Copy Bot Link
+          </Button>
+          <Button
+            size="sm"
+            className="gap-2 solar-gradient text-black"
+            onClick={() => window.open(chatLink, "_blank")}
+          >
+            <ExternalLink className="w-3.5 h-3.5" />
+            Test Bot
+          </Button>
+        </div>
+      </div>
+
+      {/* Chat Link Banner */}
+      <Card className="bg-gradient-to-r from-primary/10 via-primary/5 to-transparent border-primary/20">
+        <CardContent className="py-4">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+            <div className="w-10 h-10 rounded-xl solar-gradient flex items-center justify-center shrink-0">
+              <Zap className="w-5 h-5 text-black" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium">Your AI Bot Link (use in ads)</p>
+              <p className="text-xs text-muted-foreground mt-0.5 truncate font-mono">{chatLink}</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Stats Grid */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <StatCard
+          icon={MessageSquare}
+          label="Total Conversations"
+          value={convStats?.total || 0}
+          color="text-blue-400"
+          bgColor="bg-blue-400/10"
+        />
+        <StatCard
+          icon={Users}
+          label="Leads Captured"
+          value={convStats?.leadsCaptured || 0}
+          color="text-green-400"
+          bgColor="bg-green-400/10"
+        />
+        <StatCard
+          icon={IndianRupee}
+          label="Estimates Given"
+          value={convStats?.estimatesGiven || 0}
+          color="text-amber-400"
+          bgColor="bg-amber-400/10"
+        />
+        <StatCard
+          icon={TrendingUp}
+          label="Converted"
+          value={convStats?.converted || 0}
+          color="text-emerald-400"
+          bgColor="bg-emerald-400/10"
+        />
+      </div>
+
+      {/* Two Column Layout */}
+      <div className="grid lg:grid-cols-2 gap-6">
+        {/* Recent Conversations */}
+        <Card>
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base">Recent Conversations</CardTitle>
+              <Button variant="ghost" size="sm" onClick={() => setLocation("/conversations")} className="text-xs gap-1">
+                View All <ArrowRight className="w-3 h-3" />
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {recentConversations.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground text-sm">
+                <MessageSquare className="w-8 h-8 mx-auto mb-2 opacity-30" />
+                <p>No conversations yet</p>
+                <p className="text-xs mt-1">Share your bot link to start getting leads</p>
+              </div>
+            ) : (
+              recentConversations.map((conv: any) => (
+                <button
+                  key={conv.id}
+                  onClick={() => setLocation(`/conversations/${conv.id}`)}
+                  className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-accent/50 transition-colors text-left"
+                >
+                  <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                    <span className="text-sm font-medium text-primary">
+                      {(conv.customerName || "?")[0]?.toUpperCase()}
+                    </span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">
+                      {conv.customerName || "Unknown Visitor"}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {conv.customerState || "Unknown State"} · {conv.messageCount || 0} messages
+                    </p>
+                  </div>
+                  <ConvStatusBadge status={conv.status} />
+                </button>
+              ))
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Recent Leads */}
+        <Card>
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base">Recent Leads</CardTitle>
+              <Button variant="ghost" size="sm" onClick={() => setLocation("/leads")} className="text-xs gap-1">
+                View All <ArrowRight className="w-3 h-3" />
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {recentLeads.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground text-sm">
+                <Users className="w-8 h-8 mx-auto mb-2 opacity-30" />
+                <p>No leads captured yet</p>
+                <p className="text-xs mt-1">Your AI bot will capture leads automatically</p>
+              </div>
+            ) : (
+              recentLeads.map((lead: any) => (
+                <button
+                  key={lead.id}
+                  onClick={() => setLocation(`/leads/${lead.id}`)}
+                  className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-accent/50 transition-colors text-left"
+                >
+                  <div className="w-9 h-9 rounded-full bg-green-500/10 flex items-center justify-center shrink-0">
+                    <span className="text-sm font-medium text-green-400">
+                      {(lead.firstName || "?")[0]?.toUpperCase()}
+                    </span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">
+                      {lead.firstName} {lead.lastName}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {lead.phone || lead.email || "No contact"} · Score: {lead.leadScore || 0}
+                    </p>
+                  </div>
+                  <span className={`status-badge status-${lead.status}`}>{lead.status}</span>
+                </button>
+              ))
+            )}
+          </CardContent>
+        </Card>
       </div>
     </div>
   );
 }
 
-function StatCard({ title, value, icon: Icon, trend, trendUp }: {
-  title: string;
-  value: string;
-  icon: any;
-  trend: string;
-  trendUp: boolean;
+function StatCard({ icon: Icon, label, value, color, bgColor }: {
+  icon: any; label: string; value: number; color: string; bgColor: string;
 }) {
   return (
     <div className="stat-card">
-      <div className="flex items-center justify-between mb-3">
-        <span className="text-sm text-muted-foreground">{title}</span>
-        <Icon className="w-4 h-4 text-muted-foreground" />
+      <div className="flex items-center gap-3">
+        <div className={`w-10 h-10 rounded-xl ${bgColor} flex items-center justify-center`}>
+          <Icon className={`w-5 h-5 ${color}`} />
+        </div>
+        <div>
+          <p className="text-2xl font-bold">{value}</p>
+          <p className="text-xs text-muted-foreground">{label}</p>
+        </div>
       </div>
-      <div className="flex items-end gap-2">
-        <span className="text-2xl font-bold">{value}</span>
-        <span className={`text-xs font-medium flex items-center gap-0.5 mb-1 ${trendUp ? "text-green-400" : "text-red-400"}`}>
-          {trendUp ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
-          {trend}
-        </span>
+    </div>
+  );
+}
+
+function ConvStatusBadge({ status }: { status: string }) {
+  const styles: Record<string, string> = {
+    active: "bg-blue-500/10 text-blue-400",
+    lead_captured: "bg-green-500/10 text-green-400",
+    estimate_given: "bg-amber-500/10 text-amber-400",
+    converted: "bg-emerald-500/10 text-emerald-400",
+    dropped: "bg-red-500/10 text-red-400",
+  };
+  return (
+    <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${styles[status] || styles.active}`}>
+      {status.replace("_", " ")}
+    </span>
+  );
+}
+
+// Agency Setup Component
+function AgencySetup() {
+  const [, setLocation] = useLocation();
+  const [formData, setFormData] = useState({
+    agencyName: "",
+    agencySlug: "",
+    phone: "",
+    email: "",
+    state: "",
+    city: "",
+    botGreeting: "",
+    botTone: "friendly",
+    installationChargePerKw: "8000",
+    marginPercent: "15",
+  });
+
+  const createAgency = trpc.agency.create.useMutation({
+    onSuccess: () => {
+      toast.success("Agency created! Now add your products.");
+      window.location.reload();
+    },
+    onError: (err) => {
+      toast.error(err.message);
+    },
+  });
+
+  const handleSlugify = (name: string) => {
+    return name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+  };
+
+  return (
+    <div className="max-w-2xl mx-auto animate-fade-in">
+      <div className="text-center mb-8">
+        <div className="w-16 h-16 rounded-2xl solar-gradient flex items-center justify-center mx-auto mb-4">
+          <Sun className="w-8 h-8 text-black" />
+        </div>
+        <h1 className="text-2xl font-bold">Set Up Your Agency</h1>
+        <p className="text-muted-foreground mt-2">
+          Configure your agency to start using the AI sales bot
+        </p>
       </div>
+
+      <Card>
+        <CardContent className="pt-6 space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="col-span-2">
+              <label className="text-sm font-medium mb-1.5 block">Agency Name *</label>
+              <input
+                className="w-full px-3 py-2 rounded-lg bg-secondary border border-border text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                value={formData.agencyName}
+                onChange={(e) => setFormData({
+                  ...formData,
+                  agencyName: e.target.value,
+                  agencySlug: handleSlugify(e.target.value),
+                })}
+                placeholder="e.g., SunPower Solutions"
+              />
+            </div>
+            <div className="col-span-2">
+              <label className="text-sm font-medium mb-1.5 block">Bot URL Slug *</label>
+              <div className="flex items-center gap-1 text-xs text-muted-foreground mb-1">
+                <span>{window.location.origin}/chat/</span>
+                <span className="text-primary font-medium">{formData.agencySlug || "your-slug"}</span>
+              </div>
+              <input
+                className="w-full px-3 py-2 rounded-lg bg-secondary border border-border text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                value={formData.agencySlug}
+                onChange={(e) => setFormData({ ...formData, agencySlug: handleSlugify(e.target.value) })}
+                placeholder="your-agency-slug"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-1.5 block">Phone</label>
+              <input
+                className="w-full px-3 py-2 rounded-lg bg-secondary border border-border text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                value={formData.phone}
+                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                placeholder="+91 98765 43210"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-1.5 block">Email</label>
+              <input
+                className="w-full px-3 py-2 rounded-lg bg-secondary border border-border text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                value={formData.email}
+                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                placeholder="info@agency.com"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-1.5 block">State</label>
+              <input
+                className="w-full px-3 py-2 rounded-lg bg-secondary border border-border text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                value={formData.state}
+                onChange={(e) => setFormData({ ...formData, state: e.target.value })}
+                placeholder="Maharashtra"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-1.5 block">City</label>
+              <input
+                className="w-full px-3 py-2 rounded-lg bg-secondary border border-border text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                value={formData.city}
+                onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                placeholder="Mumbai"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-1.5 block">Installation ₹/kW</label>
+              <input
+                className="w-full px-3 py-2 rounded-lg bg-secondary border border-border text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                value={formData.installationChargePerKw}
+                onChange={(e) => setFormData({ ...formData, installationChargePerKw: e.target.value })}
+                placeholder="8000"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-1.5 block">Margin %</label>
+              <input
+                className="w-full px-3 py-2 rounded-lg bg-secondary border border-border text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                value={formData.marginPercent}
+                onChange={(e) => setFormData({ ...formData, marginPercent: e.target.value })}
+                placeholder="15"
+              />
+            </div>
+            <div className="col-span-2">
+              <label className="text-sm font-medium mb-1.5 block">Bot Tone</label>
+              <select
+                className="w-full px-3 py-2 rounded-lg bg-secondary border border-border text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                value={formData.botTone}
+                onChange={(e) => setFormData({ ...formData, botTone: e.target.value })}
+              >
+                <option value="friendly">Friendly & Warm</option>
+                <option value="professional">Professional</option>
+                <option value="enthusiastic">Enthusiastic & Energetic</option>
+                <option value="consultative">Consultative & Expert</option>
+              </select>
+            </div>
+            <div className="col-span-2">
+              <label className="text-sm font-medium mb-1.5 block">Custom Greeting (optional)</label>
+              <textarea
+                className="w-full px-3 py-2 rounded-lg bg-secondary border border-border text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 min-h-[80px]"
+                value={formData.botGreeting}
+                onChange={(e) => setFormData({ ...formData, botGreeting: e.target.value })}
+                placeholder="Leave empty for default greeting. Or write your own opening message..."
+              />
+            </div>
+          </div>
+
+          <Button
+            className="w-full solar-gradient text-black font-semibold"
+            onClick={() => createAgency.mutate(formData)}
+            disabled={!formData.agencyName || !formData.agencySlug || createAgency.isPending}
+          >
+            {createAgency.isPending ? "Creating..." : "Create Agency & Get Started"}
+          </Button>
+        </CardContent>
+      </Card>
     </div>
   );
 }

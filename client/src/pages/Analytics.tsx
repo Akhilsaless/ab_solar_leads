@@ -1,264 +1,165 @@
 import { trpc } from "@/lib/trpc";
-import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
-  BarChart3, TrendingUp, Users, Megaphone, DollarSign,
-  ArrowUpRight, ArrowDownRight, Target, Zap, Mail, Phone, MessageSquare
+  BarChart3, MessageSquare, Users, TrendingUp, IndianRupee,
+  Sun, Target, Clock
 } from "lucide-react";
 import {
-  AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
-  XAxis, YAxis, Tooltip, ResponsiveContainer, Legend
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
+  ResponsiveContainer, PieChart, Pie, Cell, AreaChart, Area
 } from "recharts";
-
-const COLORS = ["#e8a735", "#4ade80", "#60a5fa", "#f472b6", "#a78bfa", "#f97316"];
 
 const tooltipStyle = {
   backgroundColor: "oklch(0.155 0.005 260)",
   border: "1px solid oklch(0.24 0.005 260)",
   borderRadius: "8px",
   color: "#fff",
+  fontSize: 12,
 };
 
 export default function Analytics() {
-  const stats = trpc.leads.stats.useQuery();
+  const { data: stats } = trpc.conversations.stats.useQuery();
+  const { data: conversations } = trpc.conversations.list.useQuery();
 
-  const total = stats.data?.total || 0;
-  const converted = stats.data?.byStatus?.converted || 0;
-  const qualified = stats.data?.byStatus?.qualified || 0;
-  const contacted = stats.data?.byStatus?.contacted || 0;
-  const conversionRate = total > 0 ? ((converted / total) * 100).toFixed(1) : "0";
-  const qualificationRate = total > 0 ? ((qualified / total) * 100).toFixed(1) : "0";
+  const allConvs = conversations || [];
+  const totalConvs = stats?.total || 0;
+  const leadsCaptured = stats?.leadsCaptured || 0;
+  const estimatesGiven = stats?.estimatesGiven || 0;
+  const converted = stats?.converted || 0;
+  const conversionRate = totalConvs > 0 ? ((converted / totalConvs) * 100).toFixed(1) : "0";
+  const captureRate = totalConvs > 0 ? ((leadsCaptured / totalConvs) * 100).toFixed(1) : "0";
 
-  const statusData = stats.data?.byStatus
-    ? Object.entries(stats.data.byStatus).map(([name, value]) => ({ name: name.charAt(0).toUpperCase() + name.slice(1), value }))
-    : [];
+  const statusData = [
+    { name: "Active", value: stats?.active || 0, color: "#3B82F6" },
+    { name: "Lead Captured", value: stats?.leadsCaptured || 0, color: "#22C55E" },
+    { name: "Estimate Given", value: stats?.estimatesGiven || 0, color: "#F59E0B" },
+    { name: "Converted", value: stats?.converted || 0, color: "#10B981" },
+    { name: "Dropped", value: stats?.dropped || 0, color: "#EF4444" },
+  ].filter(d => d.value > 0);
 
-  const sourceData = stats.data?.bySource
-    ? Object.entries(stats.data.bySource).map(([name, value]) => ({ name: name.charAt(0).toUpperCase() + name.slice(1), value }))
-    : [];
+  const last7Days = Array.from({ length: 7 }, (_, i) => {
+    const date = new Date();
+    date.setDate(date.getDate() - (6 - i));
+    const dateStr = date.toISOString().split("T")[0];
+    const dayConvs = allConvs.filter((c: any) => new Date(c.createdAt).toISOString().split("T")[0] === dateStr);
+    return {
+      date: date.toLocaleDateString("en-IN", { weekday: "short", day: "numeric" }),
+      conversations: dayConvs.length,
+      leads: dayConvs.filter((c: any) => c.customerName).length,
+    };
+  });
 
-  const priorityData = stats.data?.byPriority
-    ? Object.entries(stats.data.byPriority).map(([name, value]) => ({ name: name.charAt(0).toUpperCase() + name.slice(1), value }))
-    : [];
+  const stateMap: Record<string, number> = {};
+  allConvs.forEach((c: any) => { if (c.customerState) stateMap[c.customerState] = (stateMap[c.customerState] || 0) + 1; });
+  const stateData = Object.entries(stateMap).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value).slice(0, 8);
 
-  // Simulated monthly trend
-  const monthlyTrend = [
-    { month: "Oct", leads: 8, converted: 2 },
-    { month: "Nov", leads: 15, converted: 4 },
-    { month: "Dec", leads: 22, converted: 6 },
-    { month: "Jan", leads: 30, converted: 10 },
-    { month: "Feb", leads: 38, converted: 14 },
-    { month: "Mar", leads: total || 45, converted: converted || 18 },
-  ];
-
-  // Channel performance
-  const channelData = [
-    { channel: "Email", sent: 120, opened: 85, responded: 32 },
-    { channel: "SMS", sent: 80, opened: 72, responded: 28 },
-    { channel: "WhatsApp", sent: 65, opened: 60, responded: 35 },
-    { channel: "Phone", sent: 40, opened: 40, responded: 22 },
-  ];
+  const systemSizes = allConvs.filter((c: any) => c.recommendedKw).map((c: any) => Number(c.recommendedKw));
+  const avgSystemSize = systemSizes.length > 0 ? (systemSizes.reduce((a: number, b: number) => a + b, 0) / systemSizes.length).toFixed(1) : "0";
+  const totalEstimatedValue = allConvs.filter((c: any) => c.netCost).reduce((sum: number, c: any) => sum + Number(c.netCost), 0);
 
   return (
     <div className="space-y-6 animate-fade-in">
       <div>
-        <h1 className="text-2xl font-bold flex items-center gap-2">
-          <BarChart3 className="w-6 h-6 text-primary" /> Analytics
-        </h1>
-        <p className="text-muted-foreground text-sm mt-1">Track your lead generation and outreach performance</p>
+        <h1 className="text-2xl font-bold tracking-tight">Analytics</h1>
+        <p className="text-muted-foreground mt-1">Performance metrics for your AI sales bot</p>
       </div>
 
-      {/* KPI Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <KPICard title="Total Leads" value={total.toString()} icon={Users} trend="+12%" up />
-        <KPICard title="Conversion Rate" value={`${conversionRate}%`} icon={Target} trend="+3.2%" up />
-        <KPICard title="Qualification Rate" value={`${qualificationRate}%`} icon={TrendingUp} trend="+5.1%" up />
-        <KPICard title="Est. Revenue" value={`₹${(converted * 150000).toLocaleString()}`} icon={DollarSign} trend="+18%" up />
+        <KPICard icon={MessageSquare} label="Total Conversations" value={totalConvs} color="text-blue-400" bg="bg-blue-400/10" />
+        <KPICard icon={Target} label="Capture Rate" value={`${captureRate}%`} color="text-green-400" bg="bg-green-400/10" />
+        <KPICard icon={TrendingUp} label="Conversion Rate" value={`${conversionRate}%`} color="text-emerald-400" bg="bg-emerald-400/10" />
+        <KPICard icon={Sun} label="Avg System Size" value={`${avgSystemSize} kW`} color="text-amber-400" bg="bg-amber-400/10" />
+      </div>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <KPICard icon={Users} label="Leads Captured" value={leadsCaptured} color="text-violet-400" bg="bg-violet-400/10" />
+        <KPICard icon={IndianRupee} label="Estimates Given" value={estimatesGiven} color="text-orange-400" bg="bg-orange-400/10" />
+        <KPICard icon={IndianRupee} label="Pipeline Value" value={`₹${(totalEstimatedValue / 100000).toFixed(1)}L`} color="text-primary" bg="bg-primary/10" />
+        <KPICard icon={Clock} label="Avg Messages" value={totalConvs > 0 ? Math.round(allConvs.reduce((s: number, c: any) => s + (c.messageCount || 0), 0) / totalConvs) : 0} color="text-cyan-400" bg="bg-cyan-400/10" />
       </div>
 
-      {/* Charts Row 1 */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Lead Growth */}
-        <div className="stat-card">
-          <h3 className="font-semibold mb-4">Lead Growth & Conversions</h3>
-          <div className="h-[260px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={monthlyTrend}>
-                <defs>
-                  <linearGradient id="colorLeads2" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#e8a735" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="#e8a735" stopOpacity={0} />
-                  </linearGradient>
-                  <linearGradient id="colorConverted" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#4ade80" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="#4ade80" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <XAxis dataKey="month" stroke="#555" fontSize={12} tickLine={false} axisLine={false} />
-                <YAxis stroke="#555" fontSize={12} tickLine={false} axisLine={false} />
-                <Tooltip contentStyle={tooltipStyle} />
-                <Legend />
-                <Area type="monotone" dataKey="leads" stroke="#e8a735" fill="url(#colorLeads2)" strokeWidth={2} />
-                <Area type="monotone" dataKey="converted" stroke="#4ade80" fill="url(#colorConverted)" strokeWidth={2} />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
+      <div className="grid lg:grid-cols-2 gap-6">
+        <Card>
+          <CardHeader className="pb-2"><CardTitle className="text-base">Daily Activity (Last 7 Days)</CardTitle></CardHeader>
+          <CardContent>
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={last7Days}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
+                  <XAxis dataKey="date" tick={{ fontSize: 11, fill: "#888" }} />
+                  <YAxis tick={{ fontSize: 11, fill: "#888" }} />
+                  <Tooltip contentStyle={tooltipStyle} />
+                  <Area type="monotone" dataKey="conversations" stroke="#F97316" fill="#F9731620" name="Conversations" />
+                  <Area type="monotone" dataKey="leads" stroke="#22C55E" fill="#22C55E20" name="Leads" />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </Card>
 
-        {/* Channel Performance */}
-        <div className="stat-card">
-          <h3 className="font-semibold mb-4">Channel Performance</h3>
-          <div className="h-[260px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={channelData}>
-                <XAxis dataKey="channel" stroke="#555" fontSize={12} tickLine={false} axisLine={false} />
-                <YAxis stroke="#555" fontSize={12} tickLine={false} axisLine={false} />
-                <Tooltip contentStyle={tooltipStyle} />
-                <Legend />
-                <Bar dataKey="sent" fill="#60a5fa" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="opened" fill="#e8a735" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="responded" fill="#4ade80" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-      </div>
-
-      {/* Charts Row 2 */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {/* Status Distribution */}
-        <div className="stat-card">
-          <h3 className="font-semibold mb-4">Lead Status</h3>
-          {statusData.length > 0 ? (
-            <>
-              <div className="h-[200px]">
+        <Card>
+          <CardHeader className="pb-2"><CardTitle className="text-base">Conversation Status</CardTitle></CardHeader>
+          <CardContent>
+            <div className="h-64 flex items-center justify-center">
+              {statusData.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No data yet</p>
+              ) : (
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
-                    <Pie data={statusData} cx="50%" cy="50%" innerRadius={45} outerRadius={75} dataKey="value" paddingAngle={3}>
-                      {statusData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                    <Pie data={statusData} cx="50%" cy="50%" innerRadius={60} outerRadius={90} paddingAngle={4} dataKey="value">
+                      {statusData.map((entry, i) => <Cell key={i} fill={entry.color} />)}
                     </Pie>
                     <Tooltip contentStyle={tooltipStyle} />
                   </PieChart>
                 </ResponsiveContainer>
-              </div>
-              <div className="flex flex-wrap gap-2 mt-2">
-                {statusData.map((item, i) => (
-                  <div key={item.name} className="flex items-center gap-1.5 text-xs">
-                    <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
-                    <span className="text-muted-foreground">{item.name}: {item.value}</span>
-                  </div>
-                ))}
-              </div>
-            </>
-          ) : (
-            <div className="h-[200px] flex items-center justify-center text-muted-foreground text-sm">No data yet</div>
-          )}
-        </div>
-
-        {/* Source Distribution */}
-        <div className="stat-card">
-          <h3 className="font-semibold mb-4">Lead Sources</h3>
-          {sourceData.length > 0 ? (
-            <>
-              <div className="h-[200px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie data={sourceData} cx="50%" cy="50%" innerRadius={45} outerRadius={75} dataKey="value" paddingAngle={3}>
-                      {sourceData.map((_, i) => <Cell key={i} fill={COLORS[(i + 2) % COLORS.length]} />)}
-                    </Pie>
-                    <Tooltip contentStyle={tooltipStyle} />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
-              <div className="flex flex-wrap gap-2 mt-2">
-                {sourceData.map((item, i) => (
-                  <div key={item.name} className="flex items-center gap-1.5 text-xs">
-                    <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: COLORS[(i + 2) % COLORS.length] }} />
-                    <span className="text-muted-foreground">{item.name}: {item.value}</span>
-                  </div>
-                ))}
-              </div>
-            </>
-          ) : (
-            <div className="h-[200px] flex items-center justify-center text-muted-foreground text-sm">No data yet</div>
-          )}
-        </div>
-
-        {/* Priority Distribution */}
-        <div className="stat-card">
-          <h3 className="font-semibold mb-4">Priority Breakdown</h3>
-          {priorityData.length > 0 ? (
-            <>
-              <div className="h-[200px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie data={priorityData} cx="50%" cy="50%" innerRadius={45} outerRadius={75} dataKey="value" paddingAngle={3}>
-                      {priorityData.map((_, i) => <Cell key={i} fill={COLORS[(i + 4) % COLORS.length]} />)}
-                    </Pie>
-                    <Tooltip contentStyle={tooltipStyle} />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
-              <div className="flex flex-wrap gap-2 mt-2">
-                {priorityData.map((item, i) => (
-                  <div key={item.name} className="flex items-center gap-1.5 text-xs">
-                    <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: COLORS[(i + 4) % COLORS.length] }} />
-                    <span className="text-muted-foreground">{item.name}: {item.value}</span>
-                  </div>
-                ))}
-              </div>
-            </>
-          ) : (
-            <div className="h-[200px] flex items-center justify-center text-muted-foreground text-sm">No data yet</div>
-          )}
-        </div>
-      </div>
-
-      {/* Funnel */}
-      <div className="stat-card">
-        <h3 className="font-semibold mb-6">Conversion Funnel</h3>
-        <div className="space-y-3 max-w-2xl mx-auto">
-          {[
-            { label: "Total Leads", value: total, color: "#60a5fa" },
-            { label: "Contacted", value: contacted + qualified + converted, color: "#e8a735" },
-            { label: "Qualified", value: qualified + converted, color: "#a78bfa" },
-            { label: "Converted", value: converted, color: "#4ade80" },
-          ].map((step, i) => {
-            const width = total > 0 ? Math.max((step.value / total) * 100, 8) : (100 - i * 20);
-            return (
-              <div key={step.label} className="flex items-center gap-4">
-                <span className="text-xs text-muted-foreground w-20 text-right">{step.label}</span>
-                <div className="flex-1 h-10 bg-muted/30 rounded-lg overflow-hidden relative">
-                  <div
-                    className="h-full rounded-lg flex items-center justify-end pr-3 transition-all duration-700"
-                    style={{ width: `${width}%`, backgroundColor: step.color + "30", borderLeft: `3px solid ${step.color}` }}
-                  >
-                    <span className="text-sm font-bold" style={{ color: step.color }}>{step.value}</span>
-                  </div>
+              )}
+            </div>
+            <div className="flex flex-wrap justify-center gap-3 mt-2">
+              {statusData.map((d, i) => (
+                <div key={i} className="flex items-center gap-1.5 text-xs">
+                  <span className="w-2.5 h-2.5 rounded-full" style={{ background: d.color }} />
+                  <span className="text-muted-foreground">{d.name}: {d.value}</span>
                 </div>
-              </div>
-            );
-          })}
-        </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="lg:col-span-2">
+          <CardHeader className="pb-2"><CardTitle className="text-base">Leads by State</CardTitle></CardHeader>
+          <CardContent>
+            <div className="h-64">
+              {stateData.length === 0 ? (
+                <div className="flex items-center justify-center h-full text-sm text-muted-foreground">No state data yet</div>
+              ) : (
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={stateData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
+                    <XAxis dataKey="name" tick={{ fontSize: 11, fill: "#888" }} />
+                    <YAxis tick={{ fontSize: 11, fill: "#888" }} />
+                    <Tooltip contentStyle={tooltipStyle} />
+                    <Bar dataKey="value" fill="#F97316" radius={[4, 4, 0, 0]} name="Conversations" />
+                  </BarChart>
+                </ResponsiveContainer>
+              )}
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );
 }
 
-function KPICard({ title, value, icon: Icon, trend, up }: {
-  title: string; value: string; icon: any; trend: string; up: boolean;
-}) {
+function KPICard({ icon: Icon, label, value, color, bg }: { icon: any; label: string; value: any; color: string; bg: string }) {
   return (
     <div className="stat-card">
-      <div className="flex items-center justify-between mb-3">
-        <span className="text-sm text-muted-foreground">{title}</span>
-        <Icon className="w-4 h-4 text-muted-foreground" />
-      </div>
-      <div className="flex items-end gap-2">
-        <span className="text-2xl font-bold">{value}</span>
-        <span className={`text-xs font-medium flex items-center gap-0.5 mb-1 ${up ? "text-green-400" : "text-red-400"}`}>
-          {up ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
-          {trend}
-        </span>
+      <div className="flex items-center gap-3">
+        <div className={`w-10 h-10 rounded-xl ${bg} flex items-center justify-center`}>
+          <Icon className={`w-5 h-5 ${color}`} />
+        </div>
+        <div>
+          <p className="text-xl font-bold">{value}</p>
+          <p className="text-[11px] text-muted-foreground">{label}</p>
+        </div>
       </div>
     </div>
   );

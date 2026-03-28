@@ -22,8 +22,8 @@ import {
 import { getLoginUrl } from "@/const";
 import { useIsMobile } from "@/hooks/useMobile";
 import {
-  LayoutDashboard, Users, Megaphone, FileText, Globe, BarChart3,
-  MapPin, Shield, Settings, LogOut, PanelLeft, Zap, Upload
+  LayoutDashboard, Users, MessageSquare, Sun, BarChart3,
+  MapPin, Settings, LogOut, PanelLeft, Zap, BookOpen
 } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
@@ -32,14 +32,11 @@ import { Button } from "./ui/button";
 
 const menuItems = [
   { icon: LayoutDashboard, label: "Dashboard", path: "/" },
+  { icon: MessageSquare, label: "Conversations", path: "/conversations" },
   { icon: Users, label: "Leads", path: "/leads" },
-  { icon: Upload, label: "Import", path: "/leads/import" },
-  { icon: Globe, label: "Scraper", path: "/scrape" },
-  { icon: Megaphone, label: "Campaigns", path: "/campaigns" },
-  { icon: FileText, label: "Templates", path: "/templates" },
+  { icon: Sun, label: "Products", path: "/products" },
+  { icon: BookOpen, label: "Subsidies", path: "/subsidies" },
   { icon: BarChart3, label: "Analytics", path: "/analytics" },
-  { icon: MapPin, label: "Map", path: "/map" },
-  { icon: Shield, label: "DNC List", path: "/dnc" },
   { icon: Settings, label: "Settings", path: "/settings" },
 ];
 
