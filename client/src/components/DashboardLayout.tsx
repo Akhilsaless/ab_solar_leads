@@ -75,7 +75,7 @@ export default function DashboardLayout({
           </div>
           <div className="flex flex-col items-center gap-4">
             <h1 className="text-2xl font-bold tracking-tight text-center">
-              AB SOLAR Outreach
+              MAA SOLAR Outreach
             </h1>
             <p className="text-sm text-muted-foreground text-center max-w-sm">
               Sign in to access your lead generation and outreach platform.
@@ -179,7 +179,7 @@ function DashboardLayoutContent({
               {!isCollapsed ? (
                 <div className="flex items-center gap-2 min-w-0">
                   <span className="font-bold tracking-tight truncate">
-                    AB SOLAR
+                    MAA SOLAR
                   </span>
                 </div>
               ) : null}

@@ -151,7 +151,7 @@ export default function ChatBot() {
   };
 
   const brandColor = agencyInfo?.color || "#F97316";
-  const agencyName = agencyInfo?.name || "AB SOLAR";
+  const agencyName = agencyInfo?.name || "MAA SOLAR";
 
   // Initial quick replies shown before first user message
   const initialQuickReplies = messages.length <= 1 && !isLoading ? [
@@ -208,7 +208,7 @@ export default function ChatBot() {
               <div className="flex justify-center mb-6 animate-fade-in">
                 <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/5 border border-white/10 text-xs text-gray-400">
                   <Sun className="w-3.5 h-3.5" style={{ color: brandColor }} />
-                  <span>Powered by AB SOLAR AI</span>
+                  <span>Powered by MAA SOLAR AI</span>
                 </div>
               </div>
             )}
@@ -370,7 +370,7 @@ export default function ChatBot() {
             </Button>
           </div>
           <p className="text-[10px] text-gray-600 text-center mt-2">
-            Powered by AB SOLAR AI · Your data is secure
+            Powered by MAA SOLAR AI · Your data is secure
           </p>
         </div>
       </div>

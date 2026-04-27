@@ -633,7 +633,7 @@ export const appRouter = router({
             price_data: {
               currency: "inr",
               product_data: {
-                name: `AB SOLAR ${planData.name} Plan`,
+                name: `MAA SOLAR ${planData.name} Plan`,
                 description: planData.description,
               },
               unit_amount: amount * 100,
