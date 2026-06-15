@@ -41,6 +41,8 @@ export default function ChatBot() {
   const utmSource = urlParams.get("utm_source") || undefined;
   const utmMedium = urlParams.get("utm_medium") || undefined;
   const utmCampaign = urlParams.get("utm_campaign") || undefined;
+  const autoCloseMinutes = urlParams.get("autoClose") ? parseInt(urlParams.get("autoClose")!) : null;
+  const [isClosed, setIsClosed] = useState(false);
 
   // Start conversation
   const startConv = trpc.chat.startConversation.useMutation({
@@ -97,6 +99,16 @@ export default function ChatBot() {
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Auto-close timer
+  useEffect(() => {
+    if (autoCloseMinutes && autoCloseMinutes > 0) {
+      const timer = setTimeout(() => {
+        setIsClosed(true);
+      }, autoCloseMinutes * 60 * 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [autoCloseMinutes]);
 
   // Auto-scroll to bottom
   useEffect(() => {
@@ -168,6 +180,27 @@ export default function ChatBot() {
     }
     return -1;
   })();
+
+  if (isClosed) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950 flex items-center justify-center">
+        <div className="text-center space-y-4 max-w-md">
+          <div className="w-16 h-16 rounded-full bg-orange-500/20 flex items-center justify-center mx-auto">
+            <Sun className="w-8 h-8 text-orange-400" />
+          </div>
+          <h2 className="text-2xl font-bold text-white">Chat Session Closed</h2>
+          <p className="text-gray-400">Thank you for chatting with {agencyName}! Your session has ended.</p>
+          <p className="text-sm text-gray-500">Feel free to reach out again anytime.</p>
+          <Button
+            onClick={() => window.location.reload()}
+            className="mt-6 solar-gradient text-black font-semibold"
+          >
+            Start New Chat
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950 flex flex-col">
