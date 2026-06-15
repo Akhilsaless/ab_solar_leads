@@ -1033,7 +1033,7 @@ At the END of EVERY response, you MUST include a JSON block with 2-4 quick reply
 [/QUICK_REPLIES]
 
 Examples by stage:
-- After greeting/asking state: ["Maharashtra", "Karnataka", "Tamil Nadu", "Delhi"]
+- After greeting/asking state: ["Maharashtra", "Karnataka", "Tamil Nadu", "Telangana", "Delhi"]
 - After asking bill amount: ["₹1000-2000", "₹2000-4000", "₹4000-7000", "₹7000+"]
 - After asking about roof: ["Yes, I own the house", "Rented house", "Commercial building"]
 - After giving estimate: ["Sounds great!", "That's expensive", "Tell me about subsidy", "What's the warranty?"]
