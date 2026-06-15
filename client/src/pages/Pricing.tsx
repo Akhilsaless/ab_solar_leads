@@ -222,7 +222,7 @@ export default function Pricing() {
       {/* Features Comparison */}
       <Card className="border-border/30 bg-card/60 max-w-5xl mx-auto">
         <CardHeader>
-          <CardTitle className="text-center">Why Agencies Choose MAA SOLAR</CardTitle>
+          <CardTitle className="text-center">Why Agencies Choose AB SOLAR</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">

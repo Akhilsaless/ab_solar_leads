@@ -1,5 +1,5 @@
 /**
- * MAA SOLAR Subscription Plans
+ * AB SOLAR Subscription Plans
  * Prices in INR (Indian Rupees)
  */
 
