@@ -439,7 +439,37 @@ export const appRouter = router({
           cleanContent = aiContent.replace(qrRegex, '').trim();
         }
 
-        return { response: cleanContent, quickReplies };
+        // Build metadata for visual components
+        const metadata: Record<string, any> = {};
+        const updatedConv = await db.getConversation(input.sessionId);
+        
+        // Trigger structure selector after bill is provided
+        if (updatedConv?.monthlyBill && !updatedConv?.structure) {
+          metadata.showStructureSelector = true;
+        }
+        
+        // Trigger images after structure is selected
+        if (updatedConv?.structure) {
+          metadata.showImages = true;
+          metadata.structure = updatedConv.structure;
+        }
+        
+        // Trigger ROI after bill is provided
+        if (updatedConv?.monthlyBill && updatedConv?.recommendedKw) {
+          metadata.showROI = true;
+          metadata.monthlyBill = parseFloat(updatedConv.monthlyBill);
+          metadata.systemSizeKw = parseFloat(updatedConv.recommendedKw);
+          metadata.panelCount = updatedConv.recommendedPanels || 0;
+          metadata.totalCost = parseFloat(updatedConv.estimatedCost || "0");
+          metadata.subsidyAmount = parseFloat(updatedConv.subsidyAmount || "0");
+          metadata.netCost = parseFloat(updatedConv.netCost || "0");
+          metadata.monthlyElectricitySavings = parseFloat(updatedConv.estimatedSavingsMonthly || "0");
+          metadata.paybackYears = parseFloat(updatedConv.paybackYears || "0");
+          metadata.currentRate = 7.5;
+          metadata.rateIncreasePercentage = 1.3;
+        }
+
+        return { response: cleanContent, quickReplies, metadata };
       }),
 
     // Get conversation history
@@ -984,20 +1014,22 @@ CONVERSATION RULES:
 VISUAL-FIRST CONVERSATION FLOW (FAST & ENGAGING - 5 MINUTES):
 1. Greet warmly → Ask state (1 message)
 2. Ask monthly bill amount (1 message)
-3. **IMMEDIATELY SHOW 3D PREVIEW + ROI** - Don't explain, let customer see their system
-4. Ask panel preference (mono vs poly) - show live 3D update with cost difference
-5. Ask name and phone for site visit (1 message)
-6. Close: "Great! We'll call you within 24 hours" (1 message)
+3. **IMMEDIATELY SHOW STRUCTURE SELECTOR** - Ask where they want panels (Roof/Ground/Balcony/Wall)
+4. **SHOW REAL GOOGLE IMAGES** of installations on their chosen structure
+5. Ask panel preference (mono vs poly) - show ROI calculator
+6. Ask name and phone for site visit (1 message)
+7. Close: "Great! We'll call you within 24 hours" (1 message)
 
 CRITICAL: After customer provides bill amount, ALWAYS include metadata:
+- showStructureSelector: true (shows roof/ground/balcony/wall options)
+- showImages: true (displays Google images of real installations)
 - showROI: true (displays ROI calculator)
-- show3D: true (displays 3D roof visualization)
 - panelCount: calculated from bill
 - systemSizeKw: calculated from bill
 - currentRate: state's electricity rate
 - rateIncreasePercentage: 1.3%
 
-Let the VISUALS convince them, not your words. The 3D preview and ROI numbers do the selling.
+Let the REAL IMAGES convince them, not your words. Show actual installations on structures like theirs. The images and ROI numbers do the selling.
 
 AGENCY PRODUCT CATALOG:
 ${panelList || "Standard panels available - ask agency for specific models"}

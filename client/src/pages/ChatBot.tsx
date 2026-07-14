@@ -11,6 +11,8 @@ import { ROICalculator } from "@/components/ROICalculator";
 import { RoofVisualization } from "@/components/RoofVisualization";
 import { SystemSizeSlider } from "@/components/SystemSizeSlider";
 import { PanelComparison } from "@/components/PanelComparison";
+import { GoogleImagesGallery } from "@/components/GoogleImagesGallery";
+import { StructureSelector } from "@/components/StructureSelector";
 
 type ChatMessage = {
   role: "bot" | "customer";
@@ -37,6 +39,8 @@ export default function ChatBot() {
   const [isLoading, setIsLoading] = useState(false);
   const [agencyInfo, setAgencyInfo] = useState<any>(null);
   const [showScrollBtn, setShowScrollBtn] = useState(false);
+  const [selectedStructure, setSelectedStructure] = useState<"roof" | "ground" | "balcony" | "wall" | null>(null);
+  const [systemSizeKw, setSystemSizeKw] = useState(5);
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -299,6 +303,27 @@ export default function ChatBot() {
                       futureElectricityRate={msg.metadata.futureElectricityRate}
                       currentRate={msg.metadata.currentRate}
                       rateIncreasePercentage={msg.metadata.rateIncreasePercentage}
+                    />
+                  </div>
+                )}
+
+                {msg.role === "bot" && msg.metadata?.showImages && (
+                  <div className="ml-11 mt-4 max-w-[85%] md:max-w-[75%]">
+                    <GoogleImagesGallery
+                      structureType={selectedStructure}
+                      systemSizeKw={systemSizeKw}
+                    />
+                  </div>
+                )}
+
+                {msg.role === "bot" && msg.metadata?.showStructureSelector && (
+                  <div className="ml-11 mt-4 max-w-[85%] md:max-w-[75%]">
+                    <StructureSelector
+                      selected={selectedStructure}
+                      onSelect={(structure) => {
+                        setSelectedStructure(structure);
+                        handleSend(`I want panels on my ${structure}`);
+                      }}
                     />
                   </div>
                 )}
