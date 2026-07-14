@@ -438,6 +438,8 @@ export default function ChatBot() {
     .footer { background: #f8f9fa; padding: 20px 30px; text-align: center; font-size: 12px; color: #666; }
     .footer p { margin: 5px 0; }
     .chart-placeholder { background: #f0f0f0; height: 200px; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #999; margin: 15px 0; }
+    .chart-section { margin: 20px 0; }
+    .chart-section h3 { font-size: 16px; font-weight: bold; color: #333; margin-bottom: 15px; }
   </style>
 </head>
 <body>
@@ -494,6 +496,82 @@ export default function ChatBot() {
       <div class="highlight">
         <p><strong>25-Year Total Savings:</strong> Approx ₹${savings25Year}</p>
         <p style="font-size: 12px; margin-top: 10px; color: #666;">Based on current electricity rates with 1.3% annual increase</p>
+      </div>
+    </div>
+    
+    <!-- Charts Section -->
+    <div class="section">
+      <h2>📊 Visual Breakdown</h2>
+      
+      <!-- Cost Breakdown Chart -->
+      <div class="chart-section">
+        <h3>💰 System Cost Breakdown</h3>
+        <svg viewBox="0 0 400 200" xmlns="http://www.w3.org/2000/svg" style="max-width: 100%; border: 1px solid #e9ecef; border-radius: 8px;">
+          <rect width="400" height="200" fill="#f8f9fa"/>
+          <!-- Original Cost Bar -->
+          <rect x="30" y="30" width="340" height="35" fill="#F97316" rx="5"/>
+          <text x="40" y="55" font-size="13" fill="white" font-weight="bold">Original Cost: ₹${estimatedCost}</text>
+          <!-- Subsidy Bar -->
+          <rect x="30" y="80" width="170" height="35" fill="#22c55e" rx="5"/>
+          <text x="40" y="105" font-size="13" fill="white" font-weight="bold">Subsidy: ₹${subsidy}</text>
+          <!-- Net Cost Bar -->
+          <rect x="30" y="130" width="200" height="35" fill="#3b82f6" rx="5"/>
+          <text x="40" y="155" font-size="13" fill="white" font-weight="bold">Your Cost: ₹${netCost}</text>
+        </svg>
+      </div>
+      
+      <!-- Payback Timeline -->
+      <div class="chart-section">
+        <h3>📈 Payback Period: ${paybackPeriod} Years</h3>
+        <svg viewBox="0 0 400 150" xmlns="http://www.w3.org/2000/svg" style="max-width: 100%; border: 1px solid #e9ecef; border-radius: 8px;">
+          <rect width="400" height="150" fill="#f8f9fa"/>
+          <!-- Timeline line -->
+          <line x1="40" y1="75" x2="360" y2="75" stroke="#ddd" stroke-width="3"/>
+          <!-- Start marker -->
+          <circle cx="40" cy="75" r="8" fill="#F97316"/>
+          <text x="40" y="110" font-size="12" text-anchor="middle" fill="#333">Now</text>
+          <!-- Payback marker -->
+          <circle cx="200" cy="75" r="8" fill="#22c55e"/>
+          <text x="200" y="110" font-size="12" text-anchor="middle" fill="#333" font-weight="bold">Year ${paybackPeriod}</text>
+          <text x="200" y="125" font-size="11" text-anchor="middle" fill="#666">System Paid Off</text>
+          <!-- End marker -->
+          <circle cx="360" cy="75" r="8" fill="#3b82f6"/>
+          <text x="360" y="110" font-size="12" text-anchor="middle" fill="#333">Year 25</text>
+        </svg>
+      </div>
+      
+      <!-- 25-Year Savings -->
+      <div class="chart-section">
+        <h3>💵 25-Year Total Savings: ₹${savings25Year}</h3>
+        <svg viewBox="0 0 400 150" xmlns="http://www.w3.org/2000/svg" style="max-width: 100%; border: 1px solid #e9ecef; border-radius: 8px;">
+          <rect width="400" height="150" fill="#f8f9fa"/>
+          <!-- Savings bar -->
+          <rect x="50" y="30" width="300" height="80" fill="#22c55e" opacity="0.8" rx="5"/>
+          <text x="200" y="80" font-size="18" font-weight="bold" text-anchor="middle" fill="white">₹${savings25Year}</text>
+          <text x="200" y="110" font-size="12" text-anchor="middle" fill="#666">Total savings over 25 years with 1.3% annual rate increase</text>
+        </svg>
+      </div>
+      
+      <!-- Monthly Savings -->
+      <div class="chart-section">
+        <h3>📅 Monthly Savings: ₹${monthlySavings}</h3>
+        <svg viewBox="0 0 400 120" xmlns="http://www.w3.org/2000/svg" style="max-width: 100%; border: 1px solid #e9ecef; border-radius: 8px;">
+          <rect width="400" height="120" fill="#f8f9fa"/>
+          <!-- Monthly bars (12 months representation) -->
+          <rect x="25" y="50" width="12" height="50" fill="#F97316" opacity="0.8"/>
+          <rect x="42" y="50" width="12" height="50" fill="#F97316" opacity="0.8"/>
+          <rect x="59" y="50" width="12" height="50" fill="#F97316" opacity="0.8"/>
+          <rect x="76" y="50" width="12" height="50" fill="#F97316" opacity="0.8"/>
+          <rect x="93" y="50" width="12" height="50" fill="#F97316" opacity="0.8"/>
+          <rect x="110" y="50" width="12" height="50" fill="#F97316" opacity="0.8"/>
+          <rect x="127" y="50" width="12" height="50" fill="#F97316" opacity="0.8"/>
+          <rect x="144" y="50" width="12" height="50" fill="#F97316" opacity="0.8"/>
+          <rect x="161" y="50" width="12" height="50" fill="#F97316" opacity="0.8"/>
+          <rect x="178" y="50" width="12" height="50" fill="#F97316" opacity="0.8"/>
+          <rect x="195" y="50" width="12" height="50" fill="#F97316" opacity="0.8"/>
+          <rect x="212" y="50" width="12" height="50" fill="#F97316" opacity="0.8"/>
+          <text x="200" y="115" font-size="11" text-anchor="middle" fill="#666">Each bar = Monthly savings (12 months shown)</text>
+        </svg>
       </div>
     </div>
     
