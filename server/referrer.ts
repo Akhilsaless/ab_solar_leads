@@ -123,8 +123,8 @@ export const referrerRouter = router({
       const uniqueCode = `REF_${nanoid(8).toUpperCase()}`;
 
       const insertResult = await db.execute(
-        sql`INSERT INTO referrers (uniqueCode, name, email, totalEarnings, totalReferrals, status, qualityScore, dailyStreak, acceptedTnC) 
-            VALUES (${uniqueCode}, ${name}, ${email}, 0, 0, 'active', 100, 0, 1)`
+        sql`INSERT INTO referrers (uniqueCode, name, email, totalEarnings, totalReferrals, status, qualityScore, dailyStreak, acceptedTnC, signupBonusPaid) 
+            VALUES (${uniqueCode}, ${name}, ${email}, 50, 0, 'active', 100, 0, 1, 1)`
       );
       const newId = insertId(insertResult);
 
@@ -133,6 +133,10 @@ export const referrerRouter = router({
         await db.execute(
           sql`INSERT INTO referralTasks (referrerId, taskNumber, targetReferrals, bonusPerReferral) 
               VALUES (${newId}, 1, 5, ${getMilestoneBonus(1)})`
+        );
+        // Deduct ₹50 signup bonus from pot
+        await db.execute(
+          sql`UPDATE pot_balance SET balance = GREATEST(0, balance - 50) WHERE id = 1`
         );
       }
 
@@ -335,12 +339,50 @@ export const referrerRouter = router({
         sql`UPDATE withdrawals SET status = 'approved', processedAt = NOW() WHERE id = ${input.withdrawalId}`
       );
 
+      // Deduct from pot balance
+      await db.execute(
+        sql`UPDATE pot_balance SET balance = GREATEST(0, balance - ${withdrawal.amount}) WHERE id = 1`
+      );
+
       sendEmail({
         to: withdrawal.email,
         subject: "Withdrawal Approved - Sales Squad",
         html: `<p>Hi ${withdrawal.name}, your withdrawal of ₹${withdrawal.amount} has been approved and will be credited shortly!</p>`,
       }).catch(console.error);
 
+      return { success: true };
+    }),
+
+  // Public: get pot balance and recent payouts for landing page
+  getPotInfo: publicProcedure.query(async () => {
+    const db = await getDb();
+    if (!db) return { balance: 10000, recentPayouts: [] };
+    try {
+      const potResult = await db.execute(sql`SELECT balance FROM pot_balance WHERE id = 1`);
+      const pot = firstRow(potResult);
+      const payoutsResult = await db.execute(
+        sql`SELECT ref.name, w.amount, w.processedAt 
+            FROM withdrawals w 
+            JOIN referrers ref ON w.referrerId = ref.id 
+            WHERE w.status = 'approved' 
+            ORDER BY w.processedAt DESC LIMIT 8`
+      );
+      return {
+        balance: Number(pot?.balance || 10000),
+        recentPayouts: rows(payoutsResult),
+      };
+    } catch {
+      return { balance: 10000, recentPayouts: [] };
+    }
+  }),
+
+  // Admin: set pot balance
+  setPotBalance: publicProcedure
+    .input(z.object({ amount: z.number().min(0) }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new Error("Database not available");
+      await db.execute(sql`UPDATE pot_balance SET balance = ${input.amount} WHERE id = 1`);
       return { success: true };
     }),
 

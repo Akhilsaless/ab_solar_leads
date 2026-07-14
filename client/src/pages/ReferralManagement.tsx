@@ -34,6 +34,10 @@ export default function ReferralManagement() {
     },
   });
 
+  const potInfo = trpc.referrer.getPotInfo.useQuery(undefined, { refetchInterval: 15000 });
+  const setPotBalance = trpc.referrer.setPotBalance.useMutation({ onSuccess: () => potInfo.refetch() });
+  const [newBalance, setNewBalance] = useState("");
+
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
   };
@@ -60,6 +64,36 @@ export default function ReferralManagement() {
             {tab.charAt(0).toUpperCase() + tab.slice(1)}
           </button>
         ))}
+      </div>
+
+      {/* Reward Pool Card — always visible above tabs */}
+      <div style={{ background: "#141414", border: "1px solid rgba(16,185,129,0.3)", borderRadius: 14, padding: "20px 24px", display: "flex", flexWrap: "wrap", gap: 24, alignItems: "center", justifyContent: "space-between" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+          <div style={{ width: 48, height: 48, borderRadius: "50%", background: "rgba(16,185,129,0.12)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22 }}>💰</div>
+          <div>
+            <p style={{ margin: 0, color: "#555", fontSize: 12, fontWeight: 600, letterSpacing: 1, textTransform: "uppercase" }}>Reward Pool Balance</p>
+            <p style={{ margin: "4px 0 0", color: "#10b981", fontSize: 32, fontWeight: 800 }}>₹{(potInfo.data?.balance ?? 10000).toLocaleString("en-IN")}</p>
+            <div style={{ marginTop: 6, height: 4, background: "#222", borderRadius: 4, overflow: "hidden", width: 200 }}>
+              <div style={{ height: "100%", background: "#10b981", borderRadius: 4, width: `${Math.min(100, ((potInfo.data?.balance ?? 10000) / 10000) * 100)}%`, transition: "width 0.5s" }} />
+            </div>
+          </div>
+        </div>
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <input
+            type="number"
+            placeholder="Set new balance (e.g. 10000)"
+            value={newBalance}
+            onChange={e => setNewBalance(e.target.value)}
+            style={{ background: "#0a0a0a", border: "1px solid #333", borderRadius: 8, padding: "8px 12px", color: "#fff", fontSize: 14, width: 220 }}
+          />
+          <button
+            onClick={() => { if (newBalance) { setPotBalance.mutate({ amount: Number(newBalance) }); setNewBalance(""); } }}
+            disabled={setPotBalance.isPending || !newBalance}
+            style={{ background: "#10b981", color: "#000", border: "none", borderRadius: 8, padding: "8px 16px", fontWeight: 700, cursor: "pointer", opacity: setPotBalance.isPending ? 0.6 : 1 }}
+          >
+            {setPotBalance.isPending ? "Updating..." : "Update Pool"}
+          </button>
+        </div>
       </div>
 
       {/* Links Tab */}

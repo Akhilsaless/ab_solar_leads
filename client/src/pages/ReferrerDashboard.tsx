@@ -272,6 +272,11 @@ export default function ReferrerDashboard() {
             {/* Earnings Breakdown */}
             <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: 20 }}>
               <h3 style={{ margin: "0 0 14px", color: C.green, fontSize: 15 }}>📈 Earnings Breakdown</h3>
+              {/* ₹50 signup bonus banner */}
+              <div style={{ background: "rgba(16,185,129,0.08)", border: `1px solid ${C.borderGreen}`, borderRadius: 8, padding: "10px 14px", marginBottom: 12, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span style={{ color: C.subtle, fontSize: 13 }}>🎁 Signup Bonus (credited on join)</span>
+                <span style={{ color: C.green, fontWeight: 700, fontSize: 15 }}>+₹50</span>
+              </div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
                 {[
                   { label: "Subsidy Bonuses (₹500)", value: `₹${(completedReferrals * 500 + subsidyReferrals * 500).toLocaleString()}`, color: "#60a5fa" },

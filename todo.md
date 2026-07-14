@@ -146,3 +146,13 @@
 - [x] All admin pages: updated card/button colors
 - [x] ReferrerDashboard: green theme, earnings hero card, pipeline glows
 - [x] ReferrerSignup and referral-facing pages: green theme
+
+## Trust Features (Current Session)
+- [x] DB: pot_balance table (id, balance, updatedAt) + recent_payouts view
+- [x] Backend: ₹50 signup bonus credited on referrer signup
+- [x] Backend: pot balance deducted on every approved payout
+- [x] Backend: getPotBalance + getRecentPayouts public procedures
+- [x] Backend: admin setPotBalance procedure
+- [x] Frontend: ReferralLanding - live pot balance display + recent payouts ticker
+- [x] Frontend: ReferrerDashboard - show ₹50 signup bonus in earnings breakdown
+- [x] Frontend: Admin - pot balance management card

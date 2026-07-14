@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
-import { ArrowRight, Users, Gift, Zap, TrendingUp } from "lucide-react";
+import { ArrowRight, Users, Gift, Zap, TrendingUp, Shield } from "lucide-react";
 import { SalesSquadLogo } from "@/components/SalesSquadLogo";
+import { trpc } from "@/lib/trpc";
 
 const G = "#10b981";
 const GDIM = "rgba(16,185,129,0.12)";
@@ -10,6 +11,9 @@ const GBORDER = "rgba(16,185,129,0.25)";
 export default function ReferralLanding() {
   const [, navigate] = useLocation();
   const [referrerCode, setReferrerCode] = useState<string>("");
+  const potInfo = trpc.referrer.getPotInfo.useQuery(undefined, { refetchInterval: 30000 });
+  const balance = potInfo.data?.balance ?? 10000;
+  const recentPayouts = potInfo.data?.recentPayouts ?? [];
 
   useEffect(() => {
     const pathParts = window.location.pathname.split("/");
@@ -38,8 +42,50 @@ export default function ReferralLanding() {
 
       <div style={{ maxWidth: 1100, margin: "0 auto", padding: "0 24px" }}>
 
+        {/* Trust Bar: Pot Balance + Recent Payouts */}
+        <div style={{ display: "flex", gap: 16, flexWrap: "wrap", padding: "28px 0 0", alignItems: "stretch" }}>
+          {/* Pot Balance */}
+          <div style={{ flex: "1 1 260px", background: "#141414", border: `1px solid ${GBORDER}`, borderRadius: 14, padding: "20px 24px", display: "flex", alignItems: "center", gap: 16 }}>
+            <div style={{ width: 48, height: 48, borderRadius: "50%", background: "rgba(16,185,129,0.12)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+              <Shield style={{ width: 22, height: 22, color: G }} />
+            </div>
+            <div>
+              <p style={{ margin: 0, color: "#555", fontSize: 12, fontWeight: 600, letterSpacing: 1, textTransform: "uppercase" }}>Reward Pool Available</p>
+              <p style={{ margin: "4px 0 0", color: G, fontSize: 28, fontWeight: 800 }}>₹{balance.toLocaleString("en-IN")}</p>
+              <div style={{ marginTop: 6, height: 4, background: "#222", borderRadius: 4, overflow: "hidden", width: 160 }}>
+                <div style={{ height: "100%", background: G, borderRadius: 4, width: `${Math.min(100, (balance / 10000) * 100)}%`, transition: "width 0.5s" }} />
+              </div>
+            </div>
+          </div>
+
+          {/* Recent Payouts Ticker */}
+          <div style={{ flex: "2 1 320px", background: "#141414", border: "1px solid #222", borderRadius: 14, padding: "20px 24px", overflow: "hidden" }}>
+            <p style={{ margin: "0 0 12px", color: "#555", fontSize: 12, fontWeight: 600, letterSpacing: 1, textTransform: "uppercase" }}>Recent Payouts</p>
+            {recentPayouts.length > 0 ? (
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {recentPayouts.slice(0, 4).map((p: any, i: number) => (
+                  <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <span style={{ color: "#ccc", fontSize: 13 }}>✅ {p.name?.split(" ")[0]} {p.name?.split(" ")[1]?.[0] ? p.name.split(" ")[1][0] + "." : ""}</span>
+                    <span style={{ color: G, fontWeight: 700, fontSize: 13 }}>₹{Number(p.amount).toLocaleString("en-IN")} paid</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {["Ravi K.", "Priya S.", "Amit M.", "Sunita R."].map((name, i) => (
+                  <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <span style={{ color: "#ccc", fontSize: 13 }}>✅ {name}</span>
+                    <span style={{ color: G, fontWeight: 700, fontSize: 13 }}>₹{[1500, 500, 2000, 500][i].toLocaleString("en-IN")} paid</span>
+                  </div>
+                ))}
+                <p style={{ color: "#333", fontSize: 11, margin: "4px 0 0" }}>Sample — real payouts shown once program starts</p>
+              </div>
+            )}
+          </div>
+        </div>
+
         {/* Hero */}
-        <div style={{ textAlign: "center", padding: "80px 0 60px" }}>
+        <div style={{ textAlign: "center", padding: "60px 0 60px" }}>
           <div style={{ display: "inline-block", background: GDIM, border: `1px solid ${GBORDER}`, borderRadius: 20, padding: "6px 16px", marginBottom: 20 }}>
             <span style={{ color: G, fontSize: 13, fontWeight: 600 }}>🌞 Solar Referral Program</span>
           </div>
