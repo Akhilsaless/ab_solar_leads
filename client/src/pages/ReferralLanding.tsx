@@ -93,7 +93,7 @@ export default function ReferralLanding() {
             Earn <span style={{ color: G }}>₹2,000</span> Per Customer
           </h1>
           <p style={{ color: "#888", fontSize: 18, margin: "0 0 36px", maxWidth: 560, marginLeft: "auto", marginRight: "auto" }}>
-            Refer customers to AB SOLAR and earn ₹500 when they apply for govt subsidy + ₹1,500 when solar is installed.
+            Refer customers to Sales Squad and earn ₹500 when they apply for govt subsidy + ₹1,500 when solar is installed.
           </p>
           <div style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap" }}>
             <button

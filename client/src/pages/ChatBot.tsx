@@ -4,10 +4,11 @@ import { useParams } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Send, Loader2, Sun, Zap, ArrowDown, Download } from "lucide-react";
+import { Send, Loader2, Sun, Zap, ArrowDown, Download, MapPin, X } from "lucide-react";
 import { Streamdown } from "streamdown";
 import { nanoid } from "nanoid";
-// ROI and 3D visualization removed - using simple text display
+import jsPDF from "jspdf";
+import { MapView } from "@/components/Map";
 
 type ChatMessage = {
   role: "bot" | "customer";
@@ -50,6 +51,101 @@ export default function ChatBot() {
   const referrerCode = pathParts.includes("refer") ? pathParts[pathParts.indexOf("refer") + 1] : undefined;
   
   const [isClosed, setIsClosed] = useState(false);
+  const [showMapPin, setShowMapPin] = useState(false);
+  const [pinnedLocation, setPinnedLocation] = useState<{ lat: number; lng: number; address: string } | null>(null);
+  const [mapInstance, setMapInstance] = useState<google.maps.Map | null>(null);
+  const [pinMarker, setPinMarker] = useState<google.maps.Marker | null>(null);
+
+  // Generate PDF estimate using jsPDF
+  const downloadPDF = () => {
+    const lastBotMsg = messages.filter(m => m.role === 'bot').pop();
+    const meta = lastBotMsg?.metadata || {};
+    const name = meta.customerName || 'Valued Customer';
+    const bill = meta.monthlyBill ? `₹${meta.monthlyBill}` : '₹2,500 (default)';
+    const systemKw = meta.systemSizeKw ? `~${meta.systemSizeKw} kW` : '~3 kW';
+    const cost = meta.estimatedCost ? `₹${Math.round(Number(meta.estimatedCost)).toLocaleString('en-IN')}` : 'On Request';
+    const subsidy = meta.subsidyAmount ? `₹${Math.round(Number(meta.subsidyAmount)).toLocaleString('en-IN')}` : '₹78,000';
+    const netCost = meta.netCost ? `₹${Math.round(Number(meta.netCost)).toLocaleString('en-IN')}` : 'On Request';
+    const savings = meta.estimatedSavingsMonthly ? `₹${Math.round(Number(meta.estimatedSavingsMonthly)).toLocaleString('en-IN')}/month` : 'On Request';
+    const payback = meta.paybackYears ? `~${meta.paybackYears} years` : '~4 years';
+    const loc = meta.customerCity ? `${meta.customerCity}${meta.customerState ? ', ' + meta.customerState : ''}` : (meta.customerState || '');
+
+    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    const green = [16, 185, 129] as [number, number, number];
+    const black = [10, 10, 10] as [number, number, number];
+    const gray = [107, 114, 128] as [number, number, number];
+    const lightGray = [243, 244, 246] as [number, number, number];
+    const white = [255, 255, 255] as [number, number, number];
+    const w = 210; const h = 297;
+
+    // Header
+    doc.setFillColor(...green);
+    doc.rect(0, 0, w, 40, 'F');
+    doc.setTextColor(...white);
+    doc.setFontSize(22); doc.setFont('helvetica', 'bold');
+    doc.text('Solar Estimate', w / 2, 16, { align: 'center' });
+    doc.setFontSize(10); doc.setFont('helvetica', 'normal');
+    doc.text('Sales Squad — Agent Klaus', w / 2, 24, { align: 'center' });
+    doc.text(`Prepared for: ${name}${loc ? ' — ' + loc : ''}`, w / 2, 32, { align: 'center' });
+
+    // Date
+    doc.setTextColor(...gray);
+    doc.setFontSize(9);
+    doc.text(`Generated: ${new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}`, w - 14, 46, { align: 'right' });
+
+    // Section helper
+    let y = 52;
+    const row = (label: string, value: string, highlight = false) => {
+      doc.setFillColor(...(highlight ? green : lightGray));
+      doc.roundedRect(14, y, w - 28, 10, 2, 2, 'F');
+      doc.setTextColor(...(highlight ? white : black));
+      doc.setFontSize(10); doc.setFont('helvetica', highlight ? 'bold' : 'normal');
+      doc.text(label, 20, y + 7);
+      doc.text(value, w - 20, y + 7, { align: 'right' });
+      y += 13;
+    };
+    const section = (title: string) => {
+      y += 4;
+      doc.setTextColor(...green);
+      doc.setFontSize(12); doc.setFont('helvetica', 'bold');
+      doc.text(title, 14, y);
+      y += 6;
+    };
+
+    section('📊 Your Solar Estimate');
+    row('Monthly Electricity Bill', bill);
+    row('Recommended System Size', systemKw);
+    row('Estimated System Cost', cost);
+    row('Govt Subsidy (PM Surya Ghar)', `− ${subsidy}`);
+    row('Your Net Cost', netCost, true);
+
+    section('💰 Financial Benefits');
+    row('Monthly Savings', savings);
+    row('Payback Period', payback);
+    row('After Payback', 'FREE electricity for 20+ years! 🎉');
+
+    section('🌟 Why Solar Now?');
+    const reasons = [
+      '• Electricity bills rising 8–10% every year',
+      '• PM Surya Ghar Yojana subsidy — limited time offer',
+      '• 25-year panel warranty with minimal maintenance',
+      '• Increases your property value',
+      '• Clean energy — good for the environment',
+    ];
+    doc.setFontSize(10); doc.setFont('helvetica', 'normal'); doc.setTextColor(...black);
+    reasons.forEach(r => { doc.text(r, 20, y); y += 7; });
+
+    // Footer
+    y = h - 20;
+    doc.setFillColor(...lightGray);
+    doc.rect(0, y - 4, w, 24, 'F');
+    doc.setTextColor(...gray);
+    doc.setFontSize(8);
+    doc.text('This estimate is approximate. Actual costs may vary based on site conditions and local rates.', w / 2, y + 2, { align: 'center' });
+    doc.text('Sales Squad — Premium Leads | Contact us to book your FREE site visit', w / 2, y + 8, { align: 'center' });
+
+    doc.save(`solar-estimate-${name.replace(/\s+/g, '-')}.pdf`);
+  };
 
   // Start conversation
   const startConv = trpc.chat.startConversation.useMutation({
@@ -392,223 +488,17 @@ export default function ChatBot() {
           {messages.length > 2 && (
             <div className="mb-3 flex gap-2">
               <Button
-                onClick={() => {
-                  // Extract conversation data for estimate
-                  const lastBotMsg = messages.filter(m => m.role === 'bot').pop();
-                  const metadata = lastBotMsg?.metadata || {};
+                onClick={downloadPDF}
+                className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white border-0">
                   
-                  // Use real data from metadata
-                  const systemSize = metadata.systemSizeKw ? `${metadata.systemSizeKw}` : '';
-                  const estimatedCost = metadata.estimatedCost ? `${metadata.estimatedCost}` : '';
-                  const monthlyBill = metadata.monthlyBill ? `${metadata.monthlyBill}` : '';
-                  const monthlySavings = metadata.estimatedSavingsMonthly ? `${metadata.estimatedSavingsMonthly}` : '';
-                  const paybackPeriod = metadata.paybackYears ? `${metadata.paybackYears}` : '';
-                  const savings25Year = metadata.estimatedSavings25Year ? `${metadata.estimatedSavings25Year}` : '';
-                  const subsidy = metadata.subsidyAmount ? `${metadata.subsidyAmount}` : '';
-                  const netCost = metadata.netCost ? `${metadata.netCost}` : '';
-                  const customerName = metadata.customerName ? `${metadata.customerName}` : '';
-                  const customerCity = metadata.customerCity ? `${metadata.customerCity}` : '';
-                  const customerState = metadata.customerState ? `${metadata.customerState}` : '';
-                  
-                  const html = `<!DOCTYPE html>
-<html>
-<head>
-  <title>Solar Estimate - Sales Squad</title>
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f8f9fa; color: #333; }
-    .container { max-width: 900px; margin: 0 auto; background: white; }
-    .header { background: linear-gradient(135deg, #F97316 0%, #EA580C 100%); color: white; padding: 40px 30px; text-align: center; }
-    .header h1 { font-size: 32px; margin-bottom: 5px; }
-    .header p { font-size: 14px; opacity: 0.9; }
-    .customer-info { background: #f8f9fa; padding: 20px 30px; border-bottom: 1px solid #e9ecef; }
-    .customer-info p { margin: 5px 0; font-size: 14px; }
-    .section { padding: 30px; border-bottom: 1px solid #e9ecef; }
-    .section h2 { color: #F97316; font-size: 20px; margin-bottom: 20px; }
-    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; }
-    .card { background: #f8f9fa; padding: 15px; border-radius: 8px; border-left: 4px solid #F97316; }
-    .card-label { font-size: 12px; color: #666; text-transform: uppercase; margin-bottom: 5px; }
-    .card-value { font-size: 24px; font-weight: bold; color: #F97316; }
-    .card-unit { font-size: 12px; color: #999; margin-top: 3px; }
-    .highlight { background: #fff3e0; padding: 15px; border-radius: 8px; margin: 15px 0; border-left: 4px solid #F97316; }
-    .highlight p { margin: 8px 0; font-size: 14px; }
-    .benefits { list-style: none; }
-    .benefits li { padding: 8px 0; padding-left: 25px; position: relative; font-size: 14px; }
-    .benefits li:before { content: '✓'; position: absolute; left: 0; color: #F97316; font-weight: bold; }
-    .footer { background: #f8f9fa; padding: 20px 30px; text-align: center; font-size: 12px; color: #666; }
-    .footer p { margin: 5px 0; }
-    .chart-placeholder { background: #f0f0f0; height: 200px; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #999; margin: 15px 0; }
-    .chart-section { margin: 20px 0; }
-    .chart-section h3 { font-size: 16px; font-weight: bold; color: #333; margin-bottom: 15px; }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <!-- Header -->
-    <div class="header">
-      <h1>☀️ Solar Estimate</h1>
-      <p>Powered by Sales Squad Agent</p>
-    </div>
-    
-    <!-- Customer Info -->
-    <div class="customer-info">
-      <p><strong>Customer:</strong> ${customerName}</p>
-      <p><strong>Location:</strong> ${customerCity}, ${customerState}</p>
-      <p><strong>Current Monthly Bill:</strong> ₹${monthlyBill}</p>
-    </div>
-    
-    <!-- System Recommendation -->
-    <div class="section">
-      <h2>System Recommendation</h2>
-      <div class="grid">
-        <div class="card">
-          <div class="card-label">System Size</div>
-          <div class="card-value">Approx ${systemSize}</div>
-          <div class="card-unit">kW</div>
-        </div>
-        <div class="card">
-          <div class="card-label">Estimated Cost</div>
-          <div class="card-value">Approx ₹${estimatedCost}</div>
-          <div class="card-unit">Before Subsidy</div>
-        </div>
-      </div>
-      <div class="highlight">
-        <p><strong>Government Subsidy:</strong> Approx ₹${subsidy}</p>
-        <p><strong>Net Cost After Subsidy:</strong> Approx ₹${netCost}</p>
-      </div>
-    </div>
-    
-    <!-- Financial Benefits -->
-    <div class="section">
-      <h2>Financial Benefits</h2>
-      <div class="grid">
-        <div class="card">
-          <div class="card-label">Monthly Savings</div>
-          <div class="card-value">Approx ₹${monthlySavings}</div>
-          <div class="card-unit">Per Month</div>
-        </div>
-        <div class="card">
-          <div class="card-label">Payback Period</div>
-          <div class="card-value">Approx ${paybackPeriod}</div>
-          <div class="card-unit">Years</div>
-        </div>
-      </div>
-      <div class="highlight">
-        <p><strong>25-Year Total Savings:</strong> Approx ₹${savings25Year}</p>
-        <p style="font-size: 12px; margin-top: 10px; color: #666;">Based on current electricity rates with 1.3% annual increase</p>
-      </div>
-    </div>
-    
-    <!-- Charts Section -->
-    <div class="section">
-      <h2>📊 Visual Breakdown</h2>
-      
-      <!-- Cost Breakdown Chart -->
-      <div class="chart-section">
-        <h3>💰 System Cost Breakdown</h3>
-        <svg viewBox="0 0 400 200" xmlns="http://www.w3.org/2000/svg" style="max-width: 100%; border: 1px solid #e9ecef; border-radius: 8px;">
-          <rect width="400" height="200" fill="#f8f9fa"/>
-          <!-- Original Cost Bar -->
-          <rect x="30" y="30" width="340" height="35" fill="#F97316" rx="5"/>
-          <text x="40" y="55" font-size="13" fill="white" font-weight="bold">Original Cost: ₹${estimatedCost}</text>
-          <!-- Subsidy Bar -->
-          <rect x="30" y="80" width="170" height="35" fill="#22c55e" rx="5"/>
-          <text x="40" y="105" font-size="13" fill="white" font-weight="bold">Subsidy: ₹${subsidy}</text>
-          <!-- Net Cost Bar -->
-          <rect x="30" y="130" width="200" height="35" fill="#3b82f6" rx="5"/>
-          <text x="40" y="155" font-size="13" fill="white" font-weight="bold">Your Cost: ₹${netCost}</text>
-        </svg>
-      </div>
-      
-      <!-- Payback Timeline -->
-      <div class="chart-section">
-        <h3>📈 Payback Period: ${paybackPeriod} Years</h3>
-        <svg viewBox="0 0 400 150" xmlns="http://www.w3.org/2000/svg" style="max-width: 100%; border: 1px solid #e9ecef; border-radius: 8px;">
-          <rect width="400" height="150" fill="#f8f9fa"/>
-          <!-- Timeline line -->
-          <line x1="40" y1="75" x2="360" y2="75" stroke="#ddd" stroke-width="3"/>
-          <!-- Start marker -->
-          <circle cx="40" cy="75" r="8" fill="#F97316"/>
-          <text x="40" y="110" font-size="12" text-anchor="middle" fill="#333">Now</text>
-          <!-- Payback marker -->
-          <circle cx="200" cy="75" r="8" fill="#22c55e"/>
-          <text x="200" y="110" font-size="12" text-anchor="middle" fill="#333" font-weight="bold">Year ${paybackPeriod}</text>
-          <text x="200" y="125" font-size="11" text-anchor="middle" fill="#666">System Paid Off</text>
-          <!-- End marker -->
-          <circle cx="360" cy="75" r="8" fill="#3b82f6"/>
-          <text x="360" y="110" font-size="12" text-anchor="middle" fill="#333">Year 25</text>
-        </svg>
-      </div>
-      
-      <!-- 25-Year Savings -->
-      <div class="chart-section">
-        <h3>💵 25-Year Total Savings: ₹${savings25Year}</h3>
-        <svg viewBox="0 0 400 150" xmlns="http://www.w3.org/2000/svg" style="max-width: 100%; border: 1px solid #e9ecef; border-radius: 8px;">
-          <rect width="400" height="150" fill="#f8f9fa"/>
-          <!-- Savings bar -->
-          <rect x="50" y="30" width="300" height="80" fill="#22c55e" opacity="0.8" rx="5"/>
-          <text x="200" y="80" font-size="18" font-weight="bold" text-anchor="middle" fill="white">₹${savings25Year}</text>
-          <text x="200" y="110" font-size="12" text-anchor="middle" fill="#666">Total savings over 25 years with 1.3% annual rate increase</text>
-        </svg>
-      </div>
-      
-      <!-- Monthly Savings -->
-      <div class="chart-section">
-        <h3>📅 Monthly Savings: ₹${monthlySavings}</h3>
-        <svg viewBox="0 0 400 120" xmlns="http://www.w3.org/2000/svg" style="max-width: 100%; border: 1px solid #e9ecef; border-radius: 8px;">
-          <rect width="400" height="120" fill="#f8f9fa"/>
-          <!-- Monthly bars (12 months representation) -->
-          <rect x="25" y="50" width="12" height="50" fill="#F97316" opacity="0.8"/>
-          <rect x="42" y="50" width="12" height="50" fill="#F97316" opacity="0.8"/>
-          <rect x="59" y="50" width="12" height="50" fill="#F97316" opacity="0.8"/>
-          <rect x="76" y="50" width="12" height="50" fill="#F97316" opacity="0.8"/>
-          <rect x="93" y="50" width="12" height="50" fill="#F97316" opacity="0.8"/>
-          <rect x="110" y="50" width="12" height="50" fill="#F97316" opacity="0.8"/>
-          <rect x="127" y="50" width="12" height="50" fill="#F97316" opacity="0.8"/>
-          <rect x="144" y="50" width="12" height="50" fill="#F97316" opacity="0.8"/>
-          <rect x="161" y="50" width="12" height="50" fill="#F97316" opacity="0.8"/>
-          <rect x="178" y="50" width="12" height="50" fill="#F97316" opacity="0.8"/>
-          <rect x="195" y="50" width="12" height="50" fill="#F97316" opacity="0.8"/>
-          <rect x="212" y="50" width="12" height="50" fill="#F97316" opacity="0.8"/>
-          <text x="200" y="115" font-size="11" text-anchor="middle" fill="#666">Each bar = Monthly savings (12 months shown)</text>
-        </svg>
-      </div>
-    </div>
-    
-    <!-- Why Solar -->
-    <div class="section">
-      <h2>Why Go Solar?</h2>
-      <ul class="benefits">
-        <li>Lock in electricity costs for 25 years</li>
-        <li>Reduce your carbon footprint</li>
-        <li>Increase property value</li>
-        <li>Government incentives and subsidies available</li>
-        <li>Minimal maintenance required</li>
-        <li>25-year warranty on panels</li>
-      </ul>
-    </div>
-    
-    <!-- Footer -->
-    <div class="footer">
-      <p><strong>This estimate is approximate.</strong> Actual costs and savings may vary based on site conditions, local rates, and system configuration.</p>
-      <p>For a detailed site survey and accurate quote, please contact us.</p>
-      <p style="margin-top: 15px; font-size: 11px; color: #999;">Generated by Sales Squad Agent | ${new Date().toLocaleDateString('en-IN')}</p>
-    </div>
-  </div>
-</body>
-</html>`;
-                  const blob = new Blob([html], { type: 'text/html' });
-                  const url = window.URL.createObjectURL(blob);
-                  const a = document.createElement('a');
-                  a.href = url;
-                  a.download = `solar-estimate-${new Date().getTime()}.html`;
-                  a.click();
-                  window.URL.revokeObjectURL(url);
-                }}
-                className="w-full bg-white/10 hover:bg-white/20 text-white border border-white/20"
-              >
-                <Download className="w-4 h-4 mr-2" />
-                Download Estimate
+              <Download className="w-4 h-4 mr-2" />
+                Download Estimate PDF
+              </Button>
+              <Button
+                onClick={() => setShowMapPin(true)}
+                className="flex-1 bg-white/10 hover:bg-white/20 text-white border border-white/20">
+              <MapPin className="w-4 h-4 mr-2" />
+                Drop Pin Location
               </Button>
             </div>
           )}
@@ -637,10 +527,85 @@ export default function ChatBot() {
             </Button>
           </div>
           <p className="text-[10px] text-gray-600 text-center mt-2">
-            Powered by AB SOLAR AI · Your data is secure
+            Agent Klaus · Sales Squad · Your data is secure
           </p>
         </div>
       </div>
+
+      {/* Google Maps Pin Drop Modal */}
+      {showMapPin && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
+          <div className="bg-gray-900 rounded-2xl border border-white/10 w-full max-w-lg overflow-hidden">
+            <div className="flex items-center justify-between p-4 border-b border-white/10">
+              <div>
+                <h3 className="text-white font-semibold">Drop Your Location Pin</h3>
+                <p className="text-gray-400 text-xs mt-0.5">Tap on the map to mark your home</p>
+              </div>
+              <button onClick={() => setShowMapPin(false)} className="text-gray-400 hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="h-72">
+              <MapView
+                onMapReady={(map) => {
+                  setMapInstance(map);
+                  // Try to center on user's location
+                  if (navigator.geolocation) {
+                    navigator.geolocation.getCurrentPosition(
+                      (pos) => map.setCenter({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+                      () => map.setCenter({ lat: 20.5937, lng: 78.9629 }) // India center
+                    );
+                  }
+                  // Click to drop pin
+                  map.addListener('click', (e: google.maps.MapMouseEvent) => {
+                    if (!e.latLng) return;
+                    const lat = e.latLng.lat();
+                    const lng = e.latLng.lng();
+                    // Remove old marker
+                    if (pinMarker) pinMarker.setMap(null);
+                    const marker = new google.maps.Marker({
+                      position: { lat, lng },
+                      map,
+                      title: 'Your Location',
+                      animation: google.maps.Animation.DROP,
+                    });
+                    setPinMarker(marker);
+                    // Reverse geocode
+                    const geocoder = new google.maps.Geocoder();
+                    geocoder.geocode({ location: { lat, lng } }, (results, status) => {
+                      const address = status === 'OK' && results?.[0] ? results[0].formatted_address : `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+                      setPinnedLocation({ lat, lng, address });
+                    });
+                  });
+                }}
+              />
+            </div>
+            {pinnedLocation && (
+              <div className="p-3 bg-emerald-900/30 border-t border-emerald-500/20">
+                <p className="text-emerald-400 text-xs font-medium">📍 {pinnedLocation.address}</p>
+              </div>
+            )}
+            <div className="p-4 flex gap-3">
+              <Button
+                variant="outline"
+                onClick={() => { setShowMapPin(false); setPinnedLocation(null); }}
+                className="flex-1 border-white/20 text-white bg-transparent hover:bg-white/10"
+              >Cancel</Button>
+              <Button
+                onClick={() => {
+                  if (pinnedLocation) {
+                    setShowMapPin(false);
+                    const msg = `My location: ${pinnedLocation.address} (${pinnedLocation.lat.toFixed(5)}, ${pinnedLocation.lng.toFixed(5)})`;
+                    handleSend(msg);
+                  }
+                }}
+                disabled={!pinnedLocation}
+                className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white border-0"
+              >Confirm Location</Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

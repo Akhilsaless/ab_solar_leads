@@ -75,6 +75,8 @@ export default function ReferrerDashboard() {
     { enabled: !!uniqueCode, retry: 1 }
   );
 
+  const { data: potData } = trpc.referrer.getPotInfo.useQuery(undefined, { staleTime: 30000 });
+
   const withdrawMutation = trpc.referrer.requestWithdrawal.useMutation({
     onSuccess: () => {
       setWithdrawMsg("✅ Withdrawal request submitted! We'll process it in 2-3 business days.");
@@ -170,6 +172,40 @@ export default function ReferrerDashboard() {
             <div>
               <p style={{ margin: 0, fontWeight: 600, color: "#f87171", fontSize: 14 }}>Lead Quality Warning</p>
               <p style={{ margin: "4px 0 0", fontSize: 12, color: C.subtle }}>Your lead quality score is low ({qualityScore}%). Ensure customers verify their email. Accounts below 40% are suspended per our T&C.</p>
+            </div>
+          </div>
+        )}
+
+        {/* ₹50 Welcome Bonus Banner */}
+        {!referrer.signupBonusPaid && (
+          <div style={{ background: "linear-gradient(135deg, rgba(16,185,129,0.15), rgba(16,185,129,0.05))", border: `2px solid ${C.green}`, borderRadius: 12, padding: "14px 18px", marginBottom: 16, display: "flex", justifyContent: "space-between", alignItems: "center", boxShadow: `0 0 24px ${C.greenGlow}` }}>
+            <div>
+              <p style={{ margin: 0, fontWeight: 700, color: C.green, fontSize: 15 }}>🎁 Welcome Bonus Credited!</p>
+              <p style={{ margin: "3px 0 0", fontSize: 12, color: C.subtle }}>₹50 added to your account for joining Sales Squad</p>
+            </div>
+            <span style={{ fontSize: 28, fontWeight: 800, color: C.green }}>+₹50</span>
+          </div>
+        )}
+        {referrer.signupBonusPaid && Number(referrer.totalEarnings || 0) <= 50 && (
+          <div style={{ background: "rgba(16,185,129,0.06)", border: `1px solid ${C.borderGreen}`, borderRadius: 12, padding: "12px 16px", marginBottom: 16, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div>
+              <p style={{ margin: 0, fontWeight: 600, color: C.green, fontSize: 14 }}>🎁 Welcome Bonus</p>
+              <p style={{ margin: "2px 0 0", fontSize: 12, color: C.subtle }}>Already credited to your account</p>
+            </div>
+            <span style={{ fontWeight: 700, color: C.green }}>₹50 ✓</span>
+          </div>
+        )}
+
+        {/* Reward Pool */}
+        {potData && (
+          <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: "12px 16px", marginBottom: 16, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div>
+              <p style={{ margin: 0, fontSize: 13, color: C.subtle }}>💰 Reward Pool Available</p>
+              <p style={{ margin: "2px 0 0", fontSize: 11, color: C.muted }}>Funds set aside for your payouts</p>
+            </div>
+            <div style={{ textAlign: "right" }}>
+              <p style={{ margin: 0, fontSize: 18, fontWeight: 700, color: Number(potData.balance) > 2000 ? C.green : C.orange }}>₹{Number(potData.balance).toLocaleString()}</p>
+              <p style={{ margin: 0, fontSize: 10, color: C.muted }}>remaining</p>
             </div>
           </div>
         )}
