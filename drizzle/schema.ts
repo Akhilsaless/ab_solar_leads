@@ -98,6 +98,7 @@ export const conversations = mysqlTable("conversations3", {
   customerState: varchar("customerState", { length: 100 }),
   customerAddress: text("customerAddress"),
   monthlyBill: decimal("monthlyBill", { precision: 10, scale: 2 }),
+  structure: varchar("structure", { length: 50 }), // "roof", "ground", "balcony", "wall"
   monthlyUnits: int("monthlyUnits"),
   recommendedKw: decimal("recommendedKw", { precision: 6, scale: 2 }),
   recommendedPanels: int("recommendedPanels"),
