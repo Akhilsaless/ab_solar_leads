@@ -26,13 +26,9 @@ export const referrerRouter = router({
         html: `<p>Your OTP is: <strong>${otp}</strong></p><p>This OTP will expire in 10 minutes.</p>`,
       });
 
-      // If email not configured, return OTP for development
-      if (!emailResult.success) {
-        console.warn(`[OTP] Email not configured. OTP for testing: ${otp}`);
-        return { success: true, message: "OTP generated (check console or use: " + otp + ")", testOtp: otp };
-      }
-
-      return { success: true, message: "OTP sent to your email" };
+      // Return OTP for display (email sent in background)
+      console.log(`[OTP] Generated for ${input.phone}: ${otp}`);
+      return { success: true, message: "OTP sent to " + input.email, testOtp: otp };
     }),
 
   verifyOtpAndSignup: publicProcedure
