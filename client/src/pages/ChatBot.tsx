@@ -7,17 +7,12 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Send, Loader2, Sun, Zap, ArrowDown } from "lucide-react";
 import { Streamdown } from "streamdown";
 import { nanoid } from "nanoid";
-import { ROICalculator } from "@/components/ROICalculator";
-import { RoofVisualization } from "@/components/RoofVisualization";
-import { SystemSizeSlider } from "@/components/SystemSizeSlider";
-import { PanelComparison } from "@/components/PanelComparison";
 
 type ChatMessage = {
   role: "bot" | "customer";
   content: string;
   quickReplies?: string[];
   createdAt?: Date | string;
-  metadata?: Record<string, any>;
 };
 
 export default function ChatBot() {
@@ -46,8 +41,6 @@ export default function ChatBot() {
   const utmSource = urlParams.get("utm_source") || undefined;
   const utmMedium = urlParams.get("utm_medium") || undefined;
   const utmCampaign = urlParams.get("utm_campaign") || undefined;
-  const autoCloseMinutes = urlParams.get("autoClose") ? parseInt(urlParams.get("autoClose")!) : null;
-  const [isClosed, setIsClosed] = useState(false);
 
   // Start conversation
   const startConv = trpc.chat.startConversation.useMutation({
@@ -74,7 +67,6 @@ export default function ChatBot() {
           role: "bot",
           content: data.response,
           quickReplies: data.quickReplies || [],
-          metadata: data.metadata || {},
           createdAt: new Date(),
         },
       ]);
@@ -105,16 +97,6 @@ export default function ChatBot() {
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  // Auto-close timer
-  useEffect(() => {
-    if (autoCloseMinutes && autoCloseMinutes > 0) {
-      const timer = setTimeout(() => {
-        setIsClosed(true);
-      }, autoCloseMinutes * 60 * 1000);
-      return () => clearTimeout(timer);
-    }
-  }, [autoCloseMinutes]);
 
   // Auto-scroll to bottom
   useEffect(() => {
@@ -186,27 +168,6 @@ export default function ChatBot() {
     }
     return -1;
   })();
-
-  if (isClosed) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950 flex items-center justify-center">
-        <div className="text-center space-y-4 max-w-md">
-          <div className="w-16 h-16 rounded-full bg-orange-500/20 flex items-center justify-center mx-auto">
-            <Sun className="w-8 h-8 text-orange-400" />
-          </div>
-          <h2 className="text-2xl font-bold text-white">Chat Session Closed</h2>
-          <p className="text-gray-400">Thank you for chatting with {agencyName}! Your session has ended.</p>
-          <p className="text-sm text-gray-500">Feel free to reach out again anytime.</p>
-          <Button
-            onClick={() => window.location.reload()}
-            className="mt-6 solar-gradient text-black font-semibold"
-          >
-            Start New Chat
-          </Button>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950 flex flex-col">
@@ -286,64 +247,6 @@ export default function ChatBot() {
                     )}
                   </div>
                 </div>
-
-                {msg.role === "bot" && msg.metadata?.showROI && (
-                  <div className="ml-11 mt-4 max-w-[85%] md:max-w-[75%]">
-                    <ROICalculator
-                      monthlyBill={msg.metadata.monthlyBill || 0}
-                      systemSizeKw={msg.metadata.systemSizeKw || 0}
-                      totalCost={msg.metadata.totalCost || 0}
-                      subsidyAmount={msg.metadata.subsidyAmount || 0}
-                      netCost={msg.metadata.netCost || 0}
-                      monthlyElectricitySavings={msg.metadata.monthlyElectricitySavings || 0}
-                      paybackYears={msg.metadata.paybackYears || 0}
-                      futureElectricityRate={msg.metadata.futureElectricityRate}
-                      currentRate={msg.metadata.currentRate}
-                      rateIncreasePercentage={msg.metadata.rateIncreasePercentage}
-                    />
-                  </div>
-                )}
-
-                {msg.role === "bot" && msg.metadata?.show3D && (
-                  <div className="ml-11 mt-4 max-w-[85%] md:max-w-[75%]">
-                    <RoofVisualization
-                      panelCount={msg.metadata.panelCount || 0}
-                      systemSizeKw={msg.metadata.systemSizeKw || 0}
-                      panelType={msg.metadata.panelType || "monocrystalline"}
-                    />
-                  </div>
-                )}
-
-                {msg.role === "bot" && msg.metadata?.showSlider && msg.metadata && (
-                  <div className="ml-11 mt-4 max-w-[85%] md:max-w-[75%]">
-                    <SystemSizeSlider
-                      monthlyBill={msg.metadata.monthlyBill || 0}
-                      onSystemSizeChange={(size, panels, savings) => {
-                        if (msg.metadata) {
-                          msg.metadata.systemSizeKw = size;
-                          msg.metadata.panelCount = panels;
-                          msg.metadata.monthlyElectricitySavings = savings;
-                        }
-                      }}
-                      currentRate={msg.metadata.currentRate || 7.5}
-                    />
-                  </div>
-                )}
-
-                {msg.role === "bot" && msg.metadata?.showPanelComparison && msg.metadata && (
-                  <div className="ml-11 mt-4 max-w-[85%] md:max-w-[75%]">
-                    <PanelComparison
-                      systemSizeKw={msg.metadata.systemSizeKw || 0}
-                      totalCost={msg.metadata.totalCost || 0}
-                      onPanelSelect={(panelType, cost) => {
-                        if (msg.metadata) {
-                          msg.metadata.panelType = panelType;
-                          msg.metadata.estimatedCost = cost;
-                        }
-                      }}
-                    />
-                  </div>
-                )}
 
                 {/* Quick reply buttons - shown below the last bot message only */}
                 {msg.role === "bot" && i === lastBotMsgIndex && msg.quickReplies && msg.quickReplies.length > 0 && !isLoading && (
