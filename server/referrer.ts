@@ -25,12 +25,28 @@ export const referrerRouter = router({
       // Send OTP via email
       const emailResult = await sendEmail({
         to: input.email,
-        subject: "Your Sales Squad Referral Program OTP",
-        html: `<p>Your OTP is: <strong>${otp}</strong></p><p>This OTP will expire in 10 minutes.</p>`,
+        subject: "Your OTP - Sales Squad Referral Program",
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto; padding: 20px; background: #f9f9f9;">
+            <div style="background: #f97316; padding: 20px; border-radius: 8px 8px 0 0; text-align: center;">
+              <h1 style="color: white; margin: 0; font-size: 24px;">Sales Squad Agent</h1>
+              <p style="color: #ffe0c0; margin: 5px 0 0;">Referral Program</p>
+            </div>
+            <div style="background: white; padding: 30px; border-radius: 0 0 8px 8px; text-align: center;">
+              <p style="color: #333; font-size: 16px;">Hi ${input.name},</p>
+              <p style="color: #555;">Your One-Time Password (OTP) for signup is:</p>
+              <div style="background: #f97316; color: white; font-size: 36px; font-weight: bold; letter-spacing: 8px; padding: 20px; border-radius: 8px; margin: 20px 0;">${otp}</div>
+              <p style="color: #888; font-size: 14px;">This OTP expires in <strong>10 minutes</strong>.</p>
+              <p style="color: #888; font-size: 12px;">If you didn't request this, please ignore this email.</p>
+            </div>
+          </div>
+        `,
       });
 
-      // Return success message (OTP sent via email)
-      console.log(`[OTP] Generated for ${input.phone}`);
+      console.log(`[OTP] Email sent to ${input.email}: success=${emailResult.success}`);
+      if (!emailResult.success) {
+        console.error(`[OTP] Email failed:`, emailResult.error);
+      }
       return { success: true, message: "OTP sent to " + input.email };
     }),
 
