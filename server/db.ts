@@ -179,6 +179,49 @@ export async function updateConversation(sessionId: string, data: Partial<typeof
   await db.update(conversations).set(data).where(eq(conversations.sessionId, sessionId));
 }
 
+export async function getConversationByPhone(agencyId: number, phone: string) {
+  const db = await getDb();
+  if (!db) return null;
+  const result = await db.select().from(conversations)
+    .where(and(eq(conversations.agencyId, agencyId), eq(conversations.customerPhone, phone)))
+    .orderBy(desc(conversations.createdAt)).limit(1);
+  return result[0] || null;
+}
+
+export async function getConversationByEmail(agencyId: number, email: string) {
+  const db = await getDb();
+  if (!db) return null;
+  const result = await db.select().from(conversations)
+    .where(and(eq(conversations.agencyId, agencyId), eq(conversations.customerEmail, email)))
+    .orderBy(desc(conversations.createdAt)).limit(1);
+  return result[0] || null;
+}
+
+export async function getUnfollowedUpLeads() {
+  const db = await getDb();
+  if (!db) return [];
+  const now = Date.now();
+  const h24 = new Date(now - 24 * 60 * 60 * 1000);
+  const h72 = new Date(now - 72 * 60 * 60 * 1000);
+  // Get leads that: have email, not converted, not dropped, chat ended >24h ago
+  return db.select().from(conversations)
+    .where(
+      and(
+        sql`${conversations.customerEmail} IS NOT NULL`,
+        sql`${conversations.customerName} IS NOT NULL`,
+        sql`${conversations.status} NOT IN ('converted', 'dropped')`,
+        sql`${conversations.updatedAt} < ${h24}`,
+        sql`(followUp24Sent = FALSE OR (followUp72Sent = FALSE AND updatedAt < ${h72}))`
+      )
+    ).limit(50);
+}
+
+export async function markConversationReturning(sessionId: string) {
+  const db = await getDb();
+  if (!db) return;
+  await db.execute(sql`UPDATE conversations3 SET isReturning = TRUE WHERE sessionId = ${sessionId}`);
+}
+
 export async function getConversationsByAgency(agencyId: number, limit = 50) {
   const db = await getDb();
   if (!db) return [];
@@ -428,4 +471,31 @@ export async function getScrapeJobsByAgency(userId: number) {
   const db = await getDb();
   if (!db) return [];
   return db.select().from(scrapeJobs).where(eq(scrapeJobs.createdBy, userId)).orderBy(desc(scrapeJobs.createdAt)).limit(50);
+}
+export async function getUnconvertedLeadsForFollowUp(hoursAgo: number, followUpField: "followUp24Sent" | "followUp72Sent") {
+  const db = await getDb();
+  if (!db) return [];
+  const cutoff = new Date(Date.now() - hoursAgo * 60 * 60 * 1000);
+  const colExpr = followUpField === "followUp24Sent"
+    ? sql`followUp24Sent`
+    : sql`followUp72Sent`;
+  return db.select().from(conversations)
+    .where(
+      and(
+        sql`${conversations.customerEmail} IS NOT NULL`,
+        sql`${conversations.status} NOT IN ('converted', 'dropped')`,
+        sql`${conversations.updatedAt} <= ${cutoff}`,
+        sql`${colExpr} = FALSE`
+      )
+    ).limit(50);
+}
+
+export async function markFollowUpSent(sessionId: string, field: "followUp24Sent" | "followUp72Sent") {
+  const db = await getDb();
+  if (!db) return;
+  if (field === "followUp24Sent") {
+    await db.update(conversations).set({ followUp24Sent: true } as any).where(eq(conversations.sessionId, sessionId));
+  } else {
+    await db.update(conversations).set({ followUp72Sent: true } as any).where(eq(conversations.sessionId, sessionId));
+  }
 }

@@ -8,6 +8,7 @@ import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
 import { initializeEmailService } from "./emailService";
+import { followUpEmailsHandler } from "../followUpEmailHandler";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -39,6 +40,9 @@ async function startServer() {
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
   // OAuth callback under /api/oauth/callback
   registerOAuthRoutes(app);
+  // Follow-up email scheduler (cron-only endpoint)
+  app.post("/api/scheduled/followUpEmails", followUpEmailsHandler);
+
   // tRPC API
   app.use(
     "/api/trpc",

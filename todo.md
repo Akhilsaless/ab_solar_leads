@@ -179,3 +179,15 @@
 - [x] ReferrerSignup: Add "Get instant ₹50 after signup" incentive copy
 - [x] ReferrerSignup: Add "Withdrawable after 1 successful referral" note
 - [x] ReferrerSignup: Add T&C reminder with link before signup button
+
+## Agent Klaus Upgrade — Levels 1, 2, 3 (Current Session)
+- [ ] Level 1: Objection handler — top 10 objections with smart responses in system prompt
+- [ ] Level 1: Clarifying questions — roof type, ownership, decision maker
+- [x] Level 2: Session memory — returning customer detection by phone/email, picks up where left off
+- [x] Level 2: DB: store returning customer flag + last session summary
+- [x] Level 3: Follow-up email scheduler — 24h and 72h after unconverted chat
+- [x] Level 3: Backend: scheduled job checks unconverted leads and sends follow-up emails
+- [x] Dashboard: ₹50 bonus shown as prominent top card on referrer dashboard
+- [ ] Dashboard: Reward pool balance shown as prominent top card on referrer dashboard
+
+- [x] Fix all TypeScript errors (6 errors resolved: extractedDataEarly, returningCustomerChecked, duplicate db functions)
