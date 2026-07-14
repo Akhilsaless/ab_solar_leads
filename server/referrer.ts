@@ -75,13 +75,10 @@ export const referrerRouter = router({
       if (!db) throw new Error("Database not available");
 
       try {
-        // Use agency ID 1 (default agency)
-        const agencyId = 1;
-
         // Save referrer to database
         await db.execute(
-          sql`INSERT INTO referrers (agencyId, uniqueCode, name, email, totalEarnings, totalReferrals, status) 
-              VALUES (${agencyId}, ${uniqueCode}, ${name}, ${email}, 0, 0, 'active')`
+          sql`INSERT INTO referrers (uniqueCode, name, email, totalEarnings, totalReferrals, status) 
+              VALUES (${uniqueCode}, ${name}, ${email}, 0, 0, 'active')`
         );
 
         // Get the new referrer's ID using LAST_INSERT_ID()
