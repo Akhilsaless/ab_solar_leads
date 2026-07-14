@@ -122,6 +122,10 @@ export const conversations = mysqlTable("conversations3", {
   utmCampaign: varchar("utmCampaign", { length: 200 }),
   emailSent: boolean("emailSent").default(false),
   companyEmailSent: boolean("companyEmailSent").default(false),
+  followUp24Sent: boolean("followUp24Sent").default(false),
+  followUp72Sent: boolean("followUp72Sent").default(false),
+  isReturning: boolean("isReturning").default(false),
+  lastSessionSummary: text("lastSessionSummary"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });

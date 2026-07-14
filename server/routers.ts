@@ -267,7 +267,8 @@ export const appRouter = router({
           referrerCode: input.referrerCode,
         });
 
-        // Generate greeting message
+        // Generate greeting message — check for returning customer by phone in session storage (passed via UTM or referrer)
+        // We'll detect returning customers in sendMessage when phone/email is first provided
         const greeting = agency.botGreeting ||
           `Namaste! 🙏 I'm Agent Klaus from Sales Squad. May I know your name?`;
 
@@ -333,8 +334,22 @@ export const appRouter = router({
             const prevBill = prevConv.monthlyBill ? `₹${prevConv.monthlyBill}/month` : null;
             const prevState = prevConv.customerState || prevConv.customerCity || null;
             returningContext = `Customer's name: ${prevName}. They chatted with you before.${prevBill ? ` Their monthly bill was ${prevBill}.` : ''}${prevState ? ` They are from ${prevState}.` : ''} Previous status: ${prevConv.status || 'active'}. Greet them warmly by name and reference their previous interest in solar.`;
-            // Mark as returning in DB (use raw SQL to avoid schema type mismatch)
+            // Mark as returning in DB
             await db.markConversationReturning(input.sessionId);
+          }
+        }
+        const knownPhone = conversation.customerPhone || extractedDataEarly?.phone;
+        const knownEmail = conversation.customerEmail || extractedDataEarly?.email;
+        if (!conversation.returningCustomerChecked && (knownPhone || knownEmail)) {
+          let prevConv = null;
+          if (knownPhone) prevConv = await db.getConversationByPhone(agency.id, knownPhone);
+          if (!prevConv && knownEmail) prevConv = await db.getConversationByEmail(agency.id, knownEmail);
+          if (prevConv && prevConv.sessionId !== input.sessionId) {
+            const prevName = prevConv.customerName || 'there';
+            const prevBill = prevConv.monthlyBill ? `₹${prevConv.monthlyBill}/month` : null;
+            const prevState = prevConv.customerState || prevConv.customerCity || null;
+            returningContext = `Customer's name: ${prevName}. They chatted with you before.${prevBill ? ` Their monthly bill was ${prevBill}.` : ''}${prevState ? ` They are from ${prevState}.` : ''} Previous status: ${prevConv.status || 'active'}. Greet them warmly by name and reference their previous interest in solar.`;
+            await db.updateConversation(input.sessionId, { returningCustomerChecked: true } as any);
           }
         }
 
@@ -552,16 +567,23 @@ export const appRouter = router({
         // Get updated conversation with all estimate data
         const updatedConv = await db.getConversation(input.sessionId);
         
-        // Detect conversation stage for frontend auto-sequencing
-        const lowerContent = cleanContent.toLowerCase();
+        // Detect conversation stage deterministically using bot message count
+        // Count bot messages in history (before this response) to determine stage
+        const botMsgCount = history.filter(m => m.role === 'bot').length;
+        // botMsgCount 0 = greeting (ask_name), 1 = pitch_a, 2 = pitch_b, 3 = pitch_c/ask_bill
+        // After that, use content cues as fallback
         let stage = 'general';
-        if (lowerContent.includes('may i know your name') || lowerContent.includes('your name?')) stage = 'ask_name';
-        else if (lowerContent.includes('electricity bills in india are rising') || lowerContent.includes('cut that by 80')) stage = 'pitch_a';
-        else if (lowerContent.includes('pm surya ghar') && lowerContent.includes('subsidy')) stage = 'pitch_b';
-        else if (lowerContent.includes('recover their investment') || lowerContent.includes('money-making asset')) stage = 'pitch_c';
-        else if (lowerContent.includes('monthly electricity bill') && lowerContent.includes('skip')) stage = 'ask_bill';
-        else if (lowerContent.includes('personalised solar estimate') || lowerContent.includes('download it as a pdf')) stage = 'show_estimate';
-        else if (lowerContent.includes('free site visit') && lowerContent.includes('book')) stage = 'ask_site_visit';
+        if (botMsgCount === 0) stage = 'ask_name';
+        else if (botMsgCount === 1) stage = 'pitch_a';
+        else if (botMsgCount === 2) stage = 'pitch_b';
+        else if (botMsgCount === 3) stage = 'pitch_c';
+        else if (botMsgCount === 4) stage = 'ask_bill';
+        else {
+          // Fallback content-based detection for later stages
+          const lowerContent = cleanContent.toLowerCase();
+          if (lowerContent.includes('personalised solar estimate') || lowerContent.includes('download it as a pdf')) stage = 'show_estimate';
+          else if (lowerContent.includes('free site visit') && lowerContent.includes('book')) stage = 'ask_site_visit';
+        }
 
         return { 
           response: cleanContent, 
@@ -1085,7 +1107,7 @@ export function calculateSolarEstimate(
 }
 
 // ===== AI SALES AGENT PROMPT BUILDER =====
-function buildSalesAgentPrompt(agency: any, panels: any[], inverters: any[], subsidyData: any, conversation: any, returningContext?: string): string {
+function buildSalesAgentPrompt(agency: any, panels: any[], inverters: any[], subsidyData: any, conversation: any): string {
   const panelList = panels.map(p => `- ${p.brand} ${p.model} (${p.wattage}W, ₹${p.pricePerPanel}/panel, ${p.panelType}, ${p.warranty}yr warranty)`).join("\n");
   const inverterList = inverters.map(i => `- ${i.brand} ${i.model} (${i.capacityKw}kW, ₹${i.price}, ${i.inverterType}, ${i.warranty}yr warranty)`).join("\n");
 
@@ -1113,17 +1135,10 @@ CUSTOMER DATA COLLECTED SO FAR:
 
   const customerName = conversation.customerName;
 
-  const returningSection = returningContext ? `
-RETURNING CUSTOMER CONTEXT:
-${returningContext}
-This customer has chatted with you before. Greet them warmly by name, reference their previous conversation, and pick up where you left off. Skip the basic pitch if they already know it.
-` : '';
-
   return `You are Agent Klaus, a friendly solar energy advisor from Sales Squad. You are NOT an AI — you are a human advisor. Your tone is warm, respectful, and conversational — like a knowledgeable friend, not a salesperson.
 
 YOUR MISSION: Help the customer understand solar benefits, give them a personalised estimate, and get them to book a free site visit.
 
-${returningSection}
 CONVERSATION RULES:
 1. ALWAYS address the customer by their first name once you know it
 2. Keep every response SHORT — 1-3 sentences max. No walls of text.
@@ -1199,34 +1214,12 @@ ${subsidyInfo}
 
 ${conversationContext}
 
-OBJECTION HANDLING (handle naturally mid-conversation, keep responses SHORT and empathetic):
-
-- "Too expensive" / "Bahut mehenga hai" → "I understand, [Name] ji! But after the ₹78,000 government subsidy, the actual cost is much lower. Plus you recover it in 3–5 years — after that it's free electricity for 20+ years. Shall I show you the exact numbers?"
-
-- "Rented house" / "Kiraye ka ghar" → "That's a common situation, [Name] ji! Many landlords actually agree because solar increases property value. We can help you have that conversation with your landlord. Would you like to explore this?"
-
-- "Not sure it works in my area" / "Mere area mein kaam karega?" → "Solar works across India, [Name] ji! Your area gets enough sunlight. In fact, most Indian states have 5–6 hours of peak sun daily — more than enough for great savings."
-
-- "Government schemes are fake" / "Sarkari scheme fake hoti hai" → "I completely understand the skepticism, [Name] ji! PM Surya Ghar Yojana is a real central government scheme with ₹75,000 crore budget. We handle all the paperwork for you — you just sit back."
-
-- "Need to ask family" / "Ghar mein poochhna hai" → "Absolutely, [Name] ji! Family decisions are important. Shall I prepare a detailed estimate you can share with them? It has all the numbers they'll need."
-
-- "Not now, later" / "Abhi nahi, baad mein" → "Of course, [Name] ji! Just so you know — the PM Surya Ghar subsidy budget is being allocated on a first-come basis. Would you like me to save your estimate so you can come back to it?"
-
-- "Maintenance is a problem" → "Solar panels have almost zero maintenance, [Name] ji! No moving parts, just occasional cleaning once a month. Most customers forget they even have it installed!"
-
-- "Neighbour had bad experience" → "I'm sorry to hear that, [Name] ji. Bad installations do happen with unverified vendors. Sales Squad only works with certified installers with 5+ years experience and full warranty support."
-
-- "My bill is low" / "Mera bill kam hai" → "Even at ₹1,500/month, [Name] ji, that's ₹18,000/year — and over 25 years, you'd spend ₹4.5 lakh on electricity. Solar can save most of that. Want to see the numbers?"
-
-- "Already have inverter/generator" → "That's different, [Name] ji! An inverter just stores power from the grid. Solar generates your own free electricity from sunlight — your bill drops by 80-90% permanently."
-
-CLARIFYING QUESTIONS (ask these naturally when relevant to give a better estimate):
-- Roof ownership: "Is your home owned or rented, [Name] ji?" (affects subsidy eligibility)
-- Roof type: "Is your roof flat or sloped?" (affects installation method)
-- Decision maker: "Are you the decision-maker for this, or should we include someone else from your family?"
-- Appliances: "Do you run heavy appliances like AC, water heater, or water pump?" (helps size the system)
-- Ask these ONE AT A TIME, only when relevant, not all at once.
+OBJECTION HANDLING (keep responses short):
+- "Too expensive" → "After the ₹78,000 govt subsidy, the net cost is much lower — and you recover it in 3-5 years, [Name] ji!"
+- "Not reliable" → "Solar panels come with a 25-year warranty and millions are installed across India. Very reliable!"
+- "Maintenance?" → "Almost zero maintenance — just occasional cleaning. No moving parts!"
+- "Cloudy days?" → "Solar still generates on cloudy days, and net metering credits any excess power."
+- "Rented house" → "You can talk to your landlord — many share the savings. Or we have portable options."
 
 QUICK REPLY BUTTONS:
 At the END of EVERY response, include a JSON block with 2-4 short quick reply options:
