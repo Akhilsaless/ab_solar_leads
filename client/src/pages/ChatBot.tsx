@@ -9,6 +9,8 @@ import { Streamdown } from "streamdown";
 import { nanoid } from "nanoid";
 import { ROICalculator } from "@/components/ROICalculator";
 import { RoofVisualization } from "@/components/RoofVisualization";
+import { SystemSizeSlider } from "@/components/SystemSizeSlider";
+import { PanelComparison } from "@/components/PanelComparison";
 
 type ChatMessage = {
   role: "bot" | "customer";
@@ -307,6 +309,37 @@ export default function ChatBot() {
                       panelCount={msg.metadata.panelCount || 0}
                       systemSizeKw={msg.metadata.systemSizeKw || 0}
                       panelType={msg.metadata.panelType || "monocrystalline"}
+                    />
+                  </div>
+                )}
+
+                {msg.role === "bot" && msg.metadata?.showSlider && msg.metadata && (
+                  <div className="ml-11 mt-4 max-w-[85%] md:max-w-[75%]">
+                    <SystemSizeSlider
+                      monthlyBill={msg.metadata.monthlyBill || 0}
+                      onSystemSizeChange={(size, panels, savings) => {
+                        if (msg.metadata) {
+                          msg.metadata.systemSizeKw = size;
+                          msg.metadata.panelCount = panels;
+                          msg.metadata.monthlyElectricitySavings = savings;
+                        }
+                      }}
+                      currentRate={msg.metadata.currentRate || 7.5}
+                    />
+                  </div>
+                )}
+
+                {msg.role === "bot" && msg.metadata?.showPanelComparison && msg.metadata && (
+                  <div className="ml-11 mt-4 max-w-[85%] md:max-w-[75%]">
+                    <PanelComparison
+                      systemSizeKw={msg.metadata.systemSizeKw || 0}
+                      totalCost={msg.metadata.totalCost || 0}
+                      onPanelSelect={(panelType, cost) => {
+                        if (msg.metadata) {
+                          msg.metadata.panelType = panelType;
+                          msg.metadata.estimatedCost = cost;
+                        }
+                      }}
                     />
                   </div>
                 )}
