@@ -122,3 +122,19 @@
 - [x] Add withdrawal history display
 - [x] Add referrer.dashboard.test.ts with 6 tests covering all DB operations
 - [x] All 153 tests passing
+
+## Referral Program V2 (Current Session)
+- [x] DB: Add verificationToken, verificationStatus, qualityScore, dailyStreak, lastActiveDate to referrers
+- [x] DB: Add customerVerified, verificationToken columns to referrals
+- [x] Backend: Remove ₹500 bot-chat trigger; add subsidyApplied trigger (₹500) and installConfirmed trigger (₹1500)
+- [x] Backend: Auto-send customer verification email when lead is captured via referral
+- [x] Backend: Customer clicks verify link → updates referral.customerVerified = true
+- [x] Backend: Lead quality score calculation (verified leads / total leads %)
+- [x] Backend: Daily task reset logic + streak counter
+- [x] Backend: Milestone bonuses ₹100 → ₹200 → ₹300 (increasing by ₹100)
+- [x] Frontend: Referrer dashboard - show lead status pipeline (5 stages)
+- [x] Frontend: Referrer dashboard - show quality score with color indicator
+- [x] Frontend: Referrer dashboard - show daily streak
+- [x] Frontend: ReferrerSignup - add T&C checkbox (required)
+- [x] Frontend: Add T&C page at /terms-referral
+- [x] Admin: Add "Mark Subsidy Applied" and "Mark Installed" buttons per referral

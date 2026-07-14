@@ -106,15 +106,47 @@ export async function recordReferralSignup(referrerId: number, conversationId: n
   if (!db) throw new Error("Database not available");
   
   try {
+    // Generate a unique verification token for the customer to confirm the referral
+    const { nanoid } = await import("nanoid");
+    const verificationToken = nanoid(32);
+
     await db.execute(
-      sql`INSERT INTO referrals (referrerId, conversationId, customerName, customerPhone, customerEmail, monthlyBill, state, status) 
-          VALUES (${referrerId}, ${conversationId}, ${customerData.name}, ${customerData.phone}, ${customerData.email}, ${customerData.bill}, ${customerData.state}, 'pending')`
+      sql`INSERT INTO referrals (referrerId, conversationId, customerName, customerPhone, customerEmail, monthlyBill, state, status, verificationToken, verificationSentAt) 
+          VALUES (${referrerId}, ${conversationId}, ${customerData.name}, ${customerData.phone}, ${customerData.email}, ${customerData.bill}, ${customerData.state || null}, 'pending', ${verificationToken}, NOW())`
     );
-    
-    // Update referrer's total referrals and add signup bonus
-    await db.execute(
-      sql`UPDATE referrers SET totalReferrals = totalReferrals + 1, totalEarnings = totalEarnings + 500 WHERE id = ${referrerId}`
-    );
+
+    // Get referrer name for the email
+    const refResult = await db.execute(sql`SELECT name FROM referrers WHERE id = ${referrerId}`);
+    const refRows = Array.isArray(refResult) && Array.isArray(refResult[0]) ? refResult[0] : (Array.isArray(refResult) ? refResult : []);
+    const referrerName = (refRows[0] as any)?.name || "a friend";
+
+    // Send verification email to customer — no commission until they confirm
+    if (customerData.email) {
+      const { sendEmail } = await import("./_core/emailService");
+      // Use the app origin from env or fallback to the known production domain
+      const appOrigin = process.env.APP_ORIGIN || process.env.VITE_APP_ID
+        ? `https://${process.env.VITE_APP_ID}.manus.space`
+        : 'https://absolarleads-xxxqwsn9.manus.space';
+      const verifyUrl = `${appOrigin}/verify-referral?token=${verificationToken}`;
+      sendEmail({
+        to: customerData.email,
+        subject: `${referrerName} referred you to AB SOLAR — Please Confirm`,
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 24px; background: #1a1a2e; color: #fff; border-radius: 12px;">
+            <h2 style="color: #f97316;">Did ${referrerName} refer you? 🌞</h2>
+            <p style="color: #ccc;">Hi ${customerData.name || "there"},</p>
+            <p style="color: #ccc;">${referrerName} referred you to AB SOLAR for a free solar estimate. Please confirm this referral by clicking the button below.</p>
+            <div style="text-align: center; margin: 24px 0;">
+              <a href="${verifyUrl}" 
+                 style="background: #f97316; color: #fff; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: bold; font-size: 16px;">
+                ✅ Yes, Confirm Referral
+              </a>
+            </div>
+            <p style="color: #999; font-size: 12px;">If you did not ask to be referred or don't know ${referrerName}, you can ignore this email.</p>
+          </div>
+        `,
+      }).catch(console.error);
+    }
     
     return { success: true };
   } catch (error) {

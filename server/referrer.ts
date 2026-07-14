@@ -1,22 +1,18 @@
-import { publicProcedure, router } from "./_core/trpc";
+import { router, publicProcedure } from "./_core/trpc";
 import { z } from "zod";
 import { getDb } from "./db";
 import { sql } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import { sendEmail } from "./_core/emailService";
+import { notifyOwner } from "./_core/notification";
 
 // In-memory OTP store: email -> { otp, expiresAt, data }
-const otpStore = new Map<string, { otp: string; expiresAt: number; data: { name: string; email: string } }>();
+const otpStore = new Map<string, { otp: string; expiresAt: number; data: { name: string; email: string; acceptedTnC: boolean } }>();
 
 // Helper: extract rows from mysql2 execute result
 function rows(result: any): any[] {
-  // mysql2 returns [rows, fields] - result[0] is the array of rows
-  if (Array.isArray(result) && Array.isArray(result[0])) {
-    return result[0] as any[];
-  }
-  if (Array.isArray(result)) {
-    return result as any[];
-  }
+  if (Array.isArray(result) && Array.isArray(result[0])) return result[0] as any[];
+  if (Array.isArray(result)) return result as any[];
   return [];
 }
 
@@ -26,27 +22,61 @@ function firstRow(result: any): any | null {
   return r.length > 0 ? r[0] : null;
 }
 
-// Helper: get insertId
-// mysql2 via drizzle returns [ResultSetHeader, null] for INSERT/UPDATE/DELETE
+// Helper: get insertId — drizzle mysql2 returns [ResultSetHeader, null]
 function insertId(result: any): number {
-  if (Array.isArray(result)) {
-    // drizzle mysql2: result[0] is ResultSetHeader with insertId
-    return (result[0] as any)?.insertId || 0;
-  }
+  if (Array.isArray(result)) return (result[0] as any)?.insertId || 0;
   return (result as any)?.insertId || 0;
+}
+
+// Milestone bonus amounts — starts at ₹100, increases ₹100 each task
+function getMilestoneBonus(taskNumber: number): number {
+  return taskNumber * 100;
+}
+
+// Recalculate and update quality score for a referrer
+async function updateQualityScore(db: any, referrerId: number) {
+  const totalResult = await db.execute(
+    sql`SELECT COUNT(*) as total FROM referrals WHERE referrerId = ${referrerId}`
+  );
+  const verifiedResult = await db.execute(
+    sql`SELECT COUNT(*) as verified FROM referrals WHERE referrerId = ${referrerId} AND customerVerified = 1`
+  );
+  const total = Number(firstRow(totalResult)?.total || 0);
+  const verified = Number(firstRow(verifiedResult)?.verified || 0);
+  const score = total === 0 ? 100 : Math.round((verified / total) * 100);
+  await db.execute(
+    sql`UPDATE referrers SET qualityScore = ${score} WHERE id = ${referrerId}`
+  );
+  return score;
+}
+
+// Update daily streak for a referrer
+async function updateDailyStreak(db: any, referrerId: number) {
+  const ref = firstRow(await db.execute(sql`SELECT lastActiveDate, dailyStreak FROM referrers WHERE id = ${referrerId}`));
+  if (!ref) return;
+  const today = new Date().toISOString().slice(0, 10);
+  const last = ref.lastActiveDate ? new Date(ref.lastActiveDate).toISOString().slice(0, 10) : null;
+  const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+  let newStreak = 1;
+  if (last === yesterday) newStreak = (ref.dailyStreak || 0) + 1;
+  else if (last === today) newStreak = ref.dailyStreak || 1;
+  await db.execute(
+    sql`UPDATE referrers SET dailyStreak = ${newStreak}, lastActiveDate = ${today} WHERE id = ${referrerId}`
+  );
 }
 
 export const referrerRouter = router({
   sendOtp: publicProcedure
-    .input(z.object({ name: z.string().min(1), email: z.string().email() }))
+    .input(z.object({ name: z.string().min(1), email: z.string().email(), acceptedTnC: z.boolean() }))
     .mutation(async ({ input }) => {
+      if (!input.acceptedTnC) throw new Error("You must accept the Terms & Conditions to join.");
       const otp = Math.floor(100000 + Math.random() * 900000).toString();
-      const expiresAt = Date.now() + 10 * 60 * 1000; // 10 minutes
+      const expiresAt = Date.now() + 10 * 60 * 1000;
 
       otpStore.set(input.email, {
         otp,
         expiresAt,
-        data: { name: input.name, email: input.email },
+        data: { name: input.name, email: input.email, acceptedTnC: true },
       });
 
       await sendEmail({
@@ -71,7 +101,6 @@ export const referrerRouter = router({
     .input(z.object({ email: z.string().email(), otp: z.string() }))
     .mutation(async ({ input }) => {
       const stored = otpStore.get(input.email);
-
       if (!stored) throw new Error("OTP expired or not found. Please request a new one.");
       if (Date.now() > stored.expiresAt) {
         otpStore.delete(input.email);
@@ -83,10 +112,8 @@ export const referrerRouter = router({
       const db = await getDb();
       if (!db) throw new Error("Database not available");
 
-      // Check if already registered - return existing account
-      const existingResult = await db.execute(
-        sql`SELECT id, uniqueCode FROM referrers WHERE email = ${email}`
-      );
+      // Return existing account if already registered
+      const existingResult = await db.execute(sql`SELECT id, uniqueCode FROM referrers WHERE email = ${email}`);
       const existing = firstRow(existingResult);
       if (existing) {
         otpStore.delete(input.email);
@@ -95,36 +122,35 @@ export const referrerRouter = router({
 
       const uniqueCode = `REF_${nanoid(8).toUpperCase()}`;
 
-      // Insert new referrer
       const insertResult = await db.execute(
-        sql`INSERT INTO referrers (uniqueCode, name, email, totalEarnings, totalReferrals, status) 
-            VALUES (${uniqueCode}, ${name}, ${email}, 0, 0, 'active')`
+        sql`INSERT INTO referrers (uniqueCode, name, email, totalEarnings, totalReferrals, status, qualityScore, dailyStreak, acceptedTnC) 
+            VALUES (${uniqueCode}, ${name}, ${email}, 0, 0, 'active', 100, 0, 1)`
       );
       const newId = insertId(insertResult);
 
-      // Create initial task if we have a valid ID
+      // Create initial task with ₹100 bonus (task 1)
       if (newId > 0) {
         await db.execute(
           sql`INSERT INTO referralTasks (referrerId, taskNumber, targetReferrals, bonusPerReferral) 
-              VALUES (${newId}, 1, 5, 20)`
+              VALUES (${newId}, 1, 5, ${getMilestoneBonus(1)})`
         );
       }
 
       otpStore.delete(input.email);
 
-      // Send welcome email (non-blocking)
       sendEmail({
         to: email,
         subject: "Welcome to Sales Squad Referral Program!",
         html: `
           <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 24px; background: #1a1a2e; color: #fff; border-radius: 12px;">
             <h2 style="color: #f97316;">Welcome, ${name}! 🎉</h2>
-            <p style="color: #ccc;">Your referral account is ready. Start sharing your unique code to earn commissions!</p>
+            <p style="color: #ccc;">Your referral account is ready. Start sharing your unique link to earn commissions!</p>
             <div style="background: #f97316; border-radius: 8px; padding: 16px; text-align: center; margin: 20px 0;">
               <p style="color: #fff; margin: 0; font-size: 13px;">Your Referral Code</p>
               <span style="font-size: 24px; font-weight: bold; letter-spacing: 4px; color: #fff;">${uniqueCode}</span>
             </div>
-            <p style="color: #ccc;">Earn ₹500 for every customer signup + ₹1500 when they install solar!</p>
+            <p style="color: #ccc;">💰 Earn ₹500 when your referral applies for govt subsidy<br/>💰 Earn ₹1,500 when solar is installed</p>
+            <p style="color: #999; font-size: 12px;">By joining, you agreed to our Terms & Conditions. Fake or invalid leads will result in account suspension.</p>
           </div>
         `,
       }).catch(console.error);
@@ -149,11 +175,9 @@ export const referrerRouter = router({
         const referralsResult = await db.execute(
           sql`SELECT * FROM referrals WHERE referrerId = ${ref.id} ORDER BY createdAt DESC`
         );
-
         const tasksResult = await db.execute(
           sql`SELECT * FROM referralTasks WHERE referrerId = ${ref.id} ORDER BY taskNumber ASC`
         );
-
         const withdrawalsResult = await db.execute(
           sql`SELECT * FROM withdrawals WHERE referrerId = ${ref.id} ORDER BY createdAt DESC`
         );
@@ -170,6 +194,38 @@ export const referrerRouter = router({
       }
     }),
 
+  // Customer clicks verification link from email
+  verifyCustomer: publicProcedure
+    .input(z.object({ token: z.string() }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new Error("Database not available");
+
+      const referralResult = await db.execute(
+        sql`SELECT r.*, ref.name as referrerName FROM referrals r 
+            JOIN referrers ref ON r.referrerId = ref.id
+            WHERE r.verificationToken = ${input.token}`
+      );
+      const referral = firstRow(referralResult);
+      if (!referral) throw new Error("Invalid or expired verification link.");
+      if (referral.customerVerified) return { success: true, alreadyVerified: true };
+
+      await db.execute(
+        sql`UPDATE referrals SET customerVerified = 1 WHERE id = ${referral.id}`
+      );
+
+      // Update quality score
+      await updateQualityScore(db, referral.referrerId);
+
+      // Notify admin
+      notifyOwner({
+        title: "✅ Lead Verified",
+        content: `Customer ${referral.customerName} confirmed referral from ${referral.referrerName}. Lead is now verified.`,
+      }).catch(console.error);
+
+      return { success: true, referrerName: referral.referrerName };
+    }),
+
   requestWithdrawal: publicProcedure
     .input(z.object({
       uniqueCode: z.string(),
@@ -182,9 +238,7 @@ export const referrerRouter = router({
       const db = await getDb();
       if (!db) throw new Error("Database not available");
 
-      const referrerResult = await db.execute(
-        sql`SELECT * FROM referrers WHERE uniqueCode = ${input.uniqueCode}`
-      );
+      const referrerResult = await db.execute(sql`SELECT * FROM referrers WHERE uniqueCode = ${input.uniqueCode}`);
       const ref = firstRow(referrerResult);
       if (!ref) throw new Error("Referrer not found");
       if (Number(ref.totalEarnings) < input.amount) throw new Error("Insufficient balance");
@@ -212,7 +266,6 @@ export const referrerRouter = router({
       );
       return rows(result);
     } catch (error) {
-      console.error("Error getting leaderboard:", error);
       return [];
     }
   }),
@@ -223,11 +276,10 @@ export const referrerRouter = router({
     if (!db) return [];
     try {
       const result = await db.execute(
-        sql`SELECT id, uniqueCode, name, email, totalEarnings, totalReferrals, status FROM referrers ORDER BY totalEarnings DESC`
+        sql`SELECT id, uniqueCode, name, email, totalEarnings, totalReferrals, status, qualityScore, dailyStreak FROM referrers ORDER BY totalEarnings DESC`
       );
       return rows(result);
     } catch (error) {
-      console.error("Error getting all referrers:", error);
       return [];
     }
   }),
@@ -237,14 +289,15 @@ export const referrerRouter = router({
     if (!db) return [];
     try {
       const result = await db.execute(
-        sql`SELECT r.id, r.referrerId, r.customerName, r.customerPhone, r.customerEmail, r.monthlyBill, r.state, r.status, r.signupBonusPaid, r.installationBonusPaid, ref.name as referrerName 
+        sql`SELECT r.id, r.referrerId, r.customerName, r.customerPhone, r.customerEmail, r.monthlyBill, r.state, r.status, 
+                   r.customerVerified, r.subsidyApplied, r.signupBonusPaid, r.installationBonusPaid,
+                   r.createdAt, ref.name as referrerName 
             FROM referrals r 
             JOIN referrers ref ON r.referrerId = ref.id 
             ORDER BY r.createdAt DESC`
       );
       return rows(result);
     } catch (error) {
-      console.error("Error getting all referrals:", error);
       return [];
     }
   }),
@@ -262,7 +315,6 @@ export const referrerRouter = router({
       );
       return rows(result);
     } catch (error) {
-      console.error("Error getting pending withdrawals:", error);
       return [];
     }
   }),
@@ -286,7 +338,7 @@ export const referrerRouter = router({
       sendEmail({
         to: withdrawal.email,
         subject: "Withdrawal Approved - Sales Squad",
-        html: `<p>Hi ${withdrawal.name}, your withdrawal of ₹${withdrawal.amount} has been approved and will be credited to your account shortly!</p>`,
+        html: `<p>Hi ${withdrawal.name}, your withdrawal of ₹${withdrawal.amount} has been approved and will be credited shortly!</p>`,
       }).catch(console.error);
 
       return { success: true };
@@ -297,34 +349,125 @@ export const referrerRouter = router({
     .mutation(async ({ input }) => {
       const db = await getDb();
       if (!db) throw new Error("Database not available");
-
       await db.execute(
         sql`UPDATE withdrawals SET status = 'rejected', rejectionReason = ${input.reason || null} WHERE id = ${input.withdrawalId}`
       );
-
       return { success: true };
     }),
 
+  // Admin: mark subsidy applied → ₹500 to referrer
+  markSubsidyApplied: publicProcedure
+    .input(z.object({ referralId: z.number() }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new Error("Database not available");
+
+      const referralResult = await db.execute(sql`SELECT * FROM referrals WHERE id = ${input.referralId}`);
+      const referral = firstRow(referralResult);
+      if (!referral) throw new Error("Referral not found");
+      if (referral.subsidyApplied) throw new Error("Subsidy already marked for this referral");
+
+      await db.execute(
+        sql`UPDATE referrals SET subsidyApplied = 1, subsidyAppliedAt = NOW(), signupBonusPaid = 1, status = 'subsidy_applied' WHERE id = ${input.referralId}`
+      );
+      await db.execute(
+        sql`UPDATE referrers SET totalEarnings = totalEarnings + 500 WHERE id = ${referral.referrerId}`
+      );
+
+      // Update streak
+      await updateDailyStreak(db, referral.referrerId);
+
+      // Get referrer for email
+      const refResult = await db.execute(sql`SELECT * FROM referrers WHERE id = ${referral.referrerId}`);
+      const ref = firstRow(refResult);
+      if (ref) {
+        sendEmail({
+          to: ref.email,
+          subject: "🎉 ₹500 Earned! Subsidy Applied - Sales Squad",
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 24px; background: #1a1a2e; color: #fff; border-radius: 12px;">
+              <h2 style="color: #22c55e;">₹500 Credited! 🎉</h2>
+              <p style="color: #ccc;">Great news, ${ref.name}! Your referral <strong>${referral.customerName}</strong> has applied for the government solar subsidy.</p>
+              <div style="background: #22c55e22; border: 1px solid #22c55e; border-radius: 8px; padding: 16px; margin: 16px 0;">
+                <p style="color: #22c55e; font-size: 24px; font-weight: bold; margin: 0;">+₹500 added to your balance</p>
+              </div>
+              <p style="color: #ccc;">You'll earn another ₹1,500 once the solar installation is confirmed. Keep referring!</p>
+            </div>
+          `,
+        }).catch(console.error);
+      }
+
+      return { success: true, message: "₹500 subsidy bonus credited to referrer" };
+    }),
+
+  // Admin: confirm installation → ₹1500 to referrer
   confirmInstallation: publicProcedure
     .input(z.object({ referralId: z.number() }))
     .mutation(async ({ input }) => {
       const db = await getDb();
       if (!db) throw new Error("Database not available");
 
-      const referralResult = await db.execute(
-        sql`SELECT * FROM referrals WHERE id = ${input.referralId}`
-      );
+      const referralResult = await db.execute(sql`SELECT * FROM referrals WHERE id = ${input.referralId}`);
       const referral = firstRow(referralResult);
       if (!referral) throw new Error("Referral not found");
 
       await db.execute(
-        sql`UPDATE referrals SET status = 'completed', installationBonusPaid = true WHERE id = ${input.referralId}`
+        sql`UPDATE referrals SET status = 'completed', installationBonusPaid = 1, installedAt = NOW() WHERE id = ${input.referralId}`
+      );
+      await db.execute(
+        sql`UPDATE referrers SET totalEarnings = totalEarnings + 1500, totalReferrals = totalReferrals + 1 WHERE id = ${referral.referrerId}`
       );
 
-      await db.execute(
-        sql`UPDATE referrers SET totalEarnings = totalEarnings + 1500 WHERE id = ${referral.referrerId}`
-      );
+      // Check and advance task
+      await checkAndAdvanceTask(db, referral.referrerId);
+      await updateDailyStreak(db, referral.referrerId);
+
+      const refResult = await db.execute(sql`SELECT * FROM referrers WHERE id = ${referral.referrerId}`);
+      const ref = firstRow(refResult);
+      if (ref) {
+        sendEmail({
+          to: ref.email,
+          subject: "🏆 ₹1,500 Earned! Installation Confirmed - Sales Squad",
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 24px; background: #1a1a2e; color: #fff; border-radius: 12px;">
+              <h2 style="color: #f97316;">₹1,500 Credited! 🏆</h2>
+              <p style="color: #ccc;">Congratulations, ${ref.name}! Solar has been installed for your referral <strong>${referral.customerName}</strong>.</p>
+              <div style="background: #f9731622; border: 1px solid #f97316; border-radius: 8px; padding: 16px; margin: 16px 0;">
+                <p style="color: #f97316; font-size: 24px; font-weight: bold; margin: 0;">+₹1,500 added to your balance</p>
+              </div>
+              <p style="color: #ccc;">Total earned so far: ₹${Number(ref.totalEarnings)}</p>
+            </div>
+          `,
+        }).catch(console.error);
+      }
 
       return { success: true };
     }),
 });
+
+// Check if current task is complete and advance to next
+async function checkAndAdvanceTask(db: any, referrerId: number) {
+  try {
+    const ref = firstRow(await db.execute(sql`SELECT totalReferrals FROM referrers WHERE id = ${referrerId}`));
+    if (!ref) return;
+
+    const activeTask = firstRow(await db.execute(
+      sql`SELECT * FROM referralTasks WHERE referrerId = ${referrerId} AND status = 'active' ORDER BY taskNumber ASC LIMIT 1`
+    ));
+    if (!activeTask) return;
+
+    const completed = activeTask.completedReferrals + 1;
+    if (completed >= activeTask.targetReferrals) {
+      await db.execute(sql`UPDATE referralTasks SET status = 'completed', completedReferrals = ${completed}, completedAt = NOW() WHERE id = ${activeTask.id}`);
+      const nextTask = activeTask.taskNumber + 1;
+      await db.execute(
+        sql`INSERT INTO referralTasks (referrerId, taskNumber, targetReferrals, bonusPerReferral) 
+            VALUES (${referrerId}, ${nextTask}, 5, ${getMilestoneBonus(nextTask)})`
+      );
+    } else {
+      await db.execute(sql`UPDATE referralTasks SET completedReferrals = ${completed} WHERE id = ${activeTask.id}`);
+    }
+  } catch (e) {
+    console.error("Error advancing task:", e);
+  }
+}
