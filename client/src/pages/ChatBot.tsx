@@ -74,6 +74,7 @@ export default function ChatBot() {
           role: "bot",
           content: data.response,
           quickReplies: data.quickReplies || [],
+          metadata: data.metadata || {},
           createdAt: new Date(),
         },
       ]);

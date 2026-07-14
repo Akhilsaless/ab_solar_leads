@@ -439,7 +439,33 @@ export const appRouter = router({
           cleanContent = aiContent.replace(qrRegex, '').trim();
         }
 
-        return { response: cleanContent, quickReplies };
+        // Build metadata for visual components
+        const metadata: Record<string, any> = {};
+        const updatedConv = await db.getConversation(input.sessionId);
+        
+        // Trigger 3D visualization after bill is provided
+        if (updatedConv?.monthlyBill && updatedConv?.recommendedKw) {
+          metadata.show3D = true;
+          metadata.showROI = true;
+          metadata.showSlider = true;
+          metadata.monthlyBill = parseFloat(updatedConv.monthlyBill);
+          metadata.systemSizeKw = parseFloat(updatedConv.recommendedKw);
+          metadata.panelCount = updatedConv.recommendedPanels || 0;
+          metadata.totalCost = parseFloat(updatedConv.estimatedCost || "0");
+          metadata.subsidyAmount = parseFloat(updatedConv.subsidyAmount || "0");
+          metadata.netCost = parseFloat(updatedConv.netCost || "0");
+          metadata.monthlyElectricitySavings = parseFloat(updatedConv.estimatedSavingsMonthly || "0");
+          metadata.paybackYears = parseFloat(updatedConv.paybackYears || "0");
+          metadata.currentRate = 7.5;
+          metadata.rateIncreasePercentage = 1.3;
+        }
+        
+        // Trigger panel comparison if bill is known but panel not selected
+        if (updatedConv?.monthlyBill && !updatedConv?.panelType) {
+          metadata.showPanelComparison = true;
+        }
+
+        return { response: cleanContent, quickReplies, metadata };
       }),
 
     // Get conversation history
