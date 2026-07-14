@@ -110,14 +110,14 @@ export default function ReferrerDashboard() {
           <h2 className="text-xl font-bold text-white mb-4">Your Referral Link</h2>
           <div className="flex gap-2">
             <Input
-              value={`absolarleads-xxxqwsn9.manus.space/refer/${uniqueCode}`}
+              value={`absolarleads-xxxqwsn9.manus.space/referral-landing/${uniqueCode}`}
               readOnly
               className="bg-white/5 border-white/20 text-white"
             />
             <Button
               onClick={() => {
                 navigator.clipboard.writeText(
-                  `absolarleads-xxxqwsn9.manus.space/refer/${uniqueCode}`
+                  `absolarleads-xxxqwsn9.manus.space/referral-landing/${uniqueCode}`
                 );
               }}
               className="bg-orange-600 hover:bg-orange-700"
