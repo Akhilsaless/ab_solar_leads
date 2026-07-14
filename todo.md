@@ -111,3 +111,14 @@
 - [x] Include approx prices and system recommendations in estimate
 - [x] Remove chat history from estimate download
 - [x] Test end-to-end estimate download flow
+
+## Referrer Dashboard Fixes (Current Session)
+- [x] Fix insertId() helper - was returning 0 due to result[1] being null not undefined
+- [x] Fix getDashboard backend - referrerId was undefined causing SQL error
+- [x] Rebuild ReferrerDashboard.tsx with 4 tabs: Overview, Referrals, Tasks, Withdraw
+- [x] Add WhatsApp share button to referral link section
+- [x] Add task progress bar with milestone tracking
+- [x] Add earnings breakdown cards (signup bonuses, install bonuses, pending)
+- [x] Add withdrawal history display
+- [x] Add referrer.dashboard.test.ts with 6 tests covering all DB operations
+- [x] All 153 tests passing

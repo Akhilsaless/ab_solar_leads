@@ -1,163 +1,168 @@
-import { z } from "zod";
 import { publicProcedure, router } from "./_core/trpc";
-import { nanoid } from "nanoid";
+import { z } from "zod";
 import { getDb } from "./db";
-import { getAllReferrers, getAllReferrals, getPendingWithdrawals, approveWithdrawal, rejectWithdrawal } from "./referrerDb";
-import { sendEmail } from "./_core/emailService";
 import { sql } from "drizzle-orm";
+import { nanoid } from "nanoid";
+import { sendEmail } from "./_core/emailService";
 
-const otpStore = new Map<string, { otp: string; expiresAt: number; data: any }>();
+// In-memory OTP store: email -> { otp, expiresAt, data }
+const otpStore = new Map<string, { otp: string; expiresAt: number; data: { name: string; email: string } }>();
 
-// For testing: store OTPs temporarily (remove in production)
-const testOtpMap = new Map<string, string>();
+// Helper: extract rows from mysql2 execute result
+function rows(result: any): any[] {
+  // mysql2 returns [rows, fields] - result[0] is the array of rows
+  if (Array.isArray(result) && Array.isArray(result[0])) {
+    return result[0] as any[];
+  }
+  if (Array.isArray(result)) {
+    return result as any[];
+  }
+  return [];
+}
+
+// Helper: get first row
+function firstRow(result: any): any | null {
+  const r = rows(result);
+  return r.length > 0 ? r[0] : null;
+}
+
+// Helper: get insertId
+// mysql2 via drizzle returns [ResultSetHeader, null] for INSERT/UPDATE/DELETE
+function insertId(result: any): number {
+  if (Array.isArray(result)) {
+    // drizzle mysql2: result[0] is ResultSetHeader with insertId
+    return (result[0] as any)?.insertId || 0;
+  }
+  return (result as any)?.insertId || 0;
+}
 
 export const referrerRouter = router({
   sendOtp: publicProcedure
-    .input(z.object({ name: z.string(), email: z.string().email() }))
-    .mutation(async ({ input }: any) => {
+    .input(z.object({ name: z.string().min(1), email: z.string().email() }))
+    .mutation(async ({ input }) => {
       const otp = Math.floor(100000 + Math.random() * 900000).toString();
-      const expiresAt = Date.now() + 10 * 60 * 1000;
+      const expiresAt = Date.now() + 10 * 60 * 1000; // 10 minutes
 
-      otpStore.set(input.email, { otp, expiresAt, data: input });
+      otpStore.set(input.email, {
+        otp,
+        expiresAt,
+        data: { name: input.name, email: input.email },
+      });
 
-      console.log(`[OTP] Generated for ${input.email}: ${otp}`);
-
-      // Send OTP via email
-      const emailResult = await sendEmail({
+      await sendEmail({
         to: input.email,
-        subject: "Your OTP - Sales Squad Referral Program",
+        subject: "Your Sales Squad OTP Code",
         html: `
-          <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto; padding: 20px; background: #f9f9f9;">
-            <div style="background: #f97316; padding: 20px; border-radius: 8px 8px 0 0; text-align: center;">
-              <h1 style="color: white; margin: 0; font-size: 24px;">Sales Squad Agent</h1>
-              <p style="color: #ffe0c0; margin: 5px 0 0;">Referral Program</p>
+          <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 24px; background: #1a1a2e; color: #fff; border-radius: 12px;">
+            <h2 style="color: #f97316; margin-bottom: 8px;">Sales Squad Referral Program</h2>
+            <p style="color: #ccc;">Hi ${input.name}, here is your one-time password:</p>
+            <div style="background: #f97316; border-radius: 8px; padding: 20px; text-align: center; margin: 20px 0;">
+              <span style="font-size: 36px; font-weight: bold; letter-spacing: 8px; color: #fff;">${otp}</span>
             </div>
-            <div style="background: white; padding: 30px; border-radius: 0 0 8px 8px; text-align: center;">
-              <p style="color: #333; font-size: 16px;">Hi ${input.name},</p>
-              <p style="color: #555;">Your One-Time Password (OTP) for signup is:</p>
-              <div style="background: #f97316; color: white; font-size: 36px; font-weight: bold; letter-spacing: 8px; padding: 20px; border-radius: 8px; margin: 20px 0;">${otp}</div>
-              <p style="color: #888; font-size: 14px;">This OTP expires in <strong>10 minutes</strong>.</p>
-              <p style="color: #888; font-size: 12px;">If you didn't request this, please ignore this email.</p>
-            </div>
+            <p style="color: #999; font-size: 13px;">This code expires in 10 minutes. Do not share it with anyone.</p>
           </div>
         `,
       });
 
-      console.log(`[OTP] Email sent to ${input.email}: success=${emailResult.success}`);
-      if (!emailResult.success) {
-        console.error(`[OTP] Email failed:`, emailResult.error);
-      }
-      return { success: true, message: "OTP sent to " + input.email };
+      return { success: true, message: "OTP sent to your email" };
     }),
 
   verifyOtpAndSignup: publicProcedure
     .input(z.object({ email: z.string().email(), otp: z.string() }))
-    .mutation(async ({ input, ctx }: any) => {
+    .mutation(async ({ input }) => {
       const stored = otpStore.get(input.email);
 
-      if (!stored) {
-        throw new Error("OTP expired or not found");
-      }
-
+      if (!stored) throw new Error("OTP expired or not found. Please request a new one.");
       if (Date.now() > stored.expiresAt) {
         otpStore.delete(input.email);
-        throw new Error("OTP expired");
+        throw new Error("OTP expired. Please request a new one.");
       }
-
-      if (stored.otp !== input.otp) {
-        throw new Error("Invalid OTP");
-      }
+      if (stored.otp !== input.otp) throw new Error("Invalid OTP. Please check and try again.");
 
       const { name, email } = stored.data;
-      const uniqueCode = `REF_${nanoid(8).toUpperCase()}`;
-
       const db = await getDb();
       if (!db) throw new Error("Database not available");
 
-      try {
-        // Check if email already registered
-        const existing = await db.execute(
-          sql`SELECT id, uniqueCode FROM referrers WHERE email = ${email}`
-        );
-        if (existing && (existing as any[]).length > 0) {
-          const existingRef = (existing as any[])[0];
-          otpStore.delete(input.email);
-          // Return existing account instead of error
-          return { success: true, uniqueCode: existingRef.uniqueCode, alreadyExists: true };
-        }
-
-        // Save referrer to database
-        await db.execute(
-          sql`INSERT INTO referrers (uniqueCode, name, email, totalEarnings, totalReferrals, status) 
-              VALUES (${uniqueCode}, ${name}, ${email}, 0, 0, 'active')`
-        );
-
-        // Get the new referrer's ID using LAST_INSERT_ID()
-        const lastIdResult = await db.execute(sql`SELECT LAST_INSERT_ID() as newId`);
-        const referrerId = (lastIdResult as any[])[0]?.newId;
-
-        // Create initial task only if we have a valid referrerId
-        if (referrerId && Number(referrerId) > 0) {
-          await db.execute(
-            sql`INSERT INTO referralTasks (referrerId, taskNumber, targetReferrals, bonusPerReferral) 
-                VALUES (${referrerId}, 1, 5, 20)`
-          );
-        }
-
+      // Check if already registered - return existing account
+      const existingResult = await db.execute(
+        sql`SELECT id, uniqueCode FROM referrers WHERE email = ${email}`
+      );
+      const existing = firstRow(existingResult);
+      if (existing) {
         otpStore.delete(input.email);
-
-        // Send welcome email
-        try {
-          await sendEmail({
-            to: email,
-            subject: "Welcome to Sales Squad Referral Program!",
-            html: `<h2>Welcome to Sales Squad Referral Program, ${name}!</h2><p>Your referral code is: <strong>${uniqueCode}</strong></p><p>Share this code with friends to start earning commissions!</p>`,
-          });
-        } catch (error) {
-          console.error("Failed to send welcome email:", error);
-        }
-
-        return { success: true, uniqueCode };
-      } catch (error) {
-        console.error("Error during signup:", error);
-        throw error;
+        return { success: true, uniqueCode: existing.uniqueCode, alreadyExists: true };
       }
+
+      const uniqueCode = `REF_${nanoid(8).toUpperCase()}`;
+
+      // Insert new referrer
+      const insertResult = await db.execute(
+        sql`INSERT INTO referrers (uniqueCode, name, email, totalEarnings, totalReferrals, status) 
+            VALUES (${uniqueCode}, ${name}, ${email}, 0, 0, 'active')`
+      );
+      const newId = insertId(insertResult);
+
+      // Create initial task if we have a valid ID
+      if (newId > 0) {
+        await db.execute(
+          sql`INSERT INTO referralTasks (referrerId, taskNumber, targetReferrals, bonusPerReferral) 
+              VALUES (${newId}, 1, 5, 20)`
+        );
+      }
+
+      otpStore.delete(input.email);
+
+      // Send welcome email (non-blocking)
+      sendEmail({
+        to: email,
+        subject: "Welcome to Sales Squad Referral Program!",
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 24px; background: #1a1a2e; color: #fff; border-radius: 12px;">
+            <h2 style="color: #f97316;">Welcome, ${name}! 🎉</h2>
+            <p style="color: #ccc;">Your referral account is ready. Start sharing your unique code to earn commissions!</p>
+            <div style="background: #f97316; border-radius: 8px; padding: 16px; text-align: center; margin: 20px 0;">
+              <p style="color: #fff; margin: 0; font-size: 13px;">Your Referral Code</p>
+              <span style="font-size: 24px; font-weight: bold; letter-spacing: 4px; color: #fff;">${uniqueCode}</span>
+            </div>
+            <p style="color: #ccc;">Earn ₹500 for every customer signup + ₹1500 when they install solar!</p>
+          </div>
+        `,
+      }).catch(console.error);
+
+      return { success: true, uniqueCode };
     }),
 
   getDashboard: publicProcedure
     .input(z.object({ uniqueCode: z.string() }))
-    .query(async ({ input, ctx }: any) => {
+    .query(async ({ input }) => {
+      if (!input.uniqueCode) return null;
       const db = await getDb();
       if (!db) return null;
 
       try {
-        const referrer = await db.execute(
+        const referrerResult = await db.execute(
           sql`SELECT * FROM referrers WHERE uniqueCode = ${input.uniqueCode}`
         );
+        const ref = firstRow(referrerResult);
+        if (!ref) return null;
 
-        if (!referrer || (referrer as any[]).length === 0) {
-          throw new Error("Referrer not found");
-        }
-
-        const ref = (referrer as any[])[0];
-
-        const referrals = await db.execute(
-          sql`SELECT * FROM referrals WHERE referrerId = ${ref.id}`
+        const referralsResult = await db.execute(
+          sql`SELECT * FROM referrals WHERE referrerId = ${ref.id} ORDER BY createdAt DESC`
         );
 
-        const tasks = await db.execute(
-          sql`SELECT * FROM referralTasks WHERE referrerId = ${ref.id}`
+        const tasksResult = await db.execute(
+          sql`SELECT * FROM referralTasks WHERE referrerId = ${ref.id} ORDER BY taskNumber ASC`
         );
 
-        const withdrawals = await db.execute(
-          sql`SELECT * FROM withdrawals WHERE referrerId = ${ref.id}`
+        const withdrawalsResult = await db.execute(
+          sql`SELECT * FROM withdrawals WHERE referrerId = ${ref.id} ORDER BY createdAt DESC`
         );
 
         return {
           referrer: ref,
-          referrals: referrals || [],
-          tasks: tasks || [],
-          withdrawals: withdrawals || [],
+          referrals: rows(referralsResult),
+          tasks: rows(tasksResult),
+          withdrawals: rows(withdrawalsResult),
         };
       } catch (error) {
         console.error("Error getting dashboard:", error);
@@ -166,67 +171,46 @@ export const referrerRouter = router({
     }),
 
   requestWithdrawal: publicProcedure
-    .input(
-      z.object({
-        uniqueCode: z.string(),
-        amount: z.number().positive(),
-        upiId: z.string().optional(),
-        bankAccount: z.string().optional(),
-        bankIfsc: z.string().optional(),
-      })
-    )
-    .mutation(async ({ input, ctx }: any) => {
+    .input(z.object({
+      uniqueCode: z.string(),
+      amount: z.number().positive(),
+      upiId: z.string().optional(),
+      bankAccount: z.string().optional(),
+      bankIfsc: z.string().optional(),
+    }))
+    .mutation(async ({ input }) => {
       const db = await getDb();
       if (!db) throw new Error("Database not available");
 
-      try {
-        const referrer = await db.execute(
-          sql`SELECT * FROM referrers WHERE uniqueCode = ${input.uniqueCode}`
-        );
+      const referrerResult = await db.execute(
+        sql`SELECT * FROM referrers WHERE uniqueCode = ${input.uniqueCode}`
+      );
+      const ref = firstRow(referrerResult);
+      if (!ref) throw new Error("Referrer not found");
+      if (Number(ref.totalEarnings) < input.amount) throw new Error("Insufficient balance");
 
-        if (!referrer || (referrer as any[]).length === 0) {
-          throw new Error("Referrer not found");
-        }
+      await db.execute(
+        sql`INSERT INTO withdrawals (referrerId, amount, upiId, bankAccount, bankIfsc) 
+            VALUES (${ref.id}, ${input.amount}, ${input.upiId || null}, ${input.bankAccount || null}, ${input.bankIfsc || null})`
+      );
 
-        const ref = (referrer as any[])[0];
+      sendEmail({
+        to: ref.email,
+        subject: "Withdrawal Request Submitted - Sales Squad",
+        html: `<p>Hi ${ref.name}, your withdrawal request of ₹${input.amount} has been submitted and is pending approval. We'll process it within 2-3 business days.</p>`,
+      }).catch(console.error);
 
-        if (ref.totalEarnings < input.amount) {
-          throw new Error("Insufficient balance");
-        }
-
-        // Create withdrawal request
-        await db.execute(
-          sql`INSERT INTO withdrawals (referrerId, amount, upiId, bankAccount, bankIfsc) 
-              VALUES (${ref.id}, ${input.amount}, ${input.upiId || null}, ${input.bankAccount || null}, ${input.bankIfsc || null})`
-        );
-
-        // Send confirmation email
-        try {
-          await sendEmail({
-            to: ref.email,
-            subject: "Withdrawal Request Submitted - Sales Squad",
-            html: `<p>Your withdrawal request of ₹${input.amount} has been submitted and is pending approval.</p>`,
-          });
-        } catch (error) {
-          console.error("Failed to send withdrawal email:", error);
-        }
-
-        return { success: true, message: "Withdrawal request submitted" };
-      } catch (error) {
-        console.error("Error requesting withdrawal:", error);
-        throw error;
-      }
+      return { success: true, message: "Withdrawal request submitted successfully" };
     }),
 
-  getLeaderboard: publicProcedure.query(async ({ ctx }: any) => {
+  getLeaderboard: publicProcedure.query(async () => {
     const db = await getDb();
     if (!db) return [];
-
     try {
       const result = await db.execute(
         sql`SELECT id, name, totalEarnings, totalReferrals FROM referrers ORDER BY totalEarnings DESC LIMIT 10`
       );
-      return result || [];
+      return rows(result);
     } catch (error) {
       console.error("Error getting leaderboard:", error);
       return [];
@@ -234,73 +218,113 @@ export const referrerRouter = router({
   }),
 
   // Admin procedures
-  getAllReferrers: publicProcedure.query(async ({ ctx }: any) => {
-    return await getAllReferrers(ctx.agencyId);
+  getAllReferrers: publicProcedure.query(async () => {
+    const db = await getDb();
+    if (!db) return [];
+    try {
+      const result = await db.execute(
+        sql`SELECT id, uniqueCode, name, email, totalEarnings, totalReferrals, status FROM referrers ORDER BY totalEarnings DESC`
+      );
+      return rows(result);
+    } catch (error) {
+      console.error("Error getting all referrers:", error);
+      return [];
+    }
   }),
 
-  getAllReferrals: publicProcedure.query(async ({ ctx }: any) => {
-    return await getAllReferrals(ctx.agencyId);
+  getAllReferrals: publicProcedure.query(async () => {
+    const db = await getDb();
+    if (!db) return [];
+    try {
+      const result = await db.execute(
+        sql`SELECT r.id, r.referrerId, r.customerName, r.customerPhone, r.customerEmail, r.monthlyBill, r.state, r.status, r.signupBonusPaid, r.installationBonusPaid, ref.name as referrerName 
+            FROM referrals r 
+            JOIN referrers ref ON r.referrerId = ref.id 
+            ORDER BY r.createdAt DESC`
+      );
+      return rows(result);
+    } catch (error) {
+      console.error("Error getting all referrals:", error);
+      return [];
+    }
   }),
 
-  getPendingWithdrawals: publicProcedure.query(async ({ ctx }: any) => {
-    return await getPendingWithdrawals(ctx.agencyId);
+  getPendingWithdrawals: publicProcedure.query(async () => {
+    const db = await getDb();
+    if (!db) return [];
+    try {
+      const result = await db.execute(
+        sql`SELECT w.id, w.referrerId, w.amount, w.upiId, w.bankAccount, w.bankIfsc, w.status, w.createdAt, ref.name as referrerName, ref.email as referrerEmail
+            FROM withdrawals w
+            JOIN referrers ref ON w.referrerId = ref.id
+            WHERE w.status = 'pending'
+            ORDER BY w.createdAt ASC`
+      );
+      return rows(result);
+    } catch (error) {
+      console.error("Error getting pending withdrawals:", error);
+      return [];
+    }
   }),
 
   approveWithdrawal: publicProcedure
     .input(z.object({ withdrawalId: z.number() }))
-    .mutation(async ({ input, ctx }: any) => {
-      const result = await approveWithdrawal(input.withdrawalId, ctx.agencyId);
-
-      // Send approval email
+    .mutation(async ({ input }) => {
       const db = await getDb();
-      if (db) {
-        try {
-          const withdrawal = await db.execute(
-            sql`SELECT w.*, ref.email FROM withdrawals w JOIN referrers ref ON w.referrerId = ref.id WHERE w.id = ${input.withdrawalId}`
-          );
+      if (!db) throw new Error("Database not available");
 
-          if (withdrawal && (withdrawal as any[]).length > 0) {
-            const w = (withdrawal as any[])[0];
-            await sendEmail({
-              to: w.email,
-              subject: "Withdrawal Approved! - Sales Squad",
-              html: `<p>Your withdrawal of ₹${w.amount} has been approved and will be processed within 24 hours.</p>`,
-            });
-          }
-        } catch (error) {
-          console.error("Failed to send approval email:", error);
-        }
-      }
+      const withdrawalResult = await db.execute(
+        sql`SELECT w.*, ref.email, ref.name FROM withdrawals w JOIN referrers ref ON w.referrerId = ref.id WHERE w.id = ${input.withdrawalId}`
+      );
+      const withdrawal = firstRow(withdrawalResult);
+      if (!withdrawal) throw new Error("Withdrawal not found");
 
-      return result;
+      await db.execute(
+        sql`UPDATE withdrawals SET status = 'approved', processedAt = NOW() WHERE id = ${input.withdrawalId}`
+      );
+
+      sendEmail({
+        to: withdrawal.email,
+        subject: "Withdrawal Approved - Sales Squad",
+        html: `<p>Hi ${withdrawal.name}, your withdrawal of ₹${withdrawal.amount} has been approved and will be credited to your account shortly!</p>`,
+      }).catch(console.error);
+
+      return { success: true };
     }),
 
   rejectWithdrawal: publicProcedure
     .input(z.object({ withdrawalId: z.number(), reason: z.string().optional() }))
-    .mutation(async ({ input, ctx }: any) => {
-      const result = await rejectWithdrawal(input.withdrawalId, ctx.agencyId, input.reason);
-
-      // Send rejection email
+    .mutation(async ({ input }) => {
       const db = await getDb();
-      if (db) {
-        try {
-          const withdrawal = await db.execute(
-            sql`SELECT w.*, ref.email FROM withdrawals w JOIN referrers ref ON w.referrerId = ref.id WHERE w.id = ${input.withdrawalId}`
-          );
+      if (!db) throw new Error("Database not available");
 
-          if (withdrawal && (withdrawal as any[]).length > 0) {
-            const w = (withdrawal as any[])[0];
-            await sendEmail({
-              to: w.email,
-              subject: "Withdrawal Request Rejected - Sales Squad",
-              html: `<p>Your withdrawal request of ₹${w.amount} has been rejected.</p><p>Reason: ${input.reason || "No reason provided"}</p>`,
-            });
-          }
-        } catch (error) {
-          console.error("Failed to send rejection email:", error);
-        }
-      }
+      await db.execute(
+        sql`UPDATE withdrawals SET status = 'rejected', rejectionReason = ${input.reason || null} WHERE id = ${input.withdrawalId}`
+      );
 
-      return result;
+      return { success: true };
+    }),
+
+  confirmInstallation: publicProcedure
+    .input(z.object({ referralId: z.number() }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new Error("Database not available");
+
+      const referralResult = await db.execute(
+        sql`SELECT * FROM referrals WHERE id = ${input.referralId}`
+      );
+      const referral = firstRow(referralResult);
+      if (!referral) throw new Error("Referral not found");
+
+      await db.execute(
+        sql`UPDATE referrals SET status = 'completed', installationBonusPaid = true WHERE id = ${input.referralId}`
+      );
+
+      await db.execute(
+        sql`UPDATE referrers SET totalEarnings = totalEarnings + 1500 WHERE id = ${referral.referrerId}`
+      );
+
+      return { success: true };
     }),
 });
