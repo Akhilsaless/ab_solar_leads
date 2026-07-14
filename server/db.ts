@@ -152,7 +152,7 @@ export async function deleteInverter(id: number) {
 
 // ==================== CONVERSATIONS ====================
 
-export async function createConversation(data: { agencyId: number; sessionId: string; source?: string; utmSource?: string; utmMedium?: string; utmCampaign?: string; }) {
+export async function createConversation(data: { agencyId: number; sessionId: string; source?: string; utmSource?: string; utmMedium?: string; utmCampaign?: string; referrerCode?: string; }) {
   const db = await getDb();
   if (!db) return null;
   const result = await db.insert(conversations).values(data);

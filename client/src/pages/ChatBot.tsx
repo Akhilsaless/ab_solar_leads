@@ -44,6 +44,11 @@ export default function ChatBot() {
   const utmMedium = urlParams.get("utm_medium") || undefined;
   const utmCampaign = urlParams.get("utm_campaign") || undefined;
   const autoCloseMinutes = urlParams.get("autoClose") ? parseInt(urlParams.get("autoClose")!) : null;
+  
+  // Extract referrer code from URL path (e.g., /refer/REF_ABC123)
+  const pathParts = window.location.pathname.split("/");
+  const referrerCode = pathParts.includes("refer") ? pathParts[pathParts.indexOf("refer") + 1] : undefined;
+  
   const [isClosed, setIsClosed] = useState(false);
 
   // Start conversation
@@ -98,6 +103,7 @@ export default function ChatBot() {
       utmSource,
       utmMedium,
       utmCampaign,
+      referrerCode,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

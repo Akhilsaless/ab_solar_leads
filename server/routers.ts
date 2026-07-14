@@ -243,6 +243,7 @@ export const appRouter = router({
         utmSource: z.string().optional(),
         utmMedium: z.string().optional(),
         utmCampaign: z.string().optional(),
+        referrerCode: z.string().optional(),
       }))
       .mutation(async ({ input }) => {
         const agency = await db.getAgencyBySlug(input.agencySlug);
@@ -258,10 +259,11 @@ export const appRouter = router({
         const convId = await db.createConversation({
           agencyId: agency.id,
           sessionId: input.sessionId,
-          source: "ad_click",
+          source: input.referrerCode ? "referral" : "ad_click",
           utmSource: input.utmSource,
           utmMedium: input.utmMedium,
           utmCampaign: input.utmCampaign,
+          referrerCode: input.referrerCode,
         });
 
         // Generate greeting message
@@ -1019,14 +1021,16 @@ OBJECTION HANDLING:
 - "Will wait" → Subsidy may reduce, electricity rates only go up, install now for max savings
 
 IMPORTANT: When you have enough info (state + monthly bill), calculate and present a detailed estimate including:
-- Recommended system size (kW)
-- Number of panels needed
-- Total cost before subsidy
-- Government subsidy amount
-- Net cost after subsidy
-- Monthly savings
-- Payback period
-- 25-year total savings
+- Recommended system size: "Approx X kW"
+- Number of panels needed: "Approx X panels"
+- Total cost before subsidy: "Approx ₹X"
+- Government subsidy amount: "Approx ₹X"
+- Net cost after subsidy: "Approx ₹X"
+- Monthly savings: "Approx ₹X"
+- Payback period: "Approx X years"
+- 25-year total savings: "Approx ₹X"
+
+ALWAYS use "Approx" prefix for all numbers to indicate estimates.
 
 QUICK REPLY BUTTONS:
 At the END of EVERY response, you MUST include a JSON block with 2-4 quick reply button options that the customer can tap instead of typing. These should be contextually relevant to what you just asked or said. Format them as:
