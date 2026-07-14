@@ -4,7 +4,7 @@ import { useParams } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Send, Loader2, Sun, Zap, ArrowDown } from "lucide-react";
+import { Send, Loader2, Sun, Zap, ArrowDown, Download } from "lucide-react";
 import { Streamdown } from "streamdown";
 import { nanoid } from "nanoid";
 // ROI and 3D visualization removed - using simple text display
@@ -388,6 +388,27 @@ export default function ChatBot() {
 
         {/* Input Area */}
         <div className="border-t border-white/10 bg-gray-950/80 backdrop-blur-xl p-4">
+          {messages.length > 2 && (
+            <div className="mb-3 flex gap-2">
+              <Button
+                onClick={() => {
+                  const chatContent = messages.map(m => `${m.role}: ${m.content}`).join('\n\n');
+                  const html = `<!DOCTYPE html><html><head><title>AB SOLAR Estimate</title><style>body{font-family:Arial,sans-serif;max-width:800px;margin:40px auto;color:#333;background:#f5f5f5}h1{color:#F97316}.estimate{background:white;padding:20px;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.1)}.section{margin:20px 0}.label{font-weight:bold;color:#555}.value{color:#333;margin-left:10px}</style></head><body><div class="estimate"><h1>AB SOLAR Personalized Estimate</h1><div class="section"><p>This is your personalized solar energy estimate based on the information you provided.</p></div><div class="section"><h2>Chat Summary</h2><pre>${chatContent}</pre></div><p style="font-size:12px;color:#999;margin-top:30px">This estimate is approximate. Actual costs and savings may vary. Contact us for a detailed site survey.</p></div></body></html>`;
+                  const blob = new Blob([html], { type: 'text/html' });
+                  const url = window.URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = 'ab-solar-estimate.html';
+                  a.click();
+                  window.URL.revokeObjectURL(url);
+                }}
+                className="w-full bg-white/10 hover:bg-white/20 text-white border border-white/20"
+              >
+                <Download className="w-4 h-4 mr-2" />
+                Download Estimate
+              </Button>
+            </div>
+          )}
           <div className="flex gap-2 items-end">
             <Textarea
               ref={textareaRef}

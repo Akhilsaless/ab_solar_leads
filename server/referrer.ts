@@ -96,4 +96,38 @@ export const referrerRouter = router({
       { id: 3, name: "Good Referrer", totalEarnings: 20000, totalReferrals: 10 },
     ];
   }),
+
+  // Admin procedures
+  getAllReferrers: publicProcedure.query(async () => {
+    // Returns all referrers with their earnings
+    return [
+      { id: 1, name: "Sample Referrer", phone: "9876543210", email: "ref@example.com", totalEarnings: 5000, totalReferrals: 3 },
+    ];
+  }),
+
+  getAllReferrals: publicProcedure.query(async () => {
+    // Returns all referrals with status
+    return [
+      { id: 1, customerName: "John Doe", referrerName: "Sample Referrer", monthlyBill: 5000, status: "pending" },
+    ];
+  }),
+
+  getPendingWithdrawals: publicProcedure.query(async () => {
+    // Returns pending withdrawal requests
+    return [
+      { id: 1, referrerName: "Sample Referrer", referrerPhone: "9876543210", amount: 5000, upiId: "ref@upi", status: "pending" },
+    ];
+  }),
+
+  approveWithdrawal: publicProcedure
+    .input(z.object({ withdrawalId: z.number() }))
+    .mutation(async ({ input }: any) => {
+      return { success: true, message: "Withdrawal approved" };
+    }),
+
+  rejectWithdrawal: publicProcedure
+    .input(z.object({ withdrawalId: z.number(), reason: z.string().optional() }))
+    .mutation(async ({ input }: any) => {
+      return { success: true, message: "Withdrawal rejected" };
+    }),
 });
