@@ -8,7 +8,6 @@ import { trpc } from "@/lib/trpc";
 export default function ReferrerSignup() {
   const [step, setStep] = useState<"form" | "otp" | "success">("form");
   const [name, setName] = useState("");
-  const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [otp, setOtp] = useState("");
   const [error, setError] = useState("");
@@ -41,11 +40,11 @@ export default function ReferrerSignup() {
   });
 
   const handleSendOtp = () => {
-    if (!name || !phone || !email) {
+    if (!name || !email) {
       setError("Please fill all fields");
       return;
     }
-    sendOtp.mutate({ name, phone, email });
+    sendOtp.mutate({ name, phone: email, email });
   };
 
   const handleVerifyOtp = () => {
@@ -53,7 +52,7 @@ export default function ReferrerSignup() {
       setError("Please enter OTP");
       return;
     }
-    verifyOtp.mutate({ phone, otp });
+    verifyOtp.mutate({ phone: email, otp });
   };
 
   if (step === "success") {
@@ -73,11 +72,11 @@ export default function ReferrerSignup() {
             <div className="bg-blue-500/20 border border-blue-500 rounded-lg p-4">
               <p className="text-sm text-gray-300 mb-2">Your Referral Link:</p>
               <p className="text-sm text-blue-300 break-all font-mono">
-                absolarleads-xxxqwsn9.manus.space/refer/{uniqueCode}
+                absolarleads-xxxqwsn9.manus.space/referral-landing/{uniqueCode}
               </p>
               <Button
                 onClick={() => {
-                  navigator.clipboard.writeText(`absolarleads-xxxqwsn9.manus.space/refer/${uniqueCode}`);
+                  navigator.clipboard.writeText(`absolarleads-xxxqwsn9.manus.space/referral-landing/{uniqueCode}`);
                 }}
                 className="mt-3 w-full bg-blue-600 hover:bg-blue-700"
               >
@@ -121,15 +120,6 @@ export default function ReferrerSignup() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">Phone Number</label>
-                <Input
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  placeholder="10-digit number"
-                  className="bg-white/10 border-white/20 text-white placeholder:text-gray-500"
-                />
-              </div>
-              <div>
                 <label className="block text-sm font-medium text-gray-300 mb-2">Email</label>
                 <Input
                   value={email}
@@ -151,7 +141,7 @@ export default function ReferrerSignup() {
 
           {step === "otp" && (
             <div className="space-y-4">
-              <p className="text-sm text-gray-300">OTP sent to {phone}</p>
+              <p className="text-sm text-gray-300">OTP sent to {email}</p>
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-2">Enter OTP</label>
                 <Input
@@ -178,14 +168,14 @@ export default function ReferrerSignup() {
             </div>
           )}
 
-          <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4">
-            <p className="text-xs text-gray-400">
-              ✓ Earn ₹500 per signup + ₹1500 per installation<br />
-              ✓ Unlimited referrals, unlimited earnings<br />
-              ✓ Auto-payout to UPI/Bank anytime<br />
-              ✓ Monthly leaderboard with bonuses
-            </p>
-          </div>
+            <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4">
+              <p className="text-xs text-gray-400">
+                ✓ OTP will be sent to your email<br />
+                ✓ Earn ₹500 per signup + ₹1500 per installation<br />
+                ✓ Unlimited referrals, unlimited earnings<br />
+                ✓ Auto-payout to UPI/Bank anytime
+              </p>
+            </div>
         </div>
       </Card>
     </div>
