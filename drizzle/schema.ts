@@ -106,6 +106,12 @@ export const conversations = mysqlTable("conversations3", {
   netCost: decimal("netCost", { precision: 12, scale: 2 }),
   estimatedSavingsMonthly: decimal("estimatedSavingsMonthly", { precision: 10, scale: 2 }),
   paybackYears: decimal("paybackYears", { precision: 4, scale: 1 }),
+  panelType: varchar("panelType", { length: 50 }), // "monocrystalline" or "polycrystalline"
+  roofType: varchar("roofType", { length: 100 }),
+  roofSize: varchar("roofSize", { length: 50 }), // in sqft or sqm
+  estimatedSavings25Year: decimal("estimatedSavings25Year", { precision: 12, scale: 2 }),
+  futureElectricityRate: decimal("futureElectricityRate", { precision: 6, scale: 2 }), // predicted rate
+  rateIncreasePercentage: decimal("rateIncreasePercentage", { precision: 5, scale: 2 }), // yearly increase %
   status: mysqlEnum("status", ["active", "lead_captured", "estimate_given", "converted", "dropped"]).default("active").notNull(),
   leadScore: int("leadScore").default(0),
   messageCount: int("messageCount").default(0),
@@ -113,11 +119,29 @@ export const conversations = mysqlTable("conversations3", {
   utmSource: varchar("utmSource", { length: 100 }),
   utmMedium: varchar("utmMedium", { length: 100 }),
   utmCampaign: varchar("utmCampaign", { length: 200 }),
+  emailSent: boolean("emailSent").default(false),
+  companyEmailSent: boolean("companyEmailSent").default(false),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
 
 export type Conversation = typeof conversations.$inferSelect;
+
+/**
+ * Electricity rate history - for predicting future rates by state
+ */
+export const electricityRateHistory = mysqlTable("electricityRateHistory3", {
+  id: int("id").autoincrement().primaryKey(),
+  stateName: varchar("stateName", { length: 100 }).notNull(),
+  stateCode: varchar("stateCode", { length: 10 }).notNull(),
+  year: int("year").notNull(),
+  avgRate: decimal("avgRate", { precision: 6, scale: 2 }).notNull(),
+  rateIncrease: decimal("rateIncrease", { precision: 5, scale: 2 }), // % increase from previous year
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type ElectricityRateHistory = typeof electricityRateHistory.$inferSelect;
 
 /**
  * Chat messages - individual messages in a conversation

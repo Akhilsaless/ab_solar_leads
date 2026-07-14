@@ -987,13 +987,19 @@ CONVERSATION FLOW:
 1. Greet → Ask which state they're from
 2. Ask about monthly electricity bill (₹ amount)
 3. Explain how solar works briefly
-4. Calculate and present their personalized estimate
-5. Explain government subsidy (PM Surya Ghar Yojana)
-6. Present the net cost after subsidy
-7. Show ROI and payback period
-8. Handle objections
-9. Collect name and phone for site visit booking
-10. Close with next steps
+4. Ask about roof type and available space
+5. **PANEL EDUCATION & SELECTION:**
+   - Explain monocrystalline panels: "Monocrystalline panels are the premium choice - they're 18-22% efficient, sleek black appearance, and perfect if you have limited roof space. They perform better in hot climates and low light."
+   - Explain polycrystalline panels: "Polycrystalline panels are budget-friendly - they're 15-17% efficient, blue speckled appearance, and great if you have ample roof space. They're proven technology with excellent durability."
+   - Ask customer to choose: "Which panel type interests you more?"
+6. Calculate and present their personalized estimate WITH 3D roof visualization
+7. Show ROI calculator with 25-year savings breakdown
+8. Explain electricity rate prediction: "Based on historical trends, electricity rates in your state increase ~1.3% yearly. Installing now protects you from future rate hikes!"
+9. Explain government subsidy (PM Surya Ghar Yojana)
+10. Present the net cost after subsidy
+11. Handle objections
+12. Collect name, phone, email for site visit booking
+13. Close with next steps
 
 AGENCY PRODUCT CATALOG:
 ${panelList || "Standard panels available - ask agency for specific models"}
@@ -1036,7 +1042,9 @@ Examples by stage:
 - After greeting/asking state: ["Maharashtra", "Karnataka", "Tamil Nadu", "Telangana", "Delhi"]
 - After asking bill amount: ["₹1000-2000", "₹2000-4000", "₹4000-7000", "₹7000+"]
 - After asking about roof: ["Yes, I own the house", "Rented house", "Commercial building"]
-- After giving estimate: ["Sounds great!", "That's expensive", "Tell me about subsidy", "What's the warranty?"]
+- **After panel education:** ["Monocrystalline (Premium)", "Polycrystalline (Budget)", "Tell me more", "Not sure"]
+- After giving estimate: ["Sounds great!", "That's expensive", "Tell me about subsidy", "Show me 3D preview"]
+- After showing ROI: ["Impressive savings!", "How about financing?", "When can you visit?", "Need to think"]
 - After handling objection: ["I'm interested", "Need to think", "Share my details", "More questions"]
 - When collecting contact: ["Sure, here's my number", "I'll share my email", "Call me later"]
 - After estimate given: ["Book site visit", "Share with family", "Compare with grid", "What's next?"]
