@@ -60,10 +60,20 @@ export const referrerRouter = router({
       if (!db) throw new Error("Database not available");
 
       try {
+        // Get agency ID from database (first agency config)
+        const agencyResult = await db.execute(
+          sql`SELECT id FROM agencyConfig3 LIMIT 1`
+        );
+        const agencyId = agencyResult && (agencyResult as any[]).length > 0 ? (agencyResult as any[])[0].id : null;
+        
+        if (!agencyId) {
+          throw new Error("No agency found. Please set up your agency first.");
+        }
+
         // Save referrer to database
         await db.execute(
-          sql`INSERT INTO referrers (agencyId, uniqueCode, name, phone, email) 
-              VALUES (${ctx.agencyId}, ${uniqueCode}, ${name}, ${phone}, ${email})`
+          sql`INSERT INTO referrers (agencyId, uniqueCode, name, phone, email, totalEarnings, totalReferrals, status) 
+              VALUES (${agencyId}, ${uniqueCode}, ${name}, ${phone}, ${email}, 0, 0, 'active')`
         );
 
         // Create initial task
