@@ -52,6 +52,7 @@ export default function ChatBot() {
   
   const [isClosed, setIsClosed] = useState(false);
   const [showMapPin, setShowMapPin] = useState(false);
+  const [downloaded, setDownloaded] = useState(false);
   const [pinnedLocation, setPinnedLocation] = useState<{ lat: number; lng: number; address: string } | null>(null);
   const [mapInstance, setMapInstance] = useState<google.maps.Map | null>(null);
   const [pinMarker, setPinMarker] = useState<google.maps.Marker | null>(null);
@@ -145,6 +146,14 @@ export default function ChatBot() {
     doc.text('Sales Squad — Premium Leads | Contact us to book your FREE site visit', w / 2, y + 8, { align: 'center' });
 
     doc.save(`solar-estimate-${name.replace(/\s+/g, '-')}.pdf`);
+
+    // Add thank-you message after download
+    const thankYouMsg = `Thank you so much${name !== 'Valued Customer' ? ', ' + name : ''} ji! 🙏 Your solar estimate has been downloaded. Our expert will get in touch with you very soon to discuss the next steps. Have a wonderful day! ☀️`;
+    setMessages(prev => [
+      ...prev,
+      { role: 'bot' as const, content: thankYouMsg, createdAt: new Date() }
+    ]);
+    setDownloaded(true);
   };
 
   // Start conversation

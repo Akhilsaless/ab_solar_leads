@@ -158,13 +158,13 @@
 - [x] Frontend: Admin - pot balance management card
 
 ## Chatbot Overhaul + Dashboard Fixes (Current Session)
-- [ ] Chatbot: Agent Klaus greeting, name-first flow, short 3-message solar pitch
-- [ ] Chatbot: Optional electricity bill field
-- [ ] Chatbot: Google Maps interactive pin drop for location
-- [ ] Chatbot: Lead capture (name+phone+email) only on site visit agreement
-- [ ] Chatbot: Downloadable PDF estimate (jsPDF)
-- [ ] Chatbot: Thank you message after download, graceful chat end
-- [ ] Backend: Lead email changed to clean summary (name, phone, email, location, bill, savings, referrer)
-- [ ] Dashboard: ₹50 signup bonus shown as prominent welcome card on Overview tab
-- [ ] Dashboard: Reward pool balance visible on referrer dashboard
-- [ ] ReferralLanding: Change "AB SOLAR" to "Sales Squad" in hero text
+- [x] Chatbot: Agent Klaus greeting, name-first flow, short 3-message solar pitch
+- [x] Chatbot: Optional electricity bill field
+- [x] Chatbot: Google Maps interactive pin drop for location
+- [x] Chatbot: Lead capture (name+phone+email) only on site visit agreement
+- [x] Chatbot: Downloadable PDF estimate (jsPDF)
+- [x] Chatbot: Thank you message after download, graceful chat end
+- [x] Backend: Lead email changed to clean summary (name, phone, email, location, bill, savings, referrer)
+- [x] Dashboard: ₹50 signup bonus shown as prominent welcome card on Overview tab
+- [x] Dashboard: Reward pool balance visible on referrer dashboard
+- [x] ReferralLanding: Change "AB SOLAR" to "Sales Squad" in hero text
