@@ -84,13 +84,12 @@ export const referrerRouter = router({
               VALUES (${agencyId}, ${uniqueCode}, ${name}, ${phone}, ${email}, 0, 0, 'active')`
         );
 
-        // Create initial task
-        const referrer = await db.execute(
-          sql`SELECT id FROM referrers WHERE uniqueCode = ${uniqueCode}`
-        );
+        // Get the new referrer's ID using LAST_INSERT_ID()
+        const lastIdResult = await db.execute(sql`SELECT LAST_INSERT_ID() as newId`);
+        const referrerId = (lastIdResult as any[])[0]?.newId;
 
-        if (referrer && (referrer as any[]).length > 0) {
-          const referrerId = (referrer as any[])[0].id;
+        // Create initial task only if we have a valid referrerId
+        if (referrerId && Number(referrerId) > 0) {
           await db.execute(
             sql`INSERT INTO referralTasks (referrerId, taskNumber, targetReferrals, bonusPerReferral) 
                 VALUES (${referrerId}, 1, 5, 20)`
