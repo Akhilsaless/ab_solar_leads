@@ -72,13 +72,11 @@ export default function ReferralLanding() {
               </div>
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                {["Ravi K.", "Priya S.", "Amit M.", "Sunita R."].map((name, i) => (
-                  <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <span style={{ color: "#ccc", fontSize: 13 }}>✅ {name}</span>
-                    <span style={{ color: G, fontWeight: 700, fontSize: 13 }}>₹{[1500, 500, 2000, 500][i].toLocaleString("en-IN")} paid</span>
-                  </div>
-                ))}
-                <p style={{ color: "#333", fontSize: 11, margin: "4px 0 0" }}>Sample — real payouts shown once program starts</p>
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 8, padding: "12px 0" }}>
+                  <span style={{ fontSize: 28 }}>🏆</span>
+                  <p style={{ color: "#555", fontSize: 13, margin: 0, textAlign: "center" }}>Be the first to earn!</p>
+                  <p style={{ color: "#333", fontSize: 11, margin: 0, textAlign: "center" }}>Real payouts will appear here once the program kicks off.</p>
+                </div>
               </div>
             )}
           </div>

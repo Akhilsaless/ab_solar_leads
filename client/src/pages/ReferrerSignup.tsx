@@ -92,7 +92,24 @@ export default function ReferrerSignup() {
         <div style={{ background: "#141414", border: "1px solid #222", borderRadius: 16, padding: 32, boxShadow: "0 0 40px rgba(16,185,129,0.05)" }}>
           <div style={{ marginBottom: 24 }}>
             <h1 style={{ color: "#fff", fontSize: 24, fontWeight: 700, margin: "0 0 8px" }}>Earn with Sales Squad</h1>
-            <p style={{ color: "#888", fontSize: 14, margin: 0 }}>Refer customers and earn ₹500–₹1,500 per referral</p>
+            <p style={{ color: "#888", fontSize: 14, margin: "0 0 12px" }}>Refer customers and earn ₹500–₹1,500 per referral</p>
+            {/* ₹50 instant bonus highlight */}
+            <div style={{ background: "rgba(16,185,129,0.08)", border: "1px solid rgba(16,185,129,0.25)", borderRadius: 10, padding: "10px 14px", display: "flex", flexDirection: "column", gap: 4 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span style={{ fontSize: 18 }}>🎉</span>
+                <span style={{ color: "#10b981", fontWeight: 700, fontSize: 15 }}>Get instant ₹50 after signup!</span>
+              </div>
+              <p style={{ color: "#666", fontSize: 12, margin: 0, paddingLeft: 26 }}>Withdrawable after your first successful referral.</p>
+            </div>
+            {/* T&C reminder */}
+            <div style={{ marginTop: 10, display: "flex", alignItems: "flex-start", gap: 6 }}>
+              <span style={{ fontSize: 14, flexShrink: 0 }}>&#9888;&#65039;</span>
+              <p style={{ color: "#666", fontSize: 12, margin: 0, lineHeight: 1.5 }}>
+                Please read our{" "}
+                <a href="/terms-referral" target="_blank" rel="noopener noreferrer" style={{ color: "#10b981", textDecoration: "underline" }}>Terms &amp; Conditions</a>
+                {" "}carefully before signing up. Fake leads result in permanent ban and forfeiture of all earnings.
+              </p>
+            </div>
           </div>
 
           {error && (

@@ -168,3 +168,14 @@
 - [x] Dashboard: ₹50 signup bonus shown as prominent welcome card on Overview tab
 - [x] Dashboard: Reward pool balance visible on referrer dashboard
 - [x] ReferralLanding: Change "AB SOLAR" to "Sales Squad" in hero text
+
+## Chatbot & Referral Fixes (Current Session)
+- [ ] Chatbot: Auto-send all 3 pitch messages in sequence (no waiting for reply between them)
+- [ ] Chatbot: GPS auto-detect location on "Share Location" tap (browser geolocation API)
+- [ ] Chatbot: Estimate displayed in clear separate sections (numbers, savings, why solar, next step)
+- [ ] Chatbot: Goodbye message after PDF download "Our agents will get in touch ASAP"
+- [ ] Verify: Lead email sent correctly after chat ends
+- [ ] ReferralLanding: Remove fake/placeholder names from Recent Payouts section
+- [ ] ReferrerSignup: Add "Get instant ₹50 after signup" incentive copy
+- [ ] ReferrerSignup: Add "Withdrawable after 1 successful referral" note
+- [ ] ReferrerSignup: Add T&C reminder with link before signup button

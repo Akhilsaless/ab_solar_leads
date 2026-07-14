@@ -172,6 +172,9 @@ export default function ChatBot() {
     },
   });
 
+  // Auto-sequence pitch: after pitch_a send continue, after pitch_b send continue
+  const autoSequenceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   // Send message
   const sendMsg = trpc.chat.sendMessage.useMutation({
     onSuccess: (data) => {
@@ -186,6 +189,13 @@ export default function ChatBot() {
         },
       ]);
       setIsLoading(false);
+      // Auto-advance pitch sequence without customer input
+      if (data.stage === 'pitch_a' || data.stage === 'pitch_b') {
+        autoSequenceRef.current = setTimeout(() => {
+          setIsLoading(true);
+          sendMsg.mutate({ sessionId, message: '__auto_continue__' });
+        }, 1200);
+      }
     },
     onError: () => {
       setMessages((prev) => [
@@ -504,10 +514,29 @@ export default function ChatBot() {
                 Download Estimate PDF
               </Button>
               <Button
-                onClick={() => setShowMapPin(true)}
+                onClick={() => {
+                  if (navigator.geolocation) {
+                    setIsLoading(true);
+                    navigator.geolocation.getCurrentPosition(
+                      (pos) => {
+                        const { latitude: lat, longitude: lng } = pos.coords;
+                        const geocoder = new google.maps.Geocoder();
+                        geocoder.geocode({ location: { lat, lng } }, (results, status) => {
+                          const address = status === 'OK' && results?.[0] ? results[0].formatted_address : `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+                          setPinnedLocation({ lat, lng, address });
+                          setIsLoading(false);
+                          handleSend(`My location: ${address} (${lat.toFixed(5)}, ${lng.toFixed(5)})`);
+                        });
+                      },
+                      () => { setIsLoading(false); setShowMapPin(true); } // fallback to map pin
+                    );
+                  } else {
+                    setShowMapPin(true);
+                  }
+                }}
                 className="flex-1 bg-white/10 hover:bg-white/20 text-white border border-white/20">
               <MapPin className="w-4 h-4 mr-2" />
-                Drop Pin Location
+                Share My Location
               </Button>
             </div>
           )}

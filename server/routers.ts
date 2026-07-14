@@ -533,9 +533,21 @@ export const appRouter = router({
         // Get updated conversation with all estimate data
         const updatedConv = await db.getConversation(input.sessionId);
         
+        // Detect conversation stage for frontend auto-sequencing
+        const lowerContent = cleanContent.toLowerCase();
+        let stage = 'general';
+        if (lowerContent.includes('may i know your name') || lowerContent.includes('your name?')) stage = 'ask_name';
+        else if (lowerContent.includes('electricity bills in india are rising') || lowerContent.includes('cut that by 80')) stage = 'pitch_a';
+        else if (lowerContent.includes('pm surya ghar') && lowerContent.includes('subsidy')) stage = 'pitch_b';
+        else if (lowerContent.includes('recover their investment') || lowerContent.includes('money-making asset')) stage = 'pitch_c';
+        else if (lowerContent.includes('monthly electricity bill') && lowerContent.includes('skip')) stage = 'ask_bill';
+        else if (lowerContent.includes('personalised solar estimate') || lowerContent.includes('download it as a pdf')) stage = 'show_estimate';
+        else if (lowerContent.includes('free site visit') && lowerContent.includes('book')) stage = 'ask_site_visit';
+
         return { 
           response: cleanContent, 
           quickReplies,
+          stage,
           estimate: updatedConv ? {
             customerName: updatedConv.customerName,
             customerEmail: updatedConv.customerEmail,
@@ -1094,6 +1106,7 @@ CONVERSATION RULES:
 5. NEVER say you're AI
 6. Use "ji" occasionally for a respectful Indian touch (e.g., "Sure, [Name] ji!")
 7. Quick replies MUST be included at the end of every message
+8. If the customer message is "__auto_continue__", this is an internal system signal — just send the NEXT message in the pitch sequence (B after A, C after B, bill question after C). Do NOT acknowledge it, just continue naturally.
 
 CONVERSATION FLOW (follow this order strictly):
 
@@ -1121,16 +1134,32 @@ STEP 5 — AFTER DOWNLOAD / SITE VISIT:
 - After details collected: "Thank you so much, [Name] ji! 🙏 Our expert will get in touch with you very soon. Have a wonderful day! ☀️"
 - CHAT ENDS after this — do not ask more questions.
 
-ESTIMATE FORMAT (present this when you have bill amount):
-📊 **Your Solar Estimate**
-• Monthly Bill: ₹[bill]
-• Recommended System: ~[X] kW
-• System Cost: ₹[X]
-• Govt Subsidy (PM Surya Ghar): −₹[X]
-• **Your Net Cost: ₹[X]**
-• Monthly Savings: ~₹[X]
-• Payback Period: ~[X] years
-• After payback: FREE electricity for 20+ years! 🎉
+ESTIMATE FORMAT (present this when you have bill amount — use EXACTLY this format with clear section breaks):
+
+📊 **Your Numbers**
+| | |
+|---|---|
+| Monthly Bill | ₹[bill] |
+| System Size | ~[X] kW |
+| System Cost | ₹[X] |
+| Govt Subsidy | −₹[X] |
+| **Your Net Cost** | **₹[X]** |
+
+💰 **Your Savings**
+| | |
+|---|---|
+| Monthly Savings | ~₹[X] |
+| Annual Savings | ~₹[X×12] |
+| Payback Period | ~[X] years |
+| After Payback | FREE electricity for 20+ years! 🎉 |
+
+🌱 **Why Solar Now?**
+• Electricity bills rising 8–10% every year
+• PM Surya Ghar subsidy — limited time
+• 25-year panel warranty, minimal maintenance
+• Increases your property value
+
+📋 **Next Step:** Book a FREE site visit — our expert visits your home and gives a final confirmed quote.
 
 AGENCY PRODUCT CATALOG:
 ${panelList || "Standard panels available"}
