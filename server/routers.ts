@@ -438,6 +438,10 @@ export const appRouter = router({
           // Remove the quick replies block from the displayed message
           cleanContent = aiContent.replace(qrRegex, '').trim();
         }
+        
+        // Parse and remove metadata from display
+        const metadataRegex = /\[METADATA\][\s\S]*?\[\/METADATA\]/;
+        cleanContent = cleanContent.replace(metadataRegex, '').trim();
 
         // Build metadata for visual components
         const metadata: Record<string, any> = {};

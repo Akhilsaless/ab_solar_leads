@@ -136,7 +136,7 @@ export function RoofVisualization({ panelCount, systemSizeKw, panelType }: RoofV
   return (
     <div
       ref={containerRef}
-      className="w-full h-80 rounded-lg border border-white/10 bg-gray-900/50 overflow-hidden"
+      className="w-full h-64 rounded-lg border border-white/10 bg-white/5 overflow-hidden"
     />
   );
 }
