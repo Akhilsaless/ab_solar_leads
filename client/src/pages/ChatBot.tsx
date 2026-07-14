@@ -9,10 +9,6 @@ import { Streamdown } from "streamdown";
 import { nanoid } from "nanoid";
 import { ROICalculator } from "@/components/ROICalculator";
 import { RoofVisualization } from "@/components/RoofVisualization";
-import { SystemSizeSlider } from "@/components/SystemSizeSlider";
-import { PanelComparison } from "@/components/PanelComparison";
-import { GoogleImagesGallery } from "@/components/GoogleImagesGallery";
-import { StructureSelector } from "@/components/StructureSelector";
 
 type ChatMessage = {
   role: "bot" | "customer";
@@ -39,8 +35,6 @@ export default function ChatBot() {
   const [isLoading, setIsLoading] = useState(false);
   const [agencyInfo, setAgencyInfo] = useState<any>(null);
   const [showScrollBtn, setShowScrollBtn] = useState(false);
-  const [selectedStructure, setSelectedStructure] = useState<"roof" | "ground" | "balcony" | "wall" | null>(null);
-  const [systemSizeKw, setSystemSizeKw] = useState(5);
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -307,64 +301,12 @@ export default function ChatBot() {
                   </div>
                 )}
 
-                {msg.role === "bot" && msg.metadata?.showImages && (
-                  <div className="ml-11 mt-4 max-w-[85%] md:max-w-[75%]">
-                    <GoogleImagesGallery
-                      structureType={selectedStructure}
-                      systemSizeKw={systemSizeKw}
-                    />
-                  </div>
-                )}
-
-                {msg.role === "bot" && msg.metadata?.showStructureSelector && (
-                  <div className="ml-11 mt-4 max-w-[85%] md:max-w-[75%]">
-                    <StructureSelector
-                      selected={selectedStructure}
-                      onSelect={(structure) => {
-                        setSelectedStructure(structure);
-                        handleSend(`I want panels on my ${structure}`);
-                      }}
-                    />
-                  </div>
-                )}
-
                 {msg.role === "bot" && msg.metadata?.show3D && (
                   <div className="ml-11 mt-4 max-w-[85%] md:max-w-[75%]">
                     <RoofVisualization
                       panelCount={msg.metadata.panelCount || 0}
                       systemSizeKw={msg.metadata.systemSizeKw || 0}
                       panelType={msg.metadata.panelType || "monocrystalline"}
-                    />
-                  </div>
-                )}
-
-                {msg.role === "bot" && msg.metadata?.showSlider && msg.metadata && (
-                  <div className="ml-11 mt-4 max-w-[85%] md:max-w-[75%]">
-                    <SystemSizeSlider
-                      monthlyBill={msg.metadata.monthlyBill || 0}
-                      onSystemSizeChange={(size, panels, savings) => {
-                        if (msg.metadata) {
-                          msg.metadata.systemSizeKw = size;
-                          msg.metadata.panelCount = panels;
-                          msg.metadata.monthlyElectricitySavings = savings;
-                        }
-                      }}
-                      currentRate={msg.metadata.currentRate || 7.5}
-                    />
-                  </div>
-                )}
-
-                {msg.role === "bot" && msg.metadata?.showPanelComparison && msg.metadata && (
-                  <div className="ml-11 mt-4 max-w-[85%] md:max-w-[75%]">
-                    <PanelComparison
-                      systemSizeKw={msg.metadata.systemSizeKw || 0}
-                      totalCost={msg.metadata.totalCost || 0}
-                      onPanelSelect={(panelType, cost) => {
-                        if (msg.metadata) {
-                          msg.metadata.panelType = panelType;
-                          msg.metadata.estimatedCost = cost;
-                        }
-                      }}
                     />
                   </div>
                 )}
