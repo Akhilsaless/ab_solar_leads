@@ -88,7 +88,7 @@ export default function ReferrerDashboard() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-gray-300 text-sm">Current Task</p>
-                <p className="text-3xl font-bold text-green-400">Task {currentTask?.taskNumber || 1}</p>
+                <p className="text-3xl font-bold text-green-400">Task {(currentTask as any)?.taskNumber || 1}</p>
               </div>
               <TrendingUp className="w-10 h-10 text-green-500" />
             </div>
@@ -130,26 +130,26 @@ export default function ReferrerDashboard() {
         {/* Current Task */}
         {currentTask && (
           <Card className="bg-white/10 border-white/20 p-6">
-            <h2 className="text-xl font-bold text-white mb-4">Task {currentTask.taskNumber}</h2>
+            <h2 className="text-xl font-bold text-white mb-4">Task {(currentTask as any).taskNumber}</h2>
             <div className="space-y-4">
               <div>
                 <div className="flex justify-between mb-2">
                   <span className="text-gray-300">Progress</span>
                   <span className="text-white font-bold">
-                    {currentTask.completedReferrals}/{currentTask.targetReferrals}
+                    {(currentTask as any).completedReferrals}/{(currentTask as any).targetReferrals}
                   </span>
                 </div>
                 <div className="w-full bg-white/10 rounded-full h-2">
                   <div
                     className="bg-gradient-to-r from-orange-500 to-orange-600 h-2 rounded-full"
                     style={{
-                      width: `${(currentTask.completedReferrals / currentTask.targetReferrals) * 100}%`,
+                      width: `${((currentTask as any).completedReferrals / (currentTask as any).targetReferrals) * 100}%`,
                     }}
                   />
                 </div>
               </div>
               <p className="text-gray-300">
-                Earn ₹{currentTask.bonusPerReferral} per referral (₹{currentTask.totalBonus} total for this task)
+                Earn ₹{(currentTask as any).bonusPerReferral} per referral (₹{(currentTask as any).totalBonus} total for this task)
               </p>
             </div>
           </Card>
