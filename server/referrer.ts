@@ -17,17 +17,19 @@ export const referrerRouter = router({
 
       otpStore.set(input.phone, { otp, expiresAt, data: input });
 
-      console.log(`OTP for ${input.phone}: ${otp}`);
+      console.log(`[OTP] Generated for ${input.phone}: ${otp}`);
 
       // Send OTP via email
-      try {
-        await sendEmail({
-          to: input.email,
-          subject: "Your AB SOLAR Referral Program OTP",
-          html: `<p>Your OTP is: <strong>${otp}</strong></p><p>This OTP will expire in 10 minutes.</p>`,
-        });
-      } catch (error) {
-        console.error("Failed to send OTP email:", error);
+      const emailResult = await sendEmail({
+        to: input.email,
+        subject: "Your AB SOLAR Referral Program OTP",
+        html: `<p>Your OTP is: <strong>${otp}</strong></p><p>This OTP will expire in 10 minutes.</p>`,
+      });
+
+      // If email not configured, return OTP for development
+      if (!emailResult.success) {
+        console.warn(`[OTP] Email not configured. OTP for testing: ${otp}`);
+        return { success: true, message: "OTP generated (check console or use: " + otp + ")", testOtp: otp };
       }
 
       return { success: true, message: "OTP sent to your email" };

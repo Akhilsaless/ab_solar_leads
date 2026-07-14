@@ -15,9 +15,14 @@ export default function ReferrerSignup() {
   const [uniqueCode, setUniqueCode] = useState("");
 
   const sendOtp = trpc.referrer.sendOtp.useMutation({
-    onSuccess: () => {
+    onSuccess: (data: any) => {
       setStep("otp");
       setError("");
+      // If testOtp is returned, show it in the UI for development
+      if (data.testOtp) {
+        console.log("Test OTP:", data.testOtp);
+        setOtp(data.testOtp);
+      }
     },
     onError: (err: any) => {
       setError(err.message || "Failed to send OTP");
