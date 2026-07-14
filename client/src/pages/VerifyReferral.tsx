@@ -28,18 +28,18 @@ export default function VerifyReferral() {
   }, [token]);
 
   return (
-    <div style={{ minHeight: "100vh", background: "#0f172a", display: "flex", alignItems: "center", justifyContent: "center", padding: 24, fontFamily: "Arial, sans-serif" }}>
+    <div style={{ minHeight: "100vh", background: "#0a0a0a", display: "flex", alignItems: "center", justifyContent: "center", padding: 24, fontFamily: "'Inter', sans-serif" }}>
       <div style={{ maxWidth: 420, width: "100%", textAlign: "center" as const }}>
         {status === "loading" && (
           <>
-            <div style={{ width: 56, height: 56, border: "4px solid #f97316", borderTopColor: "transparent", borderRadius: "50%", animation: "spin 1s linear infinite", margin: "0 auto 20px" }} />
+            <div style={{ width: 56, height: 56, border: "4px solid #10b981", borderTopColor: "transparent", borderRadius: "50%", animation: "spin 1s linear infinite", margin: "0 auto 20px" }} />
             <p style={{ color: "#94a3b8", fontSize: 16 }}>Verifying your referral...</p>
             <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
           </>
         )}
 
         {status === "success" && (
-          <div style={{ background: "#1e293b", borderRadius: 16, padding: "40px 28px", border: "1px solid #22c55e" }}>
+          <div style={{ background: "#141414", borderRadius: 16, padding: "40px 28px", border: "1px solid #10b981" }}>
             <div style={{ fontSize: 64, marginBottom: 16 }}>✅</div>
             <h2 style={{ color: "#22c55e", margin: "0 0 12px", fontSize: 22 }}>Referral Confirmed!</h2>
             <p style={{ color: "#94a3b8", margin: "0 0 20px", fontSize: 15 }}>
@@ -50,14 +50,14 @@ export default function VerifyReferral() {
                 Our team will contact you shortly to schedule a free site inspection and solar estimate. 🌞
               </p>
             </div>
-            <a href="/" style={{ background: "#f97316", color: "#fff", padding: "12px 28px", borderRadius: 8, textDecoration: "none", fontWeight: 600, fontSize: 15 }}>
+            <a href="/" style={{ background: "#10b981", color: "#000", padding: "12px 28px", borderRadius: 8, textDecoration: "none", fontWeight: 700, fontSize: 15 }}>
               Learn More About Solar
             </a>
           </div>
         )}
 
         {status === "error" && (
-          <div style={{ background: "#1e293b", borderRadius: 16, padding: "40px 28px", border: "1px solid #ef4444" }}>
+          <div style={{ background: "#141414", borderRadius: 16, padding: "40px 28px", border: "1px solid #ef4444" }}>
             <div style={{ fontSize: 64, marginBottom: 16 }}>⚠️</div>
             <h2 style={{ color: "#f87171", margin: "0 0 12px", fontSize: 22 }}>Link Invalid or Expired</h2>
             <p style={{ color: "#94a3b8", margin: 0, fontSize: 15 }}>

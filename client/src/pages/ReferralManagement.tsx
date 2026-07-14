@@ -53,7 +53,7 @@ export default function ReferralManagement() {
             onClick={() => setSelectedTab(tab as any)}
             className={`px-4 py-3 font-medium transition-colors ${
               selectedTab === tab
-                ? "text-orange-400 border-b-2 border-orange-400"
+                ? "text-emerald-400 border-b-2 border-emerald-400"
                 : "text-gray-400 hover:text-white"
             }`}
           >
@@ -79,7 +79,7 @@ export default function ReferralManagement() {
                   />
                   <Button
                     onClick={() => copyToClipboard("absolarleads-xxxqwsn9.manus.space/referrer-signup")}
-                    className="bg-orange-600 hover:bg-orange-700"
+                    className="bg-emerald-600 hover:bg-emerald-700"
                   >
                     <Copy className="w-4 h-4" />
                   </Button>
@@ -97,7 +97,7 @@ export default function ReferralManagement() {
                   />
                   <Button
                     onClick={() => copyToClipboard("absolarleads-xxxqwsn9.manus.space/chat/ab-solar")}
-                    className="bg-orange-600 hover:bg-orange-700"
+                    className="bg-emerald-600 hover:bg-emerald-700"
                   >
                     <Copy className="w-4 h-4" />
                   </Button>
@@ -124,7 +124,7 @@ export default function ReferralManagement() {
                     <p className="text-sm text-gray-400">{ref.totalReferrals} referrals • Code: {ref.uniqueCode}</p>
                   </div>
                   <div className="text-right">
-                    <p className="text-2xl font-bold text-orange-400">₹{Number(ref.totalEarnings).toLocaleString()}</p>
+                    <p className="text-2xl font-bold text-emerald-400">₹{Number(ref.totalEarnings).toLocaleString()}</p>
                     <div className="flex items-center gap-2 justify-end mt-1">
                       <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
                         Number(ref.qualityScore ?? 100) >= 80 ? 'bg-green-500/20 text-green-400' :
@@ -161,7 +161,7 @@ export default function ReferralManagement() {
                         <span className="text-xs bg-yellow-500/20 text-yellow-400 px-2 py-0.5 rounded-full">⏳ Unverified</span>
                       )}
                     </div>
-                    <p className="text-sm text-gray-400">Referred by: <span className="text-orange-400">{ref.referrerName}</span></p>
+                    <p className="text-sm text-gray-400">Referred by: <span className="text-emerald-400">{ref.referrerName}</span></p>
                     <p className="text-sm text-gray-400">{ref.customerPhone} • {ref.customerEmail}</p>
                     {ref.monthlyBill && <p className="text-sm text-gray-400">Bill: ₹{ref.monthlyBill}/mo • {ref.state}</p>}
                     <div className="flex gap-2 mt-2 flex-wrap">
@@ -191,7 +191,7 @@ export default function ReferralManagement() {
                         size="sm"
                         onClick={() => markSubsidy.mutate({ referralId: ref.id })}
                         disabled={markSubsidy.isPending}
-                        className="bg-orange-600 hover:bg-orange-700 text-xs h-8"
+                        className="bg-orange-500 hover:bg-orange-600 text-xs h-8"
                       >
                         Mark Subsidy Applied (+₹500)
                       </Button>
@@ -229,7 +229,7 @@ export default function ReferralManagement() {
                     <h3 className="text-white font-bold">{wd.referrerName}</h3>
                     <p className="text-sm text-gray-400">{wd.referrerPhone}</p>
                     <p className="text-sm text-gray-400">UPI: {wd.upiId}</p>
-                    <p className="text-lg font-bold text-orange-400 mt-2">₹{wd.amount}</p>
+                    <p className="text-lg font-bold text-emerald-400 mt-2">₹{wd.amount}</p>
                   </div>
                   <div className="flex gap-2">
                     <Button

@@ -138,3 +138,11 @@
 - [x] Frontend: ReferrerSignup - add T&C checkbox (required)
 - [x] Frontend: Add T&C page at /terms-referral
 - [x] Admin: Add "Mark Subsidy Applied" and "Mark Installed" buttons per referral
+
+## UI Retheme — Option B (Emerald Green)
+- [x] Global CSS: pure black background, emerald green accent, Inter font
+- [x] New Sales Squad logo: triangle network SVG icon in green
+- [x] DashboardLayout sidebar: black bg, green active states
+- [x] All admin pages: updated card/button colors
+- [x] ReferrerDashboard: green theme, earnings hero card, pipeline glows
+- [x] ReferrerSignup and referral-facing pages: green theme

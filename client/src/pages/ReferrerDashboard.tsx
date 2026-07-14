@@ -1,13 +1,33 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { useLocation } from "wouter";
+import { SalesSquadLogo } from "@/components/SalesSquadLogo";
+
+// ── Design tokens (Option B: Emerald Green on Pure Black) ──
+const C = {
+  bg: "#0a0a0a",
+  surface: "#141414",
+  surface2: "#1a1a1a",
+  border: "#222",
+  borderGreen: "rgba(16,185,129,0.3)",
+  green: "#10b981",
+  greenDim: "rgba(16,185,129,0.12)",
+  greenGlow: "rgba(16,185,129,0.08)",
+  text: "#fff",
+  muted: "#555",
+  subtle: "#888",
+  orange: "#f97316",
+  orangeDim: "rgba(249,115,22,0.12)",
+  red: "#ef4444",
+  blue: "#3b82f6",
+};
 
 // Lead status pipeline stages
 const PIPELINE_STAGES = [
-  { key: "pending", label: "Lead Captured", color: "#64748b", icon: "📥" },
-  { key: "verified", label: "Customer Verified", color: "#3b82f6", icon: "✅" },
-  { key: "subsidy_applied", label: "Subsidy Applied", color: "#f97316", icon: "📋" },
-  { key: "completed", label: "Installed", color: "#22c55e", icon: "🏠" },
+  { key: "pending", label: "Captured", color: C.muted, icon: "📥" },
+  { key: "verified", label: "Verified", color: C.blue, icon: "✅" },
+  { key: "subsidy_applied", label: "Subsidy", color: C.orange, icon: "📋" },
+  { key: "completed", label: "Installed", color: C.green, icon: "🏠" },
 ];
 
 function getStageIndex(referral: any): number {
@@ -17,17 +37,17 @@ function getStageIndex(referral: any): number {
   return 0;
 }
 
-function QualityBadge({ score }: { score: number }) {
-  const color = score >= 80 ? "#22c55e" : score >= 60 ? "#f97316" : "#ef4444";
+function QualityGauge({ score }: { score: number }) {
+  const color = score >= 80 ? C.green : score >= 60 ? C.orange : C.red;
   const label = score >= 80 ? "Excellent" : score >= 60 ? "Good" : "At Risk";
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-      <div style={{ width: 36, height: 36, borderRadius: "50%", border: `3px solid ${color}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700, color }}>
+    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+      <div style={{ width: 40, height: 40, borderRadius: "50%", border: `2.5px solid ${color}`, boxShadow: `0 0 10px ${color}40`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700, color }}>
         {score}
       </div>
       <div>
-        <p style={{ margin: 0, fontSize: 11, fontWeight: 600, color }}>Lead Quality</p>
-        <p style={{ margin: 0, fontSize: 10, color: "#64748b" }}>{label}</p>
+        <p style={{ margin: 0, fontSize: 11, fontWeight: 600, color }}>Quality</p>
+        <p style={{ margin: 0, fontSize: 10, color: C.muted }}>{label}</p>
       </div>
     </div>
   );
@@ -64,7 +84,6 @@ export default function ReferrerDashboard() {
   });
 
   const referralLink = uniqueCode ? `${window.location.origin}/referral-landing/${uniqueCode}` : "";
-
   const copyLink = () => { navigator.clipboard.writeText(referralLink); setCopied(true); setTimeout(() => setCopied(false), 2000); };
   const shareWhatsApp = () => {
     const msg = encodeURIComponent(`🌞 Save on electricity bills with Solar!\nGet a FREE estimate and see how much you can save.\n\nClick here: ${referralLink}`);
@@ -75,10 +94,10 @@ export default function ReferrerDashboard() {
 
   if (isLoading) {
     return (
-      <div style={{ minHeight: "100vh", background: "#0f172a", display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <div style={{ textAlign: "center", color: "#fff" }}>
-          <div style={{ width: 48, height: 48, border: "4px solid #f97316", borderTopColor: "transparent", borderRadius: "50%", animation: "spin 1s linear infinite", margin: "0 auto 16px" }} />
-          <p style={{ color: "#94a3b8" }}>Loading your dashboard...</p>
+      <div style={{ minHeight: "100vh", background: C.bg, display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <div style={{ textAlign: "center" }}>
+          <div style={{ width: 44, height: 44, border: `3px solid ${C.green}`, borderTopColor: "transparent", borderRadius: "50%", animation: "spin 1s linear infinite", margin: "0 auto 16px", boxShadow: `0 0 20px ${C.green}40` }} />
+          <p style={{ color: C.subtle, fontSize: 14 }}>Loading your dashboard...</p>
         </div>
         <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       </div>
@@ -87,13 +106,13 @@ export default function ReferrerDashboard() {
 
   if (!data || !data.referrer) {
     return (
-      <div style={{ minHeight: "100vh", background: "#0f172a", display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
-        <div style={{ textAlign: "center", color: "#fff", maxWidth: 400 }}>
+      <div style={{ minHeight: "100vh", background: C.bg, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
+        <div style={{ textAlign: "center", maxWidth: 400 }}>
           <div style={{ fontSize: 48, marginBottom: 16 }}>⚠️</div>
-          <h2 style={{ color: "#f97316", marginBottom: 8 }}>Account Not Found</h2>
-          <p style={{ color: "#94a3b8", marginBottom: 24 }}>Your referral code was not found. Please sign up again.</p>
+          <h2 style={{ color: C.orange, marginBottom: 8 }}>Account Not Found</h2>
+          <p style={{ color: C.subtle, marginBottom: 24 }}>Your referral code was not found. Please sign up again.</p>
           <button onClick={() => { localStorage.removeItem("referrerCode"); setLocation("/referrer-signup"); }}
-            style={{ background: "#f97316", color: "#fff", border: "none", borderRadius: 8, padding: "12px 24px", cursor: "pointer", fontWeight: 600 }}>
+            style={{ background: C.green, color: "#000", border: "none", borderRadius: 8, padding: "12px 24px", cursor: "pointer", fontWeight: 700 }}>
             Sign Up / Login
           </button>
         </div>
@@ -111,34 +130,32 @@ export default function ReferrerDashboard() {
   const taskProgress = activeTask ? Math.min(100, Math.round(((activeTask.completedReferrals || 0) / Number(activeTask.targetReferrals || 5)) * 100)) : 0;
 
   const tabStyle = (t: string) => ({
-    padding: "10px 16px", border: "none", borderRadius: 8, cursor: "pointer" as const,
-    fontWeight: 600 as const, fontSize: 13,
-    background: activeTab === t ? "#f97316" : "rgba(255,255,255,0.06)",
-    color: activeTab === t ? "#fff" : "#94a3b8", transition: "all 0.2s",
+    padding: "9px 16px", border: "none", borderRadius: 8, cursor: "pointer" as const,
+    fontWeight: 600 as const, fontSize: 13, transition: "all 0.2s",
+    background: activeTab === t ? C.green : C.surface2,
+    color: activeTab === t ? "#000" : C.subtle,
+    boxShadow: activeTab === t ? `0 0 12px ${C.green}40` : "none",
   });
 
   return (
-    <div style={{ minHeight: "100vh", background: "#0f172a", color: "#fff", fontFamily: "Arial, sans-serif" }}>
-      <style>{`@keyframes spin { to { transform: rotate(360deg); } } * { box-sizing: border-box; } input:focus { outline: 2px solid #f97316; border-color: #f97316; }`}</style>
+    <div style={{ minHeight: "100vh", background: C.bg, color: C.text, fontFamily: "'Inter', sans-serif" }}>
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } } * { box-sizing: border-box; } input:focus { outline: 2px solid ${C.green}; border-color: ${C.green}; }`}</style>
 
       {/* Header */}
-      <div style={{ background: "linear-gradient(135deg, #1e293b, #0f172a)", borderBottom: "1px solid rgba(249,115,22,0.3)", padding: "14px 20px" }}>
+      <div style={{ background: C.surface, borderBottom: `1px solid ${C.borderGreen}`, padding: "14px 20px", boxShadow: `0 1px 20px ${C.greenGlow}` }}>
         <div style={{ maxWidth: 600, margin: "0 auto", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <div>
-            <h1 style={{ margin: 0, fontSize: 18, color: "#f97316", fontWeight: 700 }}>🌞 Sales Squad</h1>
-            <p style={{ margin: 0, fontSize: 11, color: "#64748b" }}>Referral Dashboard</p>
-          </div>
+          <SalesSquadLogo size={32} showText={true} />
           <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
             {dailyStreak > 0 && (
               <div style={{ textAlign: "center" }}>
                 <p style={{ margin: 0, fontSize: 16 }}>🔥</p>
-                <p style={{ margin: 0, fontSize: 11, color: "#fb923c", fontWeight: 600 }}>{dailyStreak}d streak</p>
+                <p style={{ margin: 0, fontSize: 11, color: C.orange, fontWeight: 600 }}>{dailyStreak}d</p>
               </div>
             )}
-            <QualityBadge score={qualityScore} />
+            <QualityGauge score={qualityScore} />
             <div style={{ textAlign: "right" }}>
               <p style={{ margin: 0, fontSize: 13, fontWeight: 600 }}>{referrer.name}</p>
-              <p style={{ margin: 0, fontSize: 10, color: "#f97316", fontFamily: "monospace" }}>{uniqueCode}</p>
+              <p style={{ margin: 0, fontSize: 10, color: C.green, fontFamily: "monospace" }}>{uniqueCode}</p>
             </div>
           </div>
         </div>
@@ -148,61 +165,61 @@ export default function ReferrerDashboard() {
 
         {/* Quality Score Warning */}
         {qualityScore < 60 && (
-          <div style={{ background: "rgba(239,68,68,0.1)", border: "1px solid #ef4444", borderRadius: 10, padding: "12px 16px", marginBottom: 16, display: "flex", gap: 10, alignItems: "flex-start" }}>
+          <div style={{ background: "rgba(239,68,68,0.08)", border: `1px solid ${C.red}`, borderRadius: 10, padding: "12px 16px", marginBottom: 16, display: "flex", gap: 10, alignItems: "flex-start" }}>
             <span style={{ fontSize: 20 }}>⚠️</span>
             <div>
               <p style={{ margin: 0, fontWeight: 600, color: "#f87171", fontSize: 14 }}>Lead Quality Warning</p>
-              <p style={{ margin: "4px 0 0", fontSize: 12, color: "#94a3b8" }}>Your lead quality score is low ({qualityScore}%). Ensure customers verify their email. Accounts below 40% are suspended per our T&C.</p>
+              <p style={{ margin: "4px 0 0", fontSize: 12, color: C.subtle }}>Your lead quality score is low ({qualityScore}%). Ensure customers verify their email. Accounts below 40% are suspended per our T&C.</p>
             </div>
           </div>
         )}
 
         {/* Stats Cards */}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 20 }}>
-          <div style={{ background: "linear-gradient(135deg, #1e3a1e, #0f2a0f)", border: "1px solid #16a34a", borderRadius: 12, padding: "14px 10px", textAlign: "center" as const }}>
-            <p style={{ margin: 0, fontSize: 20, fontWeight: 700, color: "#4ade80" }}>₹{Number(referrer.totalEarnings || 0).toLocaleString()}</p>
-            <p style={{ margin: "4px 0 0", fontSize: 11, color: "#86efac" }}>Total Earned</p>
+          <div style={{ background: C.surface, border: `1px solid ${C.borderGreen}`, borderRadius: 12, padding: "14px 10px", textAlign: "center", boxShadow: `0 0 20px ${C.greenGlow}` }}>
+            <p style={{ margin: 0, fontSize: 20, fontWeight: 700, color: C.green }}>₹{Number(referrer.totalEarnings || 0).toLocaleString()}</p>
+            <p style={{ margin: "4px 0 0", fontSize: 11, color: C.subtle }}>Total Earned</p>
           </div>
-          <div style={{ background: "linear-gradient(135deg, #1e2a3a, #0f1a2a)", border: "1px solid #3b82f6", borderRadius: 12, padding: "14px 10px", textAlign: "center" as const }}>
+          <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: "14px 10px", textAlign: "center" }}>
             <p style={{ margin: 0, fontSize: 20, fontWeight: 700, color: "#60a5fa" }}>{referrer.totalReferrals || 0}</p>
-            <p style={{ margin: "4px 0 0", fontSize: 11, color: "#93c5fd" }}>Referrals</p>
+            <p style={{ margin: "4px 0 0", fontSize: 11, color: C.subtle }}>Referrals</p>
           </div>
-          <div style={{ background: "linear-gradient(135deg, #2a1e0f, #1a0f00)", border: "1px solid #f97316", borderRadius: 12, padding: "14px 10px", textAlign: "center" as const }}>
-            <p style={{ margin: 0, fontSize: 20, fontWeight: 700, color: "#fb923c" }}>{completedReferrals}</p>
-            <p style={{ margin: "4px 0 0", fontSize: 11, color: "#fdba74" }}>Installed</p>
+          <div style={{ background: C.surface, border: `1px solid rgba(249,115,22,0.3)`, borderRadius: 12, padding: "14px 10px", textAlign: "center" }}>
+            <p style={{ margin: 0, fontSize: 20, fontWeight: 700, color: C.orange }}>{completedReferrals}</p>
+            <p style={{ margin: "4px 0 0", fontSize: 11, color: C.subtle }}>Installed</p>
           </div>
         </div>
 
         {/* Pending verification nudge */}
         {pendingVerify > 0 && (
-          <div style={{ background: "rgba(59,130,246,0.1)", border: "1px solid #3b82f6", borderRadius: 10, padding: "12px 16px", marginBottom: 16, display: "flex", gap: 10, alignItems: "center" }}>
+          <div style={{ background: "rgba(59,130,246,0.08)", border: `1px solid ${C.blue}`, borderRadius: 10, padding: "12px 16px", marginBottom: 16, display: "flex", gap: 10, alignItems: "center" }}>
             <span style={{ fontSize: 20 }}>📧</span>
             <div style={{ flex: 1 }}>
               <p style={{ margin: 0, fontWeight: 600, color: "#60a5fa", fontSize: 13 }}>{pendingVerify} lead{pendingVerify > 1 ? "s" : ""} awaiting customer verification</p>
-              <p style={{ margin: "2px 0 0", fontSize: 12, color: "#94a3b8" }}>Ask your referrals to check their email and click the verification link.</p>
+              <p style={{ margin: "2px 0 0", fontSize: 12, color: C.subtle }}>Ask your referrals to check their email and click the verification link.</p>
             </div>
           </div>
         )}
 
         {/* Tabs */}
-        <div style={{ display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap" as const }}>
+        <div style={{ display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap" }}>
           <button style={tabStyle("overview")} onClick={() => setActiveTab("overview")}>📊 Overview</button>
           <button style={tabStyle("referrals")} onClick={() => setActiveTab("referrals")}>👥 Referrals{referrals?.length > 0 ? ` (${referrals.length})` : ""}</button>
           <button style={tabStyle("tasks")} onClick={() => setActiveTab("tasks")}>🎯 Tasks</button>
           <button style={tabStyle("withdraw")} onClick={() => setActiveTab("withdraw")}>💰 Withdraw</button>
         </div>
 
-        {/* OVERVIEW TAB */}
+        {/* ── OVERVIEW TAB ── */}
         {activeTab === "overview" && (
           <div>
             {/* Share Link */}
-            <div style={{ background: "#1e293b", border: "1px solid rgba(249,115,22,0.3)", borderRadius: 12, padding: 20, marginBottom: 16 }}>
-              <h3 style={{ margin: "0 0 12px", color: "#f97316", fontSize: 15 }}>📤 Share Your Referral Link</h3>
-              <div style={{ background: "#0f172a", borderRadius: 8, padding: "10px 14px", marginBottom: 12, wordBreak: "break-all" as const, fontSize: 12, color: "#94a3b8", border: "1px solid #334155" }}>
+            <div style={{ background: C.surface, border: `1px solid ${C.borderGreen}`, borderRadius: 12, padding: 20, marginBottom: 16, boxShadow: `0 0 30px ${C.greenGlow}` }}>
+              <h3 style={{ margin: "0 0 12px", color: C.green, fontSize: 15 }}>📤 Share Your Referral Link</h3>
+              <div style={{ background: C.bg, borderRadius: 8, padding: "10px 14px", marginBottom: 12, wordBreak: "break-all", fontSize: 12, color: C.subtle, border: `1px solid ${C.border}` }}>
                 {referralLink}
               </div>
               <div style={{ display: "flex", gap: 10 }}>
-                <button onClick={copyLink} style={{ flex: 1, background: copied ? "#16a34a" : "#f97316", color: "#fff", border: "none", borderRadius: 8, padding: "10px 0", cursor: "pointer", fontWeight: 600, fontSize: 14 }}>
+                <button onClick={copyLink} style={{ flex: 1, background: copied ? C.green : C.surface2, color: copied ? "#000" : C.text, border: `1px solid ${copied ? C.green : C.border}`, borderRadius: 8, padding: "10px 0", cursor: "pointer", fontWeight: 600, fontSize: 14, transition: "all 0.2s" }}>
                   {copied ? "✅ Copied!" : "📋 Copy Link"}
                 </button>
                 <button onClick={shareWhatsApp} style={{ flex: 1, background: "#16a34a", color: "#fff", border: "none", borderRadius: 8, padding: "10px 0", cursor: "pointer", fontWeight: 600, fontSize: 14 }}>
@@ -213,18 +230,18 @@ export default function ReferrerDashboard() {
 
             {/* Task Progress */}
             {activeTask && (
-              <div style={{ background: "#1e293b", border: "1px solid rgba(99,102,241,0.4)", borderRadius: 12, padding: 20, marginBottom: 16 }}>
+              <div style={{ background: C.surface, border: `1px solid rgba(99,102,241,0.3)`, borderRadius: 12, padding: 20, marginBottom: 16 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
                   <h3 style={{ margin: 0, color: "#818cf8", fontSize: 15 }}>🎯 Daily Task #{activeTask.taskNumber}</h3>
-                  <span style={{ background: "#312e81", color: "#a5b4fc", padding: "3px 10px", borderRadius: 20, fontSize: 12, fontWeight: 600 }}>+₹{activeTask.bonusPerReferral}/referral</span>
+                  <span style={{ background: "rgba(99,102,241,0.15)", color: "#a5b4fc", padding: "3px 10px", borderRadius: 20, fontSize: 12, fontWeight: 600 }}>+₹{activeTask.bonusPerReferral}/referral</span>
                 </div>
-                <p style={{ margin: "0 0 10px", color: "#94a3b8", fontSize: 13 }}>
-                  Get <strong style={{ color: "#fff" }}>{activeTask.targetReferrals} referrals</strong> to complete this task!
+                <p style={{ margin: "0 0 10px", color: C.subtle, fontSize: 13 }}>
+                  Get <strong style={{ color: C.text }}>{activeTask.targetReferrals} referrals</strong> to complete this task!
                 </p>
-                <div style={{ background: "#0f172a", borderRadius: 8, height: 10, overflow: "hidden", marginBottom: 6 }}>
-                  <div style={{ height: "100%", width: `${taskProgress}%`, background: "linear-gradient(90deg, #f97316, #fbbf24)", borderRadius: 8, transition: "width 0.5s" }} />
+                <div style={{ background: C.bg, borderRadius: 8, height: 10, overflow: "hidden", marginBottom: 6 }}>
+                  <div style={{ height: "100%", width: `${taskProgress}%`, background: `linear-gradient(90deg, ${C.green}, #34d399)`, borderRadius: 8, transition: "width 0.5s", boxShadow: `0 0 8px ${C.green}60` }} />
                 </div>
-                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#64748b" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: C.muted }}>
                   <span>{activeTask.completedReferrals || 0} done</span>
                   <span>{taskProgress}% complete</span>
                   <span>{activeTask.targetReferrals} target</span>
@@ -232,39 +249,39 @@ export default function ReferrerDashboard() {
               </div>
             )}
 
-            {/* How to Earn — updated commission info */}
-            <div style={{ background: "#1e293b", border: "1px solid #334155", borderRadius: 12, padding: 20, marginBottom: 16 }}>
-              <h3 style={{ margin: "0 0 16px", color: "#f97316", fontSize: 15 }}>💡 How to Earn</h3>
+            {/* How to Earn */}
+            <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: 20, marginBottom: 16 }}>
+              <h3 style={{ margin: "0 0 16px", color: C.green, fontSize: 15 }}>💡 How to Earn</h3>
               {[
                 { icon: "1️⃣", title: "Share your link", desc: "Send to friends, family & neighbors", earn: "" },
-                { icon: "2️⃣", title: "They get a site visit", desc: "Customer completes inspection & applies for govt subsidy", earn: "₹500" },
+                { icon: "2️⃣", title: "They apply for govt subsidy", desc: "Customer completes site visit & applies for subsidy", earn: "₹500" },
                 { icon: "3️⃣", title: "Solar is installed", desc: "Installation confirmed by AB SOLAR", earn: "₹1,500" },
-                { icon: "🎯", title: "Complete daily tasks", desc: "Hit milestones for extra bonuses per referral", earn: "₹100–₹300+" },
+                { icon: "🎯", title: "Complete daily tasks", desc: "Hit milestones for extra bonuses per referral", earn: "₹100–₹500+" },
               ].map((step, i) => (
                 <div key={i} style={{ display: "flex", gap: 12, alignItems: "flex-start", marginBottom: i < 3 ? 14 : 0 }}>
                   <span style={{ fontSize: 20, flexShrink: 0 }}>{step.icon}</span>
                   <div style={{ flex: 1 }}>
                     <p style={{ margin: 0, fontWeight: 600, fontSize: 14 }}>{step.title}</p>
-                    <p style={{ margin: "2px 0 0", fontSize: 12, color: "#64748b" }}>{step.desc}</p>
+                    <p style={{ margin: "2px 0 0", fontSize: 12, color: C.subtle }}>{step.desc}</p>
                   </div>
-                  {step.earn && <span style={{ background: "rgba(74,222,128,0.1)", color: "#4ade80", padding: "3px 8px", borderRadius: 6, fontSize: 12, fontWeight: 600, flexShrink: 0 }}>{step.earn}</span>}
+                  {step.earn && <span style={{ background: C.greenDim, color: C.green, padding: "3px 8px", borderRadius: 6, fontSize: 12, fontWeight: 600, flexShrink: 0 }}>{step.earn}</span>}
                 </div>
               ))}
             </div>
 
             {/* Earnings Breakdown */}
-            <div style={{ background: "#1e293b", border: "1px solid #334155", borderRadius: 12, padding: 20 }}>
-              <h3 style={{ margin: "0 0 14px", color: "#f97316", fontSize: 15 }}>📈 Earnings Breakdown</h3>
+            <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: 20 }}>
+              <h3 style={{ margin: "0 0 14px", color: C.green, fontSize: 15 }}>📈 Earnings Breakdown</h3>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
                 {[
                   { label: "Subsidy Bonuses (₹500)", value: `₹${(completedReferrals * 500 + subsidyReferrals * 500).toLocaleString()}`, color: "#60a5fa" },
                   { label: "Install Bonuses (₹1,500)", value: `₹${(completedReferrals * 1500).toLocaleString()}`, color: "#a78bfa" },
-                  { label: "Subsidy Applied", value: subsidyReferrals.toString(), color: "#fb923c" },
-                  { label: "Potential Earn", value: `₹${(subsidyReferrals * 1500).toLocaleString()}`, color: "#4ade80" },
+                  { label: "Subsidy Applied", value: subsidyReferrals.toString(), color: C.orange },
+                  { label: "Potential Earn", value: `₹${(subsidyReferrals * 1500).toLocaleString()}`, color: C.green },
                 ].map((item, i) => (
-                  <div key={i} style={{ background: "#0f172a", borderRadius: 8, padding: 12 }}>
+                  <div key={i} style={{ background: C.bg, borderRadius: 8, padding: 12, border: `1px solid ${C.border}` }}>
                     <p style={{ margin: 0, fontSize: 18, fontWeight: 700, color: item.color }}>{item.value}</p>
-                    <p style={{ margin: "4px 0 0", fontSize: 11, color: "#64748b" }}>{item.label}</p>
+                    <p style={{ margin: "4px 0 0", fontSize: 11, color: C.muted }}>{item.label}</p>
                   </div>
                 ))}
               </div>
@@ -272,59 +289,59 @@ export default function ReferrerDashboard() {
           </div>
         )}
 
-        {/* REFERRALS TAB — with pipeline stages */}
+        {/* ── REFERRALS TAB ── */}
         {activeTab === "referrals" && (
           <div>
-            <div style={{ background: "#1e293b", border: "1px solid #334155", borderRadius: 12, padding: 20, marginBottom: 16 }}>
-              <h3 style={{ margin: "0 0 16px", color: "#f97316", fontSize: 15 }}>👥 People You Referred</h3>
+            <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: 20, marginBottom: 16 }}>
+              <h3 style={{ margin: "0 0 16px", color: C.green, fontSize: 15 }}>👥 People You Referred</h3>
               {!referrals || referrals.length === 0 ? (
-                <div style={{ textAlign: "center" as const, padding: "32px 0" }}>
+                <div style={{ textAlign: "center", padding: "32px 0" }}>
                   <div style={{ fontSize: 48, marginBottom: 12 }}>🎯</div>
-                  <p style={{ color: "#94a3b8", margin: "0 0 8px", fontWeight: 600 }}>No referrals yet!</p>
-                  <p style={{ color: "#64748b", fontSize: 13, margin: "0 0 20px" }}>Share your link to start earning. Every installation earns you ₹1,500!</p>
+                  <p style={{ color: C.subtle, margin: "0 0 8px", fontWeight: 600 }}>No referrals yet!</p>
+                  <p style={{ color: C.muted, fontSize: 13, margin: "0 0 20px" }}>Share your link to start earning. Every installation earns you ₹1,500!</p>
                   <button onClick={shareWhatsApp} style={{ background: "#16a34a", color: "#fff", border: "none", borderRadius: 8, padding: "10px 20px", cursor: "pointer", fontWeight: 600 }}>
                     📱 Share on WhatsApp
                   </button>
                 </div>
               ) : (
-                <div style={{ display: "flex", flexDirection: "column" as const, gap: 12 }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                   {referrals.map((r: any, i: number) => {
                     const stageIdx = getStageIndex(r);
                     return (
-                      <div key={i} style={{ background: "#0f172a", borderRadius: 10, padding: 14, border: "1px solid #1e293b" }}>
+                      <div key={i} style={{ background: C.bg, borderRadius: 10, padding: 14, border: `1px solid ${C.border}` }}>
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
                           <div>
                             <p style={{ margin: 0, fontWeight: 600, fontSize: 14 }}>{r.customerName || "Anonymous"}</p>
-                            <p style={{ margin: "2px 0 0", fontSize: 12, color: "#64748b" }}>{r.customerEmail || r.customerPhone || "—"}</p>
+                            <p style={{ margin: "2px 0 0", fontSize: 12, color: C.muted }}>{r.customerEmail || r.customerPhone || "—"}</p>
                           </div>
-                          <div style={{ textAlign: "right" as const }}>
-                            {r.status === "completed" && <span style={{ background: "rgba(34,197,94,0.15)", color: "#22c55e", padding: "3px 10px", borderRadius: 20, fontSize: 11, fontWeight: 600 }}>✅ +₹2,000</span>}
-                            {r.subsidyApplied && r.status !== "completed" && <span style={{ background: "rgba(249,115,22,0.15)", color: "#fb923c", padding: "3px 10px", borderRadius: 20, fontSize: 11, fontWeight: 600 }}>📋 +₹500</span>}
+                          <div style={{ textAlign: "right" }}>
+                            {r.status === "completed" && <span style={{ background: C.greenDim, color: C.green, padding: "3px 10px", borderRadius: 20, fontSize: 11, fontWeight: 600 }}>✅ +₹2,000</span>}
+                            {r.subsidyApplied && r.status !== "completed" && <span style={{ background: C.orangeDim, color: C.orange, padding: "3px 10px", borderRadius: 20, fontSize: 11, fontWeight: 600 }}>📋 +₹500</span>}
                           </div>
                         </div>
 
                         {/* Pipeline progress */}
-                        <div style={{ display: "flex", alignItems: "center", gap: 0, marginBottom: 8 }}>
+                        <div style={{ display: "flex", alignItems: "center", marginBottom: 8 }}>
                           {PIPELINE_STAGES.map((stage, si) => (
                             <div key={si} style={{ display: "flex", alignItems: "center", flex: si < PIPELINE_STAGES.length - 1 ? 1 : 0 }}>
-                              <div style={{ display: "flex", flexDirection: "column" as const, alignItems: "center", gap: 2 }}>
-                                <div style={{ width: 24, height: 24, borderRadius: "50%", background: si <= stageIdx ? stage.color : "#1e293b", border: `2px solid ${si <= stageIdx ? stage.color : "#334155"}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11 }}>
+                              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
+                                <div style={{ width: 24, height: 24, borderRadius: "50%", background: si <= stageIdx ? stage.color : C.surface2, border: `2px solid ${si <= stageIdx ? stage.color : C.border}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, boxShadow: si <= stageIdx ? `0 0 8px ${stage.color}60` : "none" }}>
                                   {si <= stageIdx ? "✓" : si + 1}
                                 </div>
-                                <p style={{ margin: 0, fontSize: 9, color: si <= stageIdx ? stage.color : "#334155", textAlign: "center" as const, maxWidth: 50, lineHeight: 1.2 }}>{stage.label}</p>
+                                <p style={{ margin: 0, fontSize: 9, color: si <= stageIdx ? stage.color : C.border, textAlign: "center", maxWidth: 50, lineHeight: 1.2 }}>{stage.label}</p>
                               </div>
                               {si < PIPELINE_STAGES.length - 1 && (
-                                <div style={{ flex: 1, height: 2, background: si < stageIdx ? stage.color : "#1e293b", margin: "0 2px", marginBottom: 14 }} />
+                                <div style={{ flex: 1, height: 2, background: si < stageIdx ? stage.color : C.surface2, margin: "0 2px", marginBottom: 14 }} />
                               )}
                             </div>
                           ))}
                         </div>
 
-                        <div style={{ display: "flex", gap: 10, fontSize: 11, color: "#64748b", flexWrap: "wrap" as const }}>
+                        <div style={{ display: "flex", gap: 10, fontSize: 11, color: C.muted, flexWrap: "wrap" }}>
                           {r.monthlyBill && <span>💡 ₹{r.monthlyBill}/mo</span>}
                           {r.state && <span>📍 {r.state}</span>}
-                          {!r.customerVerified && <span style={{ color: "#f97316" }}>⏳ Awaiting verification</span>}
-                          {r.customerVerified && !r.subsidyApplied && <span style={{ color: "#3b82f6" }}>✅ Verified</span>}
+                          {!r.customerVerified && <span style={{ color: C.orange }}>⏳ Awaiting verification</span>}
+                          {r.customerVerified && !r.subsidyApplied && <span style={{ color: C.blue }}>✅ Verified</span>}
                         </div>
                       </div>
                     );
@@ -332,10 +349,10 @@ export default function ReferrerDashboard() {
                 </div>
               )}
             </div>
-            <div style={{ background: "linear-gradient(135deg, #1a2a1a, #0f1a0f)", border: "1px solid #16a34a", borderRadius: 12, padding: 20, textAlign: "center" as const }}>
-              <p style={{ margin: "0 0 12px", color: "#4ade80", fontWeight: 600 }}>Share your link to get more referrals!</p>
+            <div style={{ background: C.greenDim, border: `1px solid ${C.borderGreen}`, borderRadius: 12, padding: 20, textAlign: "center" }}>
+              <p style={{ margin: "0 0 12px", color: C.green, fontWeight: 600 }}>Share your link to get more referrals!</p>
               <div style={{ display: "flex", gap: 10, justifyContent: "center" }}>
-                <button onClick={copyLink} style={{ background: "#f97316", color: "#fff", border: "none", borderRadius: 8, padding: "10px 20px", cursor: "pointer", fontWeight: 600 }}>
+                <button onClick={copyLink} style={{ background: C.surface2, color: C.text, border: `1px solid ${C.border}`, borderRadius: 8, padding: "10px 20px", cursor: "pointer", fontWeight: 600 }}>
                   {copied ? "✅ Copied!" : "📋 Copy Link"}
                 </button>
                 <button onClick={shareWhatsApp} style={{ background: "#16a34a", color: "#fff", border: "none", borderRadius: 8, padding: "10px 20px", cursor: "pointer", fontWeight: 600 }}>
@@ -346,52 +363,52 @@ export default function ReferrerDashboard() {
           </div>
         )}
 
-        {/* TASKS TAB */}
+        {/* ── TASKS TAB ── */}
         {activeTab === "tasks" && (
           <div>
             {/* Streak Banner */}
             {dailyStreak > 0 && (
-              <div style={{ background: "linear-gradient(135deg, #2a1a0a, #1a0a00)", border: "1px solid #f97316", borderRadius: 12, padding: "14px 20px", marginBottom: 16, display: "flex", alignItems: "center", gap: 12 }}>
+              <div style={{ background: C.orangeDim, border: `1px solid ${C.orange}`, borderRadius: 12, padding: "14px 20px", marginBottom: 16, display: "flex", alignItems: "center", gap: 12 }}>
                 <span style={{ fontSize: 32 }}>🔥</span>
                 <div>
-                  <p style={{ margin: 0, fontWeight: 700, color: "#fb923c", fontSize: 16 }}>{dailyStreak}-Day Streak!</p>
-                  <p style={{ margin: "2px 0 0", fontSize: 12, color: "#94a3b8" }}>Keep referring daily to maintain your streak and unlock bonuses.</p>
+                  <p style={{ margin: 0, fontWeight: 700, color: C.orange, fontSize: 16 }}>{dailyStreak}-Day Streak!</p>
+                  <p style={{ margin: "2px 0 0", fontSize: 12, color: C.subtle }}>Keep referring daily to maintain your streak and unlock bonuses.</p>
                 </div>
               </div>
             )}
 
-            <div style={{ background: "#1e293b", border: "1px solid #334155", borderRadius: 12, padding: 20, marginBottom: 16 }}>
-              <h3 style={{ margin: "0 0 8px", color: "#f97316", fontSize: 15 }}>🎯 Your Daily Tasks</h3>
-              <p style={{ margin: "0 0 20px", color: "#64748b", fontSize: 13 }}>Complete tasks to unlock higher bonus rates per referral!</p>
+            <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: 20, marginBottom: 16 }}>
+              <h3 style={{ margin: "0 0 8px", color: C.green, fontSize: 15 }}>🎯 Your Daily Tasks</h3>
+              <p style={{ margin: "0 0 20px", color: C.muted, fontSize: 13 }}>Complete tasks to unlock higher bonus rates per referral!</p>
               {!tasks || tasks.length === 0 ? (
-                <p style={{ textAlign: "center" as const, color: "#64748b", padding: "20px 0" }}>No tasks yet. Make your first referral to unlock tasks!</p>
+                <p style={{ textAlign: "center", color: C.muted, padding: "20px 0" }}>No tasks yet. Make your first referral to unlock tasks!</p>
               ) : (
-                <div style={{ display: "flex", flexDirection: "column" as const, gap: 12 }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                   {tasks.map((task: any, i: number) => {
                     const isActive = task.status === "active";
                     const isDone = task.status === "completed";
                     const prog = Math.min(100, Math.round(((task.completedReferrals || 0) / Number(task.targetReferrals)) * 100));
                     return (
-                      <div key={i} style={{ background: "#0f172a", borderRadius: 10, padding: 16, border: `1px solid ${isDone ? "#16a34a" : isActive ? "#f97316" : "#1e293b"}` }}>
+                      <div key={i} style={{ background: C.bg, borderRadius: 10, padding: 16, border: `1px solid ${isDone ? C.green : isActive ? C.borderGreen : C.border}`, boxShadow: isActive ? `0 0 15px ${C.greenGlow}` : "none" }}>
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: isActive ? 10 : 0 }}>
                           <div>
                             <p style={{ margin: 0, fontWeight: 600, fontSize: 14 }}>Task #{task.taskNumber} — {task.targetReferrals} Referrals</p>
-                            {isActive && <p style={{ margin: "2px 0 0", fontSize: 12, color: "#64748b" }}>Currently active</p>}
+                            {isActive && <p style={{ margin: "2px 0 0", fontSize: 12, color: C.subtle }}>Currently active</p>}
                           </div>
-                          <div style={{ textAlign: "right" as const }}>
+                          <div style={{ textAlign: "right" }}>
                             <p style={{ margin: 0, fontSize: 18, fontWeight: 700, color: "#fbbf24" }}>+₹{task.bonusPerReferral}</p>
-                            <p style={{ margin: 0, fontSize: 11, color: "#64748b" }}>per referral</p>
+                            <p style={{ margin: 0, fontSize: 11, color: C.muted }}>per referral</p>
                           </div>
                         </div>
                         {isActive && (
                           <>
-                            <div style={{ background: "#1e293b", borderRadius: 6, height: 8, overflow: "hidden", marginBottom: 6 }}>
-                              <div style={{ height: "100%", width: `${prog}%`, background: "linear-gradient(90deg, #f97316, #fbbf24)", borderRadius: 6 }} />
+                            <div style={{ background: C.surface2, borderRadius: 6, height: 8, overflow: "hidden", marginBottom: 6 }}>
+                              <div style={{ height: "100%", width: `${prog}%`, background: `linear-gradient(90deg, ${C.green}, #34d399)`, borderRadius: 6, boxShadow: `0 0 6px ${C.green}60` }} />
                             </div>
-                            <p style={{ margin: 0, fontSize: 12, color: "#64748b" }}>{task.completedReferrals || 0} / {task.targetReferrals} referrals — {prog}%</p>
+                            <p style={{ margin: 0, fontSize: 12, color: C.muted }}>{task.completedReferrals || 0} / {task.targetReferrals} referrals — {prog}%</p>
                           </>
                         )}
-                        {isDone && <span style={{ color: "#4ade80", fontSize: 13, fontWeight: 600 }}>✅ Completed</span>}
+                        {isDone && <span style={{ color: C.green, fontSize: 13, fontWeight: 600 }}>✅ Completed</span>}
                       </div>
                     );
                   })}
@@ -399,81 +416,81 @@ export default function ReferrerDashboard() {
               )}
             </div>
 
-            {/* Milestone Bonuses — ₹100 increments */}
-            <div style={{ background: "#1e293b", border: "1px solid #334155", borderRadius: 12, padding: 20 }}>
+            {/* Milestone Bonuses */}
+            <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: 20 }}>
               <h3 style={{ margin: "0 0 16px", color: "#818cf8", fontSize: 15 }}>🏆 Milestone Bonuses</h3>
               {[
-                { referrals: 5, bonus: "₹100 bonus", label: "Starter", taskNum: 1 },
-                { referrals: 10, bonus: "₹200 bonus", label: "Rising Star", taskNum: 2 },
-                { referrals: 15, bonus: "₹300 bonus", label: "Champion", taskNum: 3 },
-                { referrals: 20, bonus: "₹400 bonus", label: "Pro", taskNum: 4 },
-                { referrals: 25, bonus: "₹500 bonus", label: "Legend", taskNum: 5 },
+                { referrals: 5, bonus: "₹100 bonus", label: "Starter" },
+                { referrals: 10, bonus: "₹200 bonus", label: "Rising Star" },
+                { referrals: 15, bonus: "₹300 bonus", label: "Champion" },
+                { referrals: 20, bonus: "₹400 bonus", label: "Pro" },
+                { referrals: 25, bonus: "₹500 bonus", label: "Legend" },
               ].map((m, i) => {
                 const achieved = Number(referrer.totalReferrals || 0) >= m.referrals;
                 return (
-                  <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 14px", background: "#0f172a", borderRadius: 8, border: `1px solid ${achieved ? "#16a34a" : "#1e293b"}`, marginBottom: i < 4 ? 8 : 0 }}>
+                  <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 14px", background: C.bg, borderRadius: 8, border: `1px solid ${achieved ? C.green : C.border}`, marginBottom: i < 4 ? 8 : 0, boxShadow: achieved ? `0 0 10px ${C.greenGlow}` : "none" }}>
                     <div>
                       <span style={{ fontWeight: 600, fontSize: 14 }}>{m.label}</span>
-                      <span style={{ color: "#64748b", fontSize: 12, marginLeft: 8 }}>{m.referrals} referrals</span>
+                      <span style={{ color: C.muted, fontSize: 12, marginLeft: 8 }}>{m.referrals} referrals</span>
                     </div>
                     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                       <span style={{ color: "#fbbf24", fontWeight: 600 }}>{m.bonus}</span>
-                      {achieved ? <span style={{ color: "#4ade80" }}>✅</span> : <span style={{ color: "#334155" }}>🔒</span>}
+                      {achieved ? <span style={{ color: C.green }}>✅</span> : <span style={{ color: C.border }}>🔒</span>}
                     </div>
                   </div>
                 );
               })}
-              <p style={{ margin: "12px 0 0", fontSize: 12, color: "#64748b" }}>Milestone bonuses are credited automatically when you reach each referral target.</p>
+              <p style={{ margin: "12px 0 0", fontSize: 12, color: C.muted }}>Milestone bonuses are credited automatically when you reach each referral target.</p>
             </div>
           </div>
         )}
 
-        {/* WITHDRAW TAB */}
+        {/* ── WITHDRAW TAB ── */}
         {activeTab === "withdraw" && (
           <div>
-            <div style={{ background: "#1e293b", border: "1px solid #334155", borderRadius: 12, padding: 20, marginBottom: 16 }}>
-              <h3 style={{ margin: "0 0 4px", color: "#f97316", fontSize: 15 }}>💰 Request Withdrawal</h3>
-              <p style={{ margin: "0 0 20px", color: "#64748b", fontSize: 13 }}>
-                Available: <strong style={{ color: "#4ade80" }}>₹{Number(referrer.totalEarnings || 0).toLocaleString()}</strong>
+            <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: 20, marginBottom: 16 }}>
+              <h3 style={{ margin: "0 0 4px", color: C.green, fontSize: 15 }}>💰 Request Withdrawal</h3>
+              <p style={{ margin: "0 0 20px", color: C.muted, fontSize: 13 }}>
+                Available: <strong style={{ color: C.green }}>₹{Number(referrer.totalEarnings || 0).toLocaleString()}</strong>
               </p>
               {withdrawMsg && (
-                <div style={{ background: withdrawMsg.startsWith("✅") ? "rgba(74,222,128,0.1)" : "rgba(239,68,68,0.1)", border: `1px solid ${withdrawMsg.startsWith("✅") ? "#16a34a" : "#dc2626"}`, borderRadius: 8, padding: 12, marginBottom: 16, color: withdrawMsg.startsWith("✅") ? "#4ade80" : "#f87171", fontSize: 14 }}>
+                <div style={{ background: withdrawMsg.startsWith("✅") ? C.greenDim : "rgba(239,68,68,0.08)", border: `1px solid ${withdrawMsg.startsWith("✅") ? C.green : C.red}`, borderRadius: 8, padding: 12, marginBottom: 16, color: withdrawMsg.startsWith("✅") ? C.green : "#f87171", fontSize: 14 }}>
                   {withdrawMsg}
                 </div>
               )}
-              <div style={{ display: "flex", flexDirection: "column" as const, gap: 14 }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
                 <div>
-                  <label style={{ fontSize: 13, color: "#94a3b8", display: "block", marginBottom: 6 }}>Amount (₹)</label>
+                  <label style={{ fontSize: 13, color: C.subtle, display: "block", marginBottom: 6 }}>Amount (₹)</label>
                   <input type="number" value={withdrawAmount} onChange={e => setWithdrawAmount(e.target.value)} placeholder="Enter amount"
-                    style={{ width: "100%", background: "#0f172a", border: "1px solid #334155", borderRadius: 8, padding: "10px 14px", color: "#fff", fontSize: 14 }} />
+                    style={{ width: "100%", background: C.bg, border: `1px solid ${C.border}`, borderRadius: 8, padding: "10px 14px", color: C.text, fontSize: 14 }} />
                 </div>
                 <div>
-                  <label style={{ fontSize: 13, color: "#94a3b8", display: "block", marginBottom: 6 }}>UPI ID</label>
+                  <label style={{ fontSize: 13, color: C.subtle, display: "block", marginBottom: 6 }}>UPI ID</label>
                   <input type="text" value={upiId} onChange={e => setUpiId(e.target.value)} placeholder="yourname@upi"
-                    style={{ width: "100%", background: "#0f172a", border: "1px solid #334155", borderRadius: 8, padding: "10px 14px", color: "#fff", fontSize: 14 }} />
+                    style={{ width: "100%", background: C.bg, border: `1px solid ${C.border}`, borderRadius: 8, padding: "10px 14px", color: C.text, fontSize: 14 }} />
                 </div>
                 <button
                   disabled={withdrawMutation.isPending || !withdrawAmount || !upiId}
                   onClick={() => { setWithdrawMsg(""); withdrawMutation.mutate({ uniqueCode, amount: Number(withdrawAmount), upiId }); }}
-                  style={{ background: "#f97316", color: "#fff", border: "none", borderRadius: 8, padding: "12px 24px", cursor: "pointer", fontWeight: 600, fontSize: 15, opacity: (withdrawMutation.isPending || !withdrawAmount || !upiId) ? 0.6 : 1 }}>
+                  style={{ background: C.green, color: "#000", border: "none", borderRadius: 8, padding: "12px 24px", cursor: "pointer", fontWeight: 700, fontSize: 15, opacity: (withdrawMutation.isPending || !withdrawAmount || !upiId) ? 0.5 : 1, boxShadow: `0 0 15px ${C.green}40` }}>
                   {withdrawMutation.isPending ? "Submitting..." : "Request Withdrawal"}
                 </button>
               </div>
             </div>
 
-            <div style={{ background: "#1e293b", border: "1px solid #334155", borderRadius: 12, padding: 20 }}>
-              <h3 style={{ margin: "0 0 16px", color: "#f97316", fontSize: 15 }}>📋 Withdrawal History</h3>
+            <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: 20 }}>
+              <h3 style={{ margin: "0 0 16px", color: C.green, fontSize: 15 }}>📋 Withdrawal History</h3>
               {!withdrawals || withdrawals.length === 0 ? (
-                <p style={{ color: "#64748b", fontSize: 13, textAlign: "center" as const, padding: "16px 0" }}>No withdrawal requests yet.</p>
+                <p style={{ color: C.muted, fontSize: 13, textAlign: "center", padding: "16px 0" }}>No withdrawal requests yet.</p>
               ) : (
-                <div style={{ display: "flex", flexDirection: "column" as const, gap: 10 }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                   {withdrawals.map((w: any, i: number) => (
-                    <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "#0f172a", borderRadius: 8, padding: "12px 14px" }}>
+                    <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: C.bg, borderRadius: 8, padding: "12px 14px", border: `1px solid ${C.border}` }}>
                       <div>
                         <p style={{ margin: 0, fontWeight: 600 }}>₹{Number(w.amount).toLocaleString()}</p>
-                        <p style={{ margin: "2px 0 0", fontSize: 12, color: "#64748b" }}>{w.upiId}</p>
+                        <p style={{ margin: "2px 0 0", fontSize: 12, color: C.muted }}>{w.upiId}</p>
                       </div>
-                      <span style={{ padding: "4px 10px", borderRadius: 20, fontSize: 12, fontWeight: 600, background: w.status === "approved" ? "rgba(74,222,128,0.15)" : w.status === "pending" ? "rgba(251,146,60,0.15)" : "rgba(239,68,68,0.15)", color: w.status === "approved" ? "#4ade80" : w.status === "pending" ? "#fb923c" : "#f87171" }}>
+                      <span style={{ padding: "4px 10px", borderRadius: 20, fontSize: 12, fontWeight: 600, background: w.status === "approved" ? C.greenDim : w.status === "pending" ? C.orangeDim : "rgba(239,68,68,0.12)", color: w.status === "approved" ? C.green : w.status === "pending" ? C.orange : C.red }}>
                         {w.status === "approved" ? "✅ Approved" : w.status === "pending" ? "⏳ Pending" : "❌ Rejected"}
                       </span>
                     </div>
@@ -485,10 +502,10 @@ export default function ReferrerDashboard() {
         )}
 
         {/* Footer */}
-        <div style={{ textAlign: "center" as const, padding: "24px 0 8px", borderTop: "1px solid #1e293b", marginTop: 24 }}>
-          <a href="/terms-referral" style={{ color: "#64748b", fontSize: 12, textDecoration: "none" }}>Terms & Conditions</a>
-          <span style={{ color: "#334155", margin: "0 8px" }}>•</span>
-          <span style={{ color: "#64748b", fontSize: 12 }}>Sales Squad Referral Program</span>
+        <div style={{ textAlign: "center", padding: "24px 0 8px", borderTop: `1px solid ${C.border}`, marginTop: 24 }}>
+          <a href="/terms-referral" style={{ color: C.muted, fontSize: 12, textDecoration: "none" }}>Terms & Conditions</a>
+          <span style={{ color: C.border, margin: "0 8px" }}>•</span>
+          <span style={{ color: C.muted, fontSize: 12 }}>Sales Squad Referral Program</span>
         </div>
       </div>
     </div>

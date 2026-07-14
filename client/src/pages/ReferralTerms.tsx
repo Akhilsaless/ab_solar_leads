@@ -1,13 +1,13 @@
 export default function ReferralTerms() {
   return (
-    <div style={{ minHeight: "100vh", background: "#0f172a", color: "#fff", fontFamily: "Arial, sans-serif", padding: "32px 16px" }}>
+    <div style={{ minHeight: "100vh", background: "#0a0a0a", color: "#fff", fontFamily: "'Inter', sans-serif", padding: "32px 16px" }}>
       <div style={{ maxWidth: 680, margin: "0 auto" }}>
         <div style={{ marginBottom: 32 }}>
-          <a href="/referrer-signup" style={{ color: "#f97316", textDecoration: "none", fontSize: 14 }}>← Back to Signup</a>
+          <a href="/referrer-signup" style={{ color: "#10b981", textDecoration: "none", fontSize: 14 }}>← Back to Signup</a>
         </div>
 
-        <div style={{ background: "#1e293b", borderRadius: 16, padding: "32px 28px", border: "1px solid #334155" }}>
-          <h1 style={{ margin: "0 0 4px", color: "#f97316", fontSize: 24 }}>Terms & Conditions</h1>
+        <div style={{ background: "#141414", borderRadius: 16, padding: "32px 28px", border: "1px solid #222" }}>
+          <h1 style={{ margin: "0 0 4px", color: "#10b981", fontSize: 24 }}>Terms & Conditions</h1>
           <p style={{ margin: "0 0 32px", color: "#64748b", fontSize: 14 }}>Sales Squad Referral Program — Effective from the date of signup</p>
 
           <Section title="1. Program Overview">
@@ -76,13 +76,13 @@ export default function ReferralTerms() {
             <p style={{ color: "#94a3b8", fontSize: 14 }}>This program is governed by the laws of India. Any disputes shall be subject to the jurisdiction of courts in the state where AB SOLAR is registered.</p>
           </Section>
 
-          <div style={{ marginTop: 32, padding: "16px 20px", background: "#0f172a", borderRadius: 10, border: "1px solid #334155" }}>
+          <div style={{ marginTop: 32, padding: "16px 20px", background: "#0a0a0a", borderRadius: 10, border: "1px solid #222" }}>
             <p style={{ margin: 0, color: "#64748b", fontSize: 13 }}>By signing up for the Sales Squad Referral Program, you confirm that you have read, understood, and agreed to all of the above terms and conditions.</p>
           </div>
         </div>
 
         <div style={{ textAlign: "center" as const, marginTop: 24 }}>
-          <a href="/referrer-signup" style={{ background: "#f97316", color: "#fff", padding: "12px 28px", borderRadius: 8, textDecoration: "none", fontWeight: 600, fontSize: 15 }}>
+          <a href="/referrer-signup" style={{ background: "#10b981", color: "#000", padding: "12px 28px", borderRadius: 8, textDecoration: "none", fontWeight: 700, fontSize: 15 }}>
             Back to Signup
           </a>
         </div>

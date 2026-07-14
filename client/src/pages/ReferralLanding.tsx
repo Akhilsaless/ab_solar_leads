@@ -1,237 +1,172 @@
 import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Sun, TrendingUp, Gift, Users, Zap, ArrowRight } from "lucide-react";
+import { ArrowRight, Users, Gift, Zap, TrendingUp } from "lucide-react";
+import { SalesSquadLogo } from "@/components/SalesSquadLogo";
+
+const G = "#10b981";
+const GDIM = "rgba(16,185,129,0.12)";
+const GBORDER = "rgba(16,185,129,0.25)";
 
 export default function ReferralLanding() {
   const [, navigate] = useLocation();
   const [referrerCode, setReferrerCode] = useState<string>("");
 
   useEffect(() => {
-    // Extract referrer code from URL path
     const pathParts = window.location.pathname.split("/");
     const code = pathParts[pathParts.length - 1];
-    if (code && code !== "referral-landing") {
-      setReferrerCode(code);
-    }
+    if (code && code !== "referral-landing") setReferrerCode(code);
   }, []);
 
+  const steps = [
+    { n: "1", title: "Sign Up", desc: "Create your referrer account with OTP" },
+    { n: "2", title: "Get Link", desc: "Get your unique referral code" },
+    { n: "3", title: "Share", desc: "Send to friends, family & neighbors" },
+    { n: "4", title: "They Apply", desc: "Customer applies for govt subsidy" },
+    { n: "5", title: "Withdraw", desc: "Payout to UPI/Bank anytime" },
+  ];
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-orange-900 to-slate-900">
+    <div style={{ minHeight: "100vh", background: "#0a0a0a", color: "#fff", fontFamily: "'Inter', sans-serif" }}>
+
       {/* Header */}
-      <div className="bg-black/40 backdrop-blur-sm border-b border-white/10 sticky top-0 z-50">
-        <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Sun className="w-8 h-8 text-orange-500" />
-            <span className="text-2xl font-bold text-white">AB SOLAR</span>
-          </div>
-          <div className="text-gray-300">Referral Commission Program</div>
+      <div style={{ background: "rgba(20,20,20,0.95)", borderBottom: `1px solid ${GBORDER}`, backdropFilter: "blur(10px)", position: "sticky", top: 0, zIndex: 50 }}>
+        <div style={{ maxWidth: 1100, margin: "0 auto", padding: "14px 24px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <SalesSquadLogo size={34} showText={true} />
+          <span style={{ color: "#555", fontSize: 13 }}>Referral Commission Program</span>
         </div>
       </div>
 
-      {/* Hero Section */}
-      <div className="max-w-6xl mx-auto px-4 py-16">
-        <div className="text-center mb-16">
-          <h1 className="text-5xl font-bold text-white mb-4">
-            Earn ₹2,000 Commission Per Customer
+      <div style={{ maxWidth: 1100, margin: "0 auto", padding: "0 24px" }}>
+
+        {/* Hero */}
+        <div style={{ textAlign: "center", padding: "80px 0 60px" }}>
+          <div style={{ display: "inline-block", background: GDIM, border: `1px solid ${GBORDER}`, borderRadius: 20, padding: "6px 16px", marginBottom: 20 }}>
+            <span style={{ color: G, fontSize: 13, fontWeight: 600 }}>🌞 Solar Referral Program</span>
+          </div>
+          <h1 style={{ fontSize: 48, fontWeight: 800, margin: "0 0 16px", lineHeight: 1.1 }}>
+            Earn <span style={{ color: G }}>₹2,000</span> Per Customer
           </h1>
-          <p className="text-xl text-gray-300 mb-8">
-            Your friend from AB SOLAR is offering you a commission for every customer you refer.
-            <br />
-            Share the link and earn ₹500 + ₹1,500 per customer!
+          <p style={{ color: "#888", fontSize: 18, margin: "0 0 36px", maxWidth: 560, marginLeft: "auto", marginRight: "auto" }}>
+            Refer customers to AB SOLAR and earn ₹500 when they apply for govt subsidy + ₹1,500 when solar is installed.
           </p>
-          <div className="flex gap-4 justify-center">
-            <Button
+          <div style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap" }}>
+            <button
               onClick={() => navigate("/referrer-signup")}
-              className="bg-orange-600 hover:bg-orange-700 text-white px-8 py-6 text-lg"
-            >
-              Start Earning Now <ArrowRight className="ml-2 w-5 h-5" />
-            </Button>
-            <Button
-              onClick={() =>
-                navigate(referrerCode ? `/refer/${referrerCode}` : "/chat/ab-solar")
-              }
-              variant="outline"
-              className="border-white/30 text-white hover:bg-white/10 px-8 py-6 text-lg"
-            >
+              style={{ background: G, color: "#000", border: "none", borderRadius: 10, padding: "14px 28px", fontSize: 16, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 8, boxShadow: `0 0 25px rgba(16,185,129,0.35)` }}>
+              Start Earning Now <ArrowRight style={{ width: 18, height: 18 }} />
+            </button>
+            <button
+              onClick={() => navigate(referrerCode ? `/refer/${referrerCode}` : "/chat/ab-solar")}
+              style={{ background: "transparent", color: "#fff", border: "1px solid #333", borderRadius: 10, padding: "14px 28px", fontSize: 16, fontWeight: 600, cursor: "pointer" }}>
               Get Solar Estimate
-            </Button>
+            </button>
           </div>
         </div>
 
-        {/* Earnings Breakdown */}
-        <div className="grid md:grid-cols-3 gap-6 mb-16">
-          <Card className="bg-gradient-to-br from-purple-500/20 to-purple-600/20 border-purple-500/30 p-8 text-center">
-            <TrendingUp className="w-12 h-12 text-purple-400 mx-auto mb-4" />
-            <h3 className="text-2xl font-bold text-white mb-2">₹20-₹100</h3>
-            <p className="text-gray-300">Per Referral (Task Bonus)</p>
-            <p className="text-sm text-gray-400 mt-2">When your referrals refer others</p>
-          </Card>
-
-          <Card className="bg-gradient-to-br from-green-500/20 to-green-600/20 border-green-500/30 p-8 text-center">
-            <Gift className="w-12 h-12 text-green-400 mx-auto mb-4" />
-            <h3 className="text-2xl font-bold text-white mb-2">₹500</h3>
-            <p className="text-gray-300">Signup Bonus</p>
-            <p className="text-sm text-gray-400 mt-2">When referral buys solar product</p>
-          </Card>
-
-          <Card className="bg-gradient-to-br from-blue-500/20 to-blue-600/20 border-blue-500/30 p-8 text-center">
-            <Zap className="w-12 h-12 text-blue-400 mx-auto mb-4" />
-            <h3 className="text-2xl font-bold text-white mb-2">₹1,500</h3>
-            <p className="text-gray-300">Installation Bonus</p>
-            <p className="text-sm text-gray-400 mt-2">When installation is completed</p>
-          </Card>
+        {/* Earnings Cards */}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 16, marginBottom: 60 }}>
+          {[
+            { icon: <TrendingUp style={{ width: 28, height: 28, color: "#818cf8" }} />, amount: "₹100–₹500+", label: "Task Bonus", sub: "Per referral via daily tasks", color: "#818cf8", dim: "rgba(129,140,248,0.1)", border: "rgba(129,140,248,0.25)" },
+            { icon: <Gift style={{ width: 28, height: 28, color: G }} />, amount: "₹500", label: "Subsidy Bonus", sub: "When referral applies for govt subsidy", color: G, dim: GDIM, border: GBORDER },
+            { icon: <Zap style={{ width: 28, height: 28, color: "#fbbf24" }} />, amount: "₹1,500", label: "Install Bonus", sub: "When solar installation is confirmed", color: "#fbbf24", dim: "rgba(251,191,36,0.1)", border: "rgba(251,191,36,0.25)" },
+          ].map((card, i) => (
+            <div key={i} style={{ background: "#141414", border: `1px solid ${card.border}`, borderRadius: 14, padding: "28px 24px", textAlign: "center" }}>
+              <div style={{ width: 56, height: 56, borderRadius: "50%", background: card.dim, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}>
+                {card.icon}
+              </div>
+              <h3 style={{ color: card.color, fontSize: 28, fontWeight: 800, margin: "0 0 4px" }}>{card.amount}</h3>
+              <p style={{ color: "#fff", fontWeight: 600, margin: "0 0 6px" }}>{card.label}</p>
+              <p style={{ color: "#555", fontSize: 13, margin: 0 }}>{card.sub}</p>
+            </div>
+          ))}
         </div>
 
         {/* How It Works */}
-        <Card className="bg-white/10 border-white/20 p-12 mb-16">
-          <h2 className="text-3xl font-bold text-white mb-8">How It Works</h2>
-          <div className="grid md:grid-cols-5 gap-4">
-            <div className="text-center">
-              <div className="w-12 h-12 bg-orange-600 rounded-full flex items-center justify-center text-white font-bold text-lg mx-auto mb-4">
-                1
+        <div style={{ background: "#141414", border: "1px solid #222", borderRadius: 16, padding: "40px 36px", marginBottom: 40 }}>
+          <h2 style={{ fontSize: 28, fontWeight: 700, margin: "0 0 32px" }}>How It Works</h2>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 20 }}>
+            {steps.map((s, i) => (
+              <div key={i} style={{ textAlign: "center" }}>
+                <div style={{ width: 44, height: 44, borderRadius: "50%", background: G, color: "#000", fontWeight: 700, fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 12px", boxShadow: `0 0 15px rgba(16,185,129,0.35)` }}>{s.n}</div>
+                <h3 style={{ color: "#fff", fontWeight: 600, margin: "0 0 6px", fontSize: 15 }}>{s.title}</h3>
+                <p style={{ color: "#555", fontSize: 12, margin: 0 }}>{s.desc}</p>
               </div>
-              <h3 className="text-lg font-bold text-white mb-2">Sign Up</h3>
-              <p className="text-gray-300 text-sm">
-                Create referrer account with OTP
-              </p>
-            </div>
+            ))}
+          </div>
+        </div>
 
-            <div className="text-center">
-              <div className="w-12 h-12 bg-orange-600 rounded-full flex items-center justify-center text-white font-bold text-lg mx-auto mb-4">
-                2
-              </div>
-              <h3 className="text-lg font-bold text-white mb-2">Get Link</h3>
-              <p className="text-gray-300 text-sm">
-                Get unique referral code
-              </p>
+        {/* Two Ways to Earn */}
+        <div style={{ background: "#141414", border: "1px solid #222", borderRadius: 16, padding: "40px 36px", marginBottom: 40 }}>
+          <h2 style={{ fontSize: 28, fontWeight: 700, margin: "0 0 28px" }}>Two Ways to Earn</h2>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 28 }}>
+            <div>
+              <h3 style={{ color: "#818cf8", fontSize: 18, fontWeight: 700, margin: "0 0 16px" }}>Way 1 — Task Bonuses</h3>
+              <p style={{ color: "#666", fontSize: 13, margin: "0 0 16px" }}>Earn extra per referral by completing daily tasks:</p>
+              {[
+                { label: "Task 1: 5 Referrals", earn: "₹100 bonus" },
+                { label: "Task 2: 10 Referrals", earn: "₹200 bonus" },
+                { label: "Task 3: 15 Referrals", earn: "₹300 bonus" },
+                { label: "Legend: 25 Referrals", earn: "₹500 bonus" },
+              ].map((row, i) => (
+                <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "#0a0a0a", border: "1px solid #222", borderRadius: 8, padding: "10px 14px", marginBottom: 8 }}>
+                  <span style={{ color: "#fff", fontWeight: 500, fontSize: 14 }}>{row.label}</span>
+                  <span style={{ color: "#818cf8", fontWeight: 600 }}>{row.earn}</span>
+                </div>
+              ))}
             </div>
-
-            <div className="text-center">
-              <div className="w-12 h-12 bg-orange-600 rounded-full flex items-center justify-center text-white font-bold text-lg mx-auto mb-4">
-                3
-              </div>
-              <h3 className="text-lg font-bold text-white mb-2">Share</h3>
-              <p className="text-gray-300 text-sm">
-                Share link with friends
-              </p>
-            </div>
-
-            <div className="text-center">
-              <div className="w-12 h-12 bg-orange-600 rounded-full flex items-center justify-center text-white font-bold text-lg mx-auto mb-4">
-                4
-              </div>
-              <h3 className="text-lg font-bold text-white mb-2">Earn Tasks</h3>
-              <p className="text-gray-300 text-sm">
-                When they refer others
-              </p>
-            </div>
-
-            <div className="text-center">
-              <div className="w-12 h-12 bg-orange-600 rounded-full flex items-center justify-center text-white font-bold text-lg mx-auto mb-4">
-                5
-              </div>
-              <h3 className="text-lg font-bold text-white mb-2">Withdraw</h3>
-              <p className="text-gray-300 text-sm">
-                To UPI or Bank anytime
-              </p>
+            <div>
+              <h3 style={{ color: G, fontSize: 18, fontWeight: 700, margin: "0 0 16px" }}>Way 2 — Direct Bonuses</h3>
+              <p style={{ color: "#666", fontSize: 13, margin: "0 0 16px" }}>Earn when your referral converts to solar:</p>
+              {[
+                { label: "Govt subsidy applied", earn: "₹500" },
+                { label: "Solar installed", earn: "₹1,500" },
+                { label: "Total per customer", earn: "₹2,000", highlight: true },
+              ].map((row, i) => (
+                <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: row.highlight ? GDIM : "#0a0a0a", border: `1px solid ${row.highlight ? GBORDER : "#222"}`, borderRadius: 8, padding: "10px 14px", marginBottom: 8 }}>
+                  <span style={{ color: "#fff", fontWeight: row.highlight ? 700 : 500, fontSize: 14 }}>{row.label}</span>
+                  <span style={{ color: G, fontWeight: 700 }}>{row.earn}</span>
+                </div>
+              ))}
             </div>
           </div>
-        </Card>
+        </div>
 
-        {/* Task System */}
-        <Card className="bg-white/10 border-white/20 p-12 mb-16">
-          <h2 className="text-3xl font-bold text-white mb-8">How You Earn - Two Ways</h2>
-          <div className="grid md:grid-cols-2 gap-8">
-            <div>
-              <h3 className="text-2xl font-bold text-orange-400 mb-6">Way 1: Task Bonuses</h3>
-              <p className="text-gray-300 mb-6">Earn when your referrals refer others:</p>
-              <div className="space-y-3">
-                <div className="flex items-center justify-between bg-white/5 p-3 rounded-lg">
-                  <p className="text-white font-bold">Task 1: 5 Referrals</p>
-                  <span className="text-orange-400">₹20 each</span>
-                </div>
-                <div className="flex items-center justify-between bg-white/5 p-3 rounded-lg">
-                  <p className="text-white font-bold">Task 2: 5 More</p>
-                  <span className="text-orange-400">₹40 each</span>
-                </div>
-                <div className="flex items-center justify-between bg-white/5 p-3 rounded-lg">
-                  <p className="text-white font-bold">Task 3-5: Increasing</p>
-                  <span className="text-orange-400">Up to ₹100</span>
-                </div>
-                <div className="flex items-center justify-between bg-orange-600/20 border border-orange-500/50 p-3 rounded-lg">
-                  <p className="text-white font-bold">Forever</p>
-                  <span className="text-orange-400">₹100 each</span>
-                </div>
-              </div>
+        {/* Network pitch */}
+        <div style={{ background: "#141414", border: `1px solid ${GBORDER}`, borderRadius: 16, padding: "32px 36px", marginBottom: 60 }}>
+          <div style={{ display: "flex", gap: 16, alignItems: "flex-start" }}>
+            <div style={{ width: 48, height: 48, borderRadius: "50%", background: GDIM, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+              <Users style={{ width: 24, height: 24, color: G }} />
             </div>
             <div>
-              <h3 className="text-2xl font-bold text-green-400 mb-6">Way 2: Direct Bonuses</h3>
-              <p className="text-gray-300 mb-6">Earn when your referral buys solar:</p>
-              <div className="space-y-3">
-                <div className="flex items-center justify-between bg-white/5 p-3 rounded-lg">
-                  <p className="text-white font-bold">When they buy solar</p>
-                  <span className="text-green-400">₹500</span>
-                </div>
-                <div className="flex items-center justify-between bg-white/5 p-3 rounded-lg">
-                  <p className="text-white font-bold">When installed</p>
-                  <span className="text-green-400">₹1,500</span>
-                </div>
-                <div className="flex items-center justify-between bg-green-600/20 border border-green-500/50 p-3 rounded-lg">
-                  <p className="text-white font-bold">Total per customer</p>
-                  <span className="text-green-400">₹2,000</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </Card>
-
-        {/* Multi-Level Referrals */}
-        <Card className="bg-white/10 border-white/20 p-12 mb-16">
-          <div className="flex items-start gap-4">
-            <Users className="w-8 h-8 text-orange-500 flex-shrink-0 mt-1" />
-            <div>
-              <h3 className="text-2xl font-bold text-white mb-2">
-                Unlimited Earning Potential
-              </h3>
-              <p className="text-gray-300 mb-4">
-                Your referrals can also become referrers! When they refer others and those people buy solar, you earn commissions too. Build your network and multiply your earnings indefinitely.
-              </p>
-              <div className="bg-orange-600/20 border border-orange-500/50 p-4 rounded-lg">
-                <p className="text-white font-bold">Example:</p>
-                <p className="text-gray-300 text-sm mt-2">
-                  You refer Raj (earn ₹500 when he buys solar)
-                  <br />
-                  Raj refers Priya (you earn ₹20-₹100 from Raj's task)
-                  <br />
-                  Priya buys solar (you earn commission from Raj's referral)
+              <h3 style={{ color: "#fff", fontSize: 20, fontWeight: 700, margin: "0 0 8px" }}>Unlimited Earning Potential</h3>
+              <p style={{ color: "#666", margin: "0 0 16px", fontSize: 14 }}>Build your network and multiply your earnings. The more quality referrals you send, the higher your task bonuses go.</p>
+              <div style={{ background: GDIM, border: `1px solid ${GBORDER}`, borderRadius: 10, padding: "14px 18px" }}>
+                <p style={{ color: "#fff", fontWeight: 600, margin: "0 0 8px", fontSize: 14 }}>Example:</p>
+                <p style={{ color: "#888", fontSize: 13, margin: 0, lineHeight: 1.7 }}>
+                  You refer Raj → he applies for subsidy → <span style={{ color: G }}>you earn ₹500</span><br />
+                  Raj's solar gets installed → <span style={{ color: G }}>you earn ₹1,500</span><br />
+                  You hit 5 referrals milestone → <span style={{ color: G }}>₹100 bonus</span>
                 </p>
               </div>
             </div>
           </div>
-        </Card>
+        </div>
 
-        {/* CTA Section */}
-        <div className="text-center">
-          <h2 className="text-3xl font-bold text-white mb-4">Ready to Start Earning?</h2>
-          <p className="text-gray-300 mb-8 text-lg">
-            Share your unique link and earn ₹500 + ₹1,500 per customer you refer
-          </p>
-          <Button
+        {/* CTA */}
+        <div style={{ textAlign: "center", padding: "20px 0 80px" }}>
+          <h2 style={{ fontSize: 32, fontWeight: 800, margin: "0 0 12px" }}>Ready to Start Earning?</h2>
+          <p style={{ color: "#666", fontSize: 16, margin: "0 0 28px" }}>Join thousands of referrers earning with Sales Squad</p>
+          <button
             onClick={() => navigate("/referrer-signup")}
-            className="bg-orange-600 hover:bg-orange-700 text-white px-12 py-6 text-lg"
-          >
-            Sign Up as Referrer <ArrowRight className="ml-2 w-5 h-5" />
-          </Button>
+            style={{ background: G, color: "#000", border: "none", borderRadius: 10, padding: "16px 40px", fontSize: 17, fontWeight: 700, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 8, boxShadow: `0 0 30px rgba(16,185,129,0.4)` }}>
+            Sign Up as Referrer <ArrowRight style={{ width: 20, height: 20 }} />
+          </button>
         </div>
       </div>
 
       {/* Footer */}
-      <div className="bg-black/40 border-t border-white/10 mt-16 py-8">
-        <div className="max-w-6xl mx-auto px-4 text-center text-gray-400 text-sm">
-          <p>AB SOLAR © 2026. All rights reserved. | Referral Program Terms Apply</p>
-        </div>
+      <div style={{ background: "#141414", borderTop: "1px solid #222", padding: "24px", textAlign: "center" }}>
+        <p style={{ color: "#444", fontSize: 13, margin: 0 }}>Sales Squad © 2026. All rights reserved. | Referral Program Terms Apply</p>
       </div>
     </div>
   );

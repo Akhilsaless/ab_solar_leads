@@ -23,8 +23,9 @@ import { getLoginUrl } from "@/const";
 import { useIsMobile } from "@/hooks/useMobile";
 import {
   LayoutDashboard, Users, MessageSquare, Sun, BarChart3,
-  MapPin, Settings, LogOut, PanelLeft, Zap, BookOpen, Search, CreditCard
+  Settings, LogOut, BookOpen, Search, CreditCard
 } from "lucide-react";
+import { SalesSquadLogo, SalesSquadIcon } from "./SalesSquadLogo";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from './DashboardLayoutSkeleton';
@@ -70,12 +71,10 @@ export default function DashboardLayout({
     return (
       <div className="flex items-center justify-center min-h-screen bg-background">
         <div className="flex flex-col items-center gap-8 p-8 max-w-md w-full">
-          <div className="w-14 h-14 rounded-xl solar-gradient flex items-center justify-center">
-            <Zap className="w-7 h-7 text-black" />
-          </div>
+          <SalesSquadLogo size={48} />
           <div className="flex flex-col items-center gap-4">
             <h1 className="text-2xl font-bold tracking-tight text-center">
-              AB SOLAR Outreach
+              Sales Squad
             </h1>
             <p className="text-sm text-muted-foreground text-center max-w-sm">
               Sign in to access your lead generation and outreach platform.
@@ -169,18 +168,19 @@ function DashboardLayoutContent({
             <div className="flex items-center gap-3 px-2 transition-all w-full">
               <button
                 onClick={toggleSidebar}
-                className="h-8 w-8 flex items-center justify-center hover:bg-accent rounded-lg transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring shrink-0"
+                className="flex items-center justify-center hover:opacity-80 transition-opacity focus:outline-none shrink-0"
                 aria-label="Toggle navigation"
               >
-                <div className="w-7 h-7 rounded-lg solar-gradient flex items-center justify-center">
-                  <Zap className="h-3.5 w-3.5 text-black" />
-                </div>
+                {isCollapsed ? (
+                  <SalesSquadIcon size={30} />
+                ) : (
+                  <SalesSquadLogo size={30} showText={false} />
+                )}
               </button>
               {!isCollapsed ? (
-                <div className="flex items-center gap-2 min-w-0">
-                  <span className="font-bold tracking-tight truncate">
-                    AB SOLAR
-                  </span>
+                <div className="flex flex-col leading-tight min-w-0">
+                  <span className="font-bold text-white tracking-wide text-sm truncate">Sales Squad</span>
+                  <span className="text-[#10b981] text-xs font-medium">Premium Leads</span>
                 </div>
               ) : null}
             </div>

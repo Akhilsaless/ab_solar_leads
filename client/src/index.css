@@ -43,40 +43,61 @@
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
 }
 
+/* ── Option B: Emerald Green on Pure Black ── */
 :root {
   --radius: 0.625rem;
-  --primary: oklch(0.72 0.19 60);
-  --primary-foreground: oklch(0.13 0 0);
-  --background: oklch(0.11 0.005 260);
-  --foreground: oklch(0.93 0 0);
-  --card: oklch(0.155 0.005 260);
-  --card-foreground: oklch(0.93 0 0);
-  --popover: oklch(0.155 0.005 260);
-  --popover-foreground: oklch(0.93 0 0);
-  --secondary: oklch(0.2 0.005 260);
-  --secondary-foreground: oklch(0.93 0 0);
-  --muted: oklch(0.2 0.005 260);
-  --muted-foreground: oklch(0.55 0.01 260);
-  --accent: oklch(0.2 0.02 60);
-  --accent-foreground: oklch(0.93 0 0);
+
+  /* Emerald green as primary — oklch equivalent of #10b981 */
+  --primary: oklch(0.696 0.17 162);
+  --primary-foreground: oklch(0.08 0 0);
+
+  /* Pure black backgrounds */
+  --background: oklch(0.08 0 0);
+  --foreground: oklch(0.95 0 0);
+
+  /* Dark surface cards (#18181b) */
+  --card: oklch(0.14 0 0);
+  --card-foreground: oklch(0.95 0 0);
+  --popover: oklch(0.14 0 0);
+  --popover-foreground: oklch(0.95 0 0);
+
+  /* Secondary surfaces */
+  --secondary: oklch(0.18 0 0);
+  --secondary-foreground: oklch(0.95 0 0);
+
+  /* Muted */
+  --muted: oklch(0.18 0 0);
+  --muted-foreground: oklch(0.5 0 0);
+
+  /* Accent: subtle green tint */
+  --accent: oklch(0.18 0.04 162);
+  --accent-foreground: oklch(0.95 0 0);
+
+  /* Destructive: red */
   --destructive: oklch(0.55 0.22 25);
   --destructive-foreground: oklch(0.95 0 0);
-  --border: oklch(0.24 0.005 260);
-  --input: oklch(0.24 0.005 260);
-  --ring: oklch(0.72 0.19 60);
-  --chart-1: oklch(0.72 0.19 60);
-  --chart-2: oklch(0.65 0.15 160);
+
+  /* Borders */
+  --border: oklch(0.22 0 0);
+  --input: oklch(0.22 0 0);
+  --ring: oklch(0.696 0.17 162);
+
+  /* Charts */
+  --chart-1: oklch(0.696 0.17 162);
+  --chart-2: oklch(0.65 0.15 200);
   --chart-3: oklch(0.65 0.18 250);
-  --chart-4: oklch(0.7 0.15 300);
+  --chart-4: oklch(0.72 0.19 60);
   --chart-5: oklch(0.65 0.2 30);
-  --sidebar: oklch(0.1 0.005 260);
-  --sidebar-foreground: oklch(0.93 0 0);
-  --sidebar-primary: oklch(0.72 0.19 60);
-  --sidebar-primary-foreground: oklch(0.13 0 0);
-  --sidebar-accent: oklch(0.18 0.01 60);
-  --sidebar-accent-foreground: oklch(0.93 0 0);
-  --sidebar-border: oklch(0.2 0.005 260);
-  --sidebar-ring: oklch(0.72 0.19 60);
+
+  /* Sidebar — slightly lighter than background */
+  --sidebar: oklch(0.1 0 0);
+  --sidebar-foreground: oklch(0.95 0 0);
+  --sidebar-primary: oklch(0.696 0.17 162);
+  --sidebar-primary-foreground: oklch(0.08 0 0);
+  --sidebar-accent: oklch(0.18 0.04 162);
+  --sidebar-accent-foreground: oklch(0.95 0 0);
+  --sidebar-border: oklch(0.18 0 0);
+  --sidebar-ring: oklch(0.696 0.17 162);
 }
 
 @layer base {
@@ -131,27 +152,37 @@
     }
   }
 
+  /* Glass card with green tint border */
   .glass-card {
-    background: oklch(0.155 0.005 260 / 0.8);
+    background: oklch(0.14 0 0 / 0.9);
     backdrop-filter: blur(12px);
-    border: 1px solid oklch(0.28 0 0 / 0.5);
+    border: 1px solid oklch(0.696 0.17 162 / 0.15);
     border-radius: var(--radius);
   }
 
+  /* Green gradient for hero elements */
   .solar-gradient {
-    background: linear-gradient(135deg, oklch(0.72 0.19 60), oklch(0.65 0.18 40));
+    background: linear-gradient(135deg, oklch(0.696 0.17 162), oklch(0.6 0.15 180));
+  }
+
+  /* Earnings hero card with green glow */
+  .earnings-hero {
+    background: oklch(0.14 0 0);
+    border: 1px solid oklch(0.696 0.17 162 / 0.3);
+    border-radius: var(--radius);
+    box-shadow: 0 0 40px oklch(0.696 0.17 162 / 0.08);
   }
 
   .stat-card {
-    background: oklch(0.155 0.005 260);
-    border: 1px solid oklch(0.24 0.005 260);
+    background: oklch(0.14 0 0);
+    border: 1px solid oklch(0.22 0 0);
     border-radius: var(--radius);
     padding: 1.25rem;
     transition: all 0.2s ease;
   }
   .stat-card:hover {
-    border-color: oklch(0.72 0.19 60 / 0.4);
-    box-shadow: 0 0 20px oklch(0.72 0.19 60 / 0.08);
+    border-color: oklch(0.696 0.17 162 / 0.4);
+    box-shadow: 0 0 20px oklch(0.696 0.17 162 / 0.08);
   }
 
   .status-badge {
@@ -164,14 +195,14 @@
     letter-spacing: 0.02em;
   }
   .status-new { color: oklch(0.72 0.15 250); background: oklch(0.72 0.15 250 / 0.12); }
-  .status-contacted { color: oklch(0.72 0.19 60); background: oklch(0.72 0.19 60 / 0.12); }
-  .status-qualified { color: oklch(0.7 0.18 160); background: oklch(0.7 0.18 160 / 0.12); }
-  .status-converted { color: oklch(0.72 0.2 145); background: oklch(0.72 0.2 145 / 0.12); }
+  .status-contacted { color: oklch(0.696 0.17 162); background: oklch(0.696 0.17 162 / 0.12); }
+  .status-qualified { color: oklch(0.696 0.17 162); background: oklch(0.696 0.17 162 / 0.12); }
+  .status-converted { color: oklch(0.696 0.17 162); background: oklch(0.696 0.17 162 / 0.15); }
   .status-lost { color: oklch(0.6 0.15 25); background: oklch(0.6 0.15 25 / 0.12); }
 
   .priority-low { color: oklch(0.55 0 0); }
-  .priority-medium { color: oklch(0.72 0.19 60); }
-  .priority-high { color: oklch(0.65 0.2 30); }
+  .priority-medium { color: oklch(0.696 0.17 162); }
+  .priority-high { color: oklch(0.72 0.19 60); }
   .priority-urgent { color: oklch(0.55 0.22 25); }
 
   .channel-badge {
@@ -184,10 +215,11 @@
     font-weight: 600;
   }
   .channel-email { color: oklch(0.72 0.15 250); background: oklch(0.72 0.15 250 / 0.12); }
-  .channel-sms { color: oklch(0.7 0.18 160); background: oklch(0.7 0.18 160 / 0.12); }
-  .channel-whatsapp { color: oklch(0.72 0.2 145); background: oklch(0.72 0.2 145 / 0.12); }
+  .channel-sms { color: oklch(0.696 0.17 162); background: oklch(0.696 0.17 162 / 0.12); }
+  .channel-whatsapp { color: oklch(0.696 0.17 162); background: oklch(0.696 0.17 162 / 0.12); }
   .channel-phone { color: oklch(0.7 0.15 300); background: oklch(0.7 0.15 300 / 0.12); }
 
+  /* Sidebar links with green active state */
   .sidebar-link {
     display: flex;
     align-items: center;
@@ -196,29 +228,52 @@
     border-radius: var(--radius);
     font-size: 0.875rem;
     font-weight: 500;
-    color: oklch(0.55 0.01 260);
+    color: oklch(0.5 0 0);
     transition: all 0.15s ease;
     text-decoration: none;
   }
   .sidebar-link:hover {
-    color: oklch(0.93 0 0);
-    background: oklch(0.2 0.005 260);
+    color: oklch(0.95 0 0);
+    background: oklch(0.18 0 0);
   }
   .sidebar-link.active {
-    color: oklch(0.72 0.19 60);
-    background: oklch(0.72 0.19 60 / 0.1);
+    color: oklch(0.696 0.17 162);
+    background: oklch(0.696 0.17 162 / 0.1);
+    border-left: 2px solid oklch(0.696 0.17 162);
   }
 
   .table-row {
     transition: background 0.15s ease;
   }
   .table-row:hover {
-    background: oklch(0.18 0.005 260);
+    background: oklch(0.16 0 0);
+  }
+
+  /* Green glow progress bar */
+  .progress-green {
+    background: linear-gradient(90deg, oklch(0.696 0.17 162), oklch(0.75 0.18 162));
+    box-shadow: 0 0 8px oklch(0.696 0.17 162 / 0.5);
+    border-radius: 9999px;
+  }
+
+  /* Pipeline circle active state */
+  .pipeline-active {
+    border: 2px solid oklch(0.696 0.17 162);
+    box-shadow: 0 0 12px oklch(0.696 0.17 162 / 0.4);
+    color: oklch(0.696 0.17 162);
   }
 }
 
 @layer utilities {
+  /* Green gradient text */
   .text-gradient {
+    background: linear-gradient(135deg, oklch(0.696 0.17 162), oklch(0.8 0.15 162));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  /* Orange gradient text (for earnings/money highlights) */
+  .text-gradient-orange {
     background: linear-gradient(135deg, oklch(0.72 0.19 60), oklch(0.82 0.14 80));
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
@@ -229,6 +284,10 @@
   }
   .animate-slide-up {
     animation: slideUp 0.3s ease-out;
+  }
+  /* Green glow utility */
+  .glow-green {
+    box-shadow: 0 0 20px oklch(0.696 0.17 162 / 0.25);
   }
 }
 
