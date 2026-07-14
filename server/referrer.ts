@@ -75,6 +75,17 @@ export const referrerRouter = router({
       if (!db) throw new Error("Database not available");
 
       try {
+        // Check if email already registered
+        const existing = await db.execute(
+          sql`SELECT id, uniqueCode FROM referrers WHERE email = ${email}`
+        );
+        if (existing && (existing as any[]).length > 0) {
+          const existingRef = (existing as any[])[0];
+          otpStore.delete(input.email);
+          // Return existing account instead of error
+          return { success: true, uniqueCode: existingRef.uniqueCode, alreadyExists: true };
+        }
+
         // Save referrer to database
         await db.execute(
           sql`INSERT INTO referrers (uniqueCode, name, email, totalEarnings, totalReferrals, status) 
