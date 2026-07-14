@@ -13,14 +13,14 @@ const testOtpMap = new Map<string, string>();
 
 export const referrerRouter = router({
   sendOtp: publicProcedure
-    .input(z.object({ name: z.string(), phone: z.string(), email: z.string().email() }))
+    .input(z.object({ name: z.string(), email: z.string().email() }))
     .mutation(async ({ input }: any) => {
       const otp = Math.floor(100000 + Math.random() * 900000).toString();
       const expiresAt = Date.now() + 10 * 60 * 1000;
 
-      otpStore.set(input.phone, { otp, expiresAt, data: input });
+      otpStore.set(input.email, { otp, expiresAt, data: input });
 
-      console.log(`[OTP] Generated for ${input.phone}: ${otp}`);
+      console.log(`[OTP] Generated for ${input.email}: ${otp}`);
 
       // Send OTP via email
       const emailResult = await sendEmail({
@@ -51,16 +51,16 @@ export const referrerRouter = router({
     }),
 
   verifyOtpAndSignup: publicProcedure
-    .input(z.object({ phone: z.string(), otp: z.string() }))
+    .input(z.object({ email: z.string().email(), otp: z.string() }))
     .mutation(async ({ input, ctx }: any) => {
-      const stored = otpStore.get(input.phone);
+      const stored = otpStore.get(input.email);
 
       if (!stored) {
         throw new Error("OTP expired or not found");
       }
 
       if (Date.now() > stored.expiresAt) {
-        otpStore.delete(input.phone);
+        otpStore.delete(input.email);
         throw new Error("OTP expired");
       }
 
@@ -68,7 +68,7 @@ export const referrerRouter = router({
         throw new Error("Invalid OTP");
       }
 
-      const { name, phone, email } = stored.data;
+      const { name, email } = stored.data;
       const uniqueCode = `REF_${nanoid(8).toUpperCase()}`;
 
       const db = await getDb();
@@ -80,8 +80,8 @@ export const referrerRouter = router({
 
         // Save referrer to database
         await db.execute(
-          sql`INSERT INTO referrers (agencyId, uniqueCode, name, phone, email, totalEarnings, totalReferrals, status) 
-              VALUES (${agencyId}, ${uniqueCode}, ${name}, ${phone}, ${email}, 0, 0, 'active')`
+          sql`INSERT INTO referrers (agencyId, uniqueCode, name, email, totalEarnings, totalReferrals, status) 
+              VALUES (${agencyId}, ${uniqueCode}, ${name}, ${email}, 0, 0, 'active')`
         );
 
         // Get the new referrer's ID using LAST_INSERT_ID()
@@ -96,7 +96,7 @@ export const referrerRouter = router({
           );
         }
 
-        otpStore.delete(input.phone);
+        otpStore.delete(input.email);
 
         // Send welcome email
         try {

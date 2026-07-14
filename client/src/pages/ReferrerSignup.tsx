@@ -44,7 +44,7 @@ export default function ReferrerSignup() {
       setError("Please fill all fields");
       return;
     }
-    sendOtp.mutate({ name, phone: email, email });
+    sendOtp.mutate({ name, email });
   };
 
   const handleVerifyOtp = () => {
@@ -52,7 +52,7 @@ export default function ReferrerSignup() {
       setError("Please enter OTP");
       return;
     }
-    verifyOtp.mutate({ phone: email, otp });
+    verifyOtp.mutate({ email, otp });
   };
 
   if (step === "success") {
@@ -62,7 +62,7 @@ export default function ReferrerSignup() {
           <div className="p-8 text-center space-y-6">
             <CheckCircle className="w-16 h-16 text-green-500 mx-auto" />
             <div>
-              <h2 className="text-2xl font-bold text-white mb-2">Welcome to AB SOLAR Referral Program!</h2>
+              <h2 className="text-2xl font-bold text-white mb-2">Welcome to Sales Squad Referral Program!</h2>
               <p className="text-gray-300">Your account is ready. Share your unique code to start earning.</p>
             </div>
             <div className="bg-orange-500/20 border border-orange-500 rounded-lg p-4">
@@ -97,7 +97,7 @@ export default function ReferrerSignup() {
       <Card className="w-full max-w-md bg-white/10 border-white/20 backdrop-blur">
         <div className="p-8 space-y-6">
           <div>
-            <h1 className="text-3xl font-bold text-white mb-2">Earn with AB SOLAR</h1>
+            <h1 className="text-3xl font-bold text-white mb-2">Earn with Sales Squad</h1>
             <p className="text-gray-300">Refer customers and earn ₹500-₹1500 per referral</p>
           </div>
 
