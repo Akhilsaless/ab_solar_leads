@@ -8,7 +8,7 @@ import { useSearchParams } from "wouter";
 
 export default function ReferrerDashboard() {
   const [searchParams] = useSearchParams();
-  const uniqueCode = searchParams.get("code") || "";
+  const uniqueCode = searchParams.get("code") || localStorage.getItem("referrerCode") || "";
   const [withdrawAmount, setWithdrawAmount] = useState("");
   const [upiId, setUpiId] = useState("");
 

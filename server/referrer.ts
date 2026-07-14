@@ -121,7 +121,7 @@ export const referrerRouter = router({
 
       try {
         const referrer = await db.execute(
-          sql`SELECT * FROM referrers WHERE uniqueCode = ${input.uniqueCode} AND agencyId = ${ctx.agencyId}`
+          sql`SELECT * FROM referrers WHERE uniqueCode = ${input.uniqueCode}`
         );
 
         if (!referrer || (referrer as any[]).length === 0) {
@@ -170,7 +170,7 @@ export const referrerRouter = router({
 
       try {
         const referrer = await db.execute(
-          sql`SELECT * FROM referrers WHERE uniqueCode = ${input.uniqueCode} AND agencyId = ${ctx.agencyId}`
+          sql`SELECT * FROM referrers WHERE uniqueCode = ${input.uniqueCode}`
         );
 
         if (!referrer || (referrer as any[]).length === 0) {
@@ -213,7 +213,7 @@ export const referrerRouter = router({
 
     try {
       const result = await db.execute(
-        sql`SELECT id, name, totalEarnings, totalReferrals FROM referrers WHERE agencyId = ${ctx.agencyId} ORDER BY totalEarnings DESC LIMIT 10`
+        sql`SELECT id, name, totalEarnings, totalReferrals FROM referrers ORDER BY totalEarnings DESC LIMIT 10`
       );
       return result || [];
     } catch (error) {

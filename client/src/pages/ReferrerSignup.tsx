@@ -31,6 +31,9 @@ export default function ReferrerSignup() {
   const verifyOtp = trpc.referrer.verifyOtpAndSignup.useMutation({
     onSuccess: (data: any) => {
       setUniqueCode(data.uniqueCode);
+      // Save to localStorage so dashboard can read it
+      localStorage.setItem("referrerCode", data.uniqueCode);
+      localStorage.setItem("referrerEmail", email);
       setStep("success");
       setError("");
     },
@@ -72,18 +75,18 @@ export default function ReferrerSignup() {
             <div className="bg-blue-500/20 border border-blue-500 rounded-lg p-4">
               <p className="text-sm text-gray-300 mb-2">Your Referral Link:</p>
               <p className="text-sm text-blue-300 break-all font-mono">
-                absolarleads-xxxqwsn9.manus.space/referral-landing/{uniqueCode}
+                {window.location.origin}/referral-landing/{uniqueCode}
               </p>
               <Button
                 onClick={() => {
-                  navigator.clipboard.writeText(`absolarleads-xxxqwsn9.manus.space/referral-landing/{uniqueCode}`);
+                  navigator.clipboard.writeText(`${window.location.origin}/referral-landing/${uniqueCode}`);
                 }}
                 className="mt-3 w-full bg-blue-600 hover:bg-blue-700"
               >
                 Copy Link
               </Button>
             </div>
-            <Button onClick={() => (window.location.href = "/referrer/dashboard")} className="w-full bg-orange-600 hover:bg-orange-700">
+            <Button onClick={() => (window.location.href = `/referrer/dashboard?code=${uniqueCode}`)} className="w-full bg-orange-600 hover:bg-orange-700">
               Go to Dashboard
             </Button>
           </div>
