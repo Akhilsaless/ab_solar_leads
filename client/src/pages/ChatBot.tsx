@@ -171,7 +171,7 @@ export default function ChatBot() {
   };
 
   const brandColor = agencyInfo?.color || "#F97316";
-  const agencyName = agencyInfo?.name || "AB SOLAR";
+  const agencyName = agencyInfo?.name || "Sales Squad Agent";
 
   // Initial quick replies shown before first user message
   const initialQuickReplies = messages.length <= 1 && !isLoading ? [
@@ -222,7 +222,7 @@ export default function ChatBot() {
             <Sun className="w-5 h-5 text-white" />
           </div>
           <div className="flex-1 min-w-0">
-            <h1 className="font-bold text-white truncate">{agencyName}</h1>
+            <h1 className="font-bold text-white truncate">Sales Squad Agent</h1>
             <div className="flex items-center gap-1.5">
               <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
               <span className="text-xs text-gray-400">Solar Advisor Online</span>
@@ -249,7 +249,7 @@ export default function ChatBot() {
               <div className="flex justify-center mb-6 animate-fade-in">
                 <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/5 border border-white/10 text-xs text-gray-400">
                   <Sun className="w-3.5 h-3.5" style={{ color: brandColor }} />
-                  <span>Powered by AB SOLAR AI</span>
+                  <span>Powered by Sales Squad Agent</span>
                 </div>
               </div>
             )}
@@ -392,13 +392,137 @@ export default function ChatBot() {
             <div className="mb-3 flex gap-2">
               <Button
                 onClick={() => {
-                  const chatContent = messages.map(m => `${m.role}: ${m.content}`).join('\n\n');
-                  const html = `<!DOCTYPE html><html><head><title>AB SOLAR Estimate</title><style>body{font-family:Arial,sans-serif;max-width:800px;margin:40px auto;color:#333;background:#f5f5f5}h1{color:#F97316}.estimate{background:white;padding:20px;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.1)}.section{margin:20px 0}.label{font-weight:bold;color:#555}.value{color:#333;margin-left:10px}</style></head><body><div class="estimate"><h1>AB SOLAR Personalized Estimate</h1><div class="section"><p>This is your personalized solar energy estimate based on the information you provided.</p></div><div class="section"><h2>Chat Summary</h2><pre>${chatContent}</pre></div><p style="font-size:12px;color:#999;margin-top:30px">This estimate is approximate. Actual costs and savings may vary. Contact us for a detailed site survey.</p></div></body></html>`;
+                  // Extract conversation data for estimate
+                  const lastBotMsg = messages.filter(m => m.role === 'bot').pop();
+                  const metadata = lastBotMsg?.metadata || {};
+                  
+                  // Get values from metadata or conversation
+                  const systemSize = metadata.systemSizeKw || '5';
+                  const estimatedCost = metadata.estimatedCost || 'Upon Request';
+                  const monthlyBill = metadata.monthlyBill || 'N/A';
+                  const monthlySavings = metadata.estimatedSavingsMonthly || 'Calculated';
+                  const paybackPeriod = metadata.paybackYears || 'Calculated';
+                  const savings25Year = metadata.estimatedSavings25Year || 'Calculated';
+                  const subsidy = metadata.subsidyAmount || 'Calculated';
+                  const netCost = metadata.netCost || 'Calculated';
+                  const customerName = metadata.customerName || 'Valued Customer';
+                  const customerCity = metadata.customerCity || 'Your City';
+                  const customerState = metadata.customerState || 'Your State';
+                  
+                  const html = `<!DOCTYPE html>
+<html>
+<head>
+  <title>Solar Estimate - Sales Squad</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f8f9fa; color: #333; }
+    .container { max-width: 900px; margin: 0 auto; background: white; }
+    .header { background: linear-gradient(135deg, #F97316 0%, #EA580C 100%); color: white; padding: 40px 30px; text-align: center; }
+    .header h1 { font-size: 32px; margin-bottom: 5px; }
+    .header p { font-size: 14px; opacity: 0.9; }
+    .customer-info { background: #f8f9fa; padding: 20px 30px; border-bottom: 1px solid #e9ecef; }
+    .customer-info p { margin: 5px 0; font-size: 14px; }
+    .section { padding: 30px; border-bottom: 1px solid #e9ecef; }
+    .section h2 { color: #F97316; font-size: 20px; margin-bottom: 20px; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; }
+    .card { background: #f8f9fa; padding: 15px; border-radius: 8px; border-left: 4px solid #F97316; }
+    .card-label { font-size: 12px; color: #666; text-transform: uppercase; margin-bottom: 5px; }
+    .card-value { font-size: 24px; font-weight: bold; color: #F97316; }
+    .card-unit { font-size: 12px; color: #999; margin-top: 3px; }
+    .highlight { background: #fff3e0; padding: 15px; border-radius: 8px; margin: 15px 0; border-left: 4px solid #F97316; }
+    .highlight p { margin: 8px 0; font-size: 14px; }
+    .benefits { list-style: none; }
+    .benefits li { padding: 8px 0; padding-left: 25px; position: relative; font-size: 14px; }
+    .benefits li:before { content: '✓'; position: absolute; left: 0; color: #F97316; font-weight: bold; }
+    .footer { background: #f8f9fa; padding: 20px 30px; text-align: center; font-size: 12px; color: #666; }
+    .footer p { margin: 5px 0; }
+    .chart-placeholder { background: #f0f0f0; height: 200px; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #999; margin: 15px 0; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <h1>☀️ Solar Estimate</h1>
+      <p>Powered by Sales Squad Agent</p>
+    </div>
+    
+    <!-- Customer Info -->
+    <div class="customer-info">
+      <p><strong>Customer:</strong> ${customerName}</p>
+      <p><strong>Location:</strong> ${customerCity}, ${customerState}</p>
+      <p><strong>Current Monthly Bill:</strong> ₹${monthlyBill}</p>
+    </div>
+    
+    <!-- System Recommendation -->
+    <div class="section">
+      <h2>System Recommendation</h2>
+      <div class="grid">
+        <div class="card">
+          <div class="card-label">System Size</div>
+          <div class="card-value">Approx ${systemSize}</div>
+          <div class="card-unit">kW</div>
+        </div>
+        <div class="card">
+          <div class="card-label">Estimated Cost</div>
+          <div class="card-value">Approx ₹${estimatedCost}</div>
+          <div class="card-unit">Before Subsidy</div>
+        </div>
+      </div>
+      <div class="highlight">
+        <p><strong>Government Subsidy:</strong> Approx ₹${subsidy}</p>
+        <p><strong>Net Cost After Subsidy:</strong> Approx ₹${netCost}</p>
+      </div>
+    </div>
+    
+    <!-- Financial Benefits -->
+    <div class="section">
+      <h2>Financial Benefits</h2>
+      <div class="grid">
+        <div class="card">
+          <div class="card-label">Monthly Savings</div>
+          <div class="card-value">Approx ₹${monthlySavings}</div>
+          <div class="card-unit">Per Month</div>
+        </div>
+        <div class="card">
+          <div class="card-label">Payback Period</div>
+          <div class="card-value">Approx ${paybackPeriod}</div>
+          <div class="card-unit">Years</div>
+        </div>
+      </div>
+      <div class="highlight">
+        <p><strong>25-Year Total Savings:</strong> Approx ₹${savings25Year}</p>
+        <p style="font-size: 12px; margin-top: 10px; color: #666;">Based on current electricity rates with 1.3% annual increase</p>
+      </div>
+    </div>
+    
+    <!-- Why Solar -->
+    <div class="section">
+      <h2>Why Go Solar?</h2>
+      <ul class="benefits">
+        <li>Lock in electricity costs for 25 years</li>
+        <li>Reduce your carbon footprint</li>
+        <li>Increase property value</li>
+        <li>Government incentives and subsidies available</li>
+        <li>Minimal maintenance required</li>
+        <li>25-year warranty on panels</li>
+      </ul>
+    </div>
+    
+    <!-- Footer -->
+    <div class="footer">
+      <p><strong>This estimate is approximate.</strong> Actual costs and savings may vary based on site conditions, local rates, and system configuration.</p>
+      <p>For a detailed site survey and accurate quote, please contact us.</p>
+      <p style="margin-top: 15px; font-size: 11px; color: #999;">Generated by Sales Squad Agent | ${new Date().toLocaleDateString('en-IN')}</p>
+    </div>
+  </div>
+</body>
+</html>`;
                   const blob = new Blob([html], { type: 'text/html' });
                   const url = window.URL.createObjectURL(blob);
                   const a = document.createElement('a');
                   a.href = url;
-                  a.download = 'ab-solar-estimate.html';
+                  a.download = `solar-estimate-${new Date().getTime()}.html`;
                   a.click();
                   window.URL.revokeObjectURL(url);
                 }}

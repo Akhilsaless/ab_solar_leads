@@ -429,7 +429,7 @@ export const appRouter = router({
             const leadCity = extractedData.city || conversation.customerCity;
             
             const leadDetailsHtml = `
-              <h2>New Lead Captured - AB SOLAR</h2>
+              <h2>New Lead Captured - Sales Squad</h2>
               <p><strong>Name:</strong> ${leadName}</p>
               <p><strong>Phone:</strong> ${leadPhone}</p>
               <p><strong>Email:</strong> ${leadEmail || 'N/A'}</p>
@@ -466,7 +466,7 @@ export const appRouter = router({
             const customerName = extractedData.name || conversation.customerName || 'Valued Customer';
             
             const estimateHtml = `
-              <h2>Your Solar Estimate - AB SOLAR</h2>
+              <h2>Your Solar Estimate - Sales Squad</h2>
               <p>Dear ${customerName},</p>
               <p>Thank you for using our solar estimate tool. Here's your personalized solar system recommendation:</p>
               <hr />
@@ -488,13 +488,13 @@ export const appRouter = router({
               </ul>
               <hr />
               <p>Our team will contact you within 24 hours to discuss your solar options and provide a detailed quote.</p>
-              <p><strong>Contact:</strong> AB SOLAR | Phone: +91-XXXXXXXXXX</p>
-              <p>Best regards,<br />AB SOLAR Team</p>
+              <p><strong>Contact:</strong> Sales Squad | Phone: +91-XXXXXXXXXX</p>
+              <p>Best regards,<br />Sales Squad Team</p>
             `;
             
             const emailResult = await sendEmail({
               to: customerEmail,
-              subject: 'Your Solar Estimate - AB SOLAR',
+              subject: 'Your Solar Estimate - Sales Squad',
               html: estimateHtml,
             });
             

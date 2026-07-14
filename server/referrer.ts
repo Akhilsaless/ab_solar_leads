@@ -25,7 +25,7 @@ export const referrerRouter = router({
       // Send OTP via email
       const emailResult = await sendEmail({
         to: input.email,
-        subject: "Your AB SOLAR Referral Program OTP",
+        subject: "Your Sales Squad Referral Program OTP",
         html: `<p>Your OTP is: <strong>${otp}</strong></p><p>This OTP will expire in 10 minutes.</p>`,
       });
 
@@ -87,8 +87,8 @@ export const referrerRouter = router({
         try {
           await sendEmail({
             to: email,
-            subject: "Welcome to AB SOLAR Referral Program!",
-            html: `<h2>Welcome, ${name}!</h2><p>Your referral code is: <strong>${uniqueCode}</strong></p><p>Share this code with friends to start earning!</p>`,
+            subject: "Welcome to Sales Squad Referral Program!",
+            html: `<h2>Welcome to Sales Squad Referral Program, ${name}!</h2><p>Your referral code is: <strong>${uniqueCode}</strong></p><p>Share this code with friends to start earning commissions!</p>`,
           });
         } catch (error) {
           console.error("Failed to send welcome email:", error);
@@ -181,7 +181,7 @@ export const referrerRouter = router({
         try {
           await sendEmail({
             to: ref.email,
-            subject: "Withdrawal Request Submitted",
+            subject: "Withdrawal Request Submitted - Sales Squad",
             html: `<p>Your withdrawal request of ₹${input.amount} has been submitted and is pending approval.</p>`,
           });
         } catch (error) {
@@ -240,7 +240,7 @@ export const referrerRouter = router({
             const w = (withdrawal as any[])[0];
             await sendEmail({
               to: w.email,
-              subject: "Withdrawal Approved!",
+              subject: "Withdrawal Approved! - Sales Squad",
               html: `<p>Your withdrawal of ₹${w.amount} has been approved and will be processed within 24 hours.</p>`,
             });
           }
@@ -269,7 +269,7 @@ export const referrerRouter = router({
             const w = (withdrawal as any[])[0];
             await sendEmail({
               to: w.email,
-              subject: "Withdrawal Request Rejected",
+              subject: "Withdrawal Request Rejected - Sales Squad",
               html: `<p>Your withdrawal request of ₹${w.amount} has been rejected.</p><p>Reason: ${input.reason || "No reason provided"}</p>`,
             });
           }

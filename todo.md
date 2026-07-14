@@ -102,3 +102,12 @@
 - [x] Populate estimate emails with real conversation data (not placeholders)
 - [x] Add emailSent flag to prevent duplicate sends
 - [x] End-to-end test: OTP → signup → lead capture → owner email → customer email
+
+
+## Branding & Estimate Redesign (Current Session)
+- [x] Rebrand chatbot from "AB SOLAR" to "Sales Squad Agent"
+- [x] Create professional HTML estimate generator with financial breakdown
+- [x] Add ROI visualization and financial breakdown to estimate
+- [x] Include approx prices and system recommendations in estimate
+- [x] Remove chat history from estimate download
+- [x] Test end-to-end estimate download flow
