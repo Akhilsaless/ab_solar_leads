@@ -517,18 +517,8 @@ export default function ChatBot() {
                 onClick={() => {
                   if (navigator.geolocation) {
                     setIsLoading(true);
-                    let timeoutId: NodeJS.Timeout | null = null;
-                    
-                    // Set 5-second timeout for geolocation
-                    timeoutId = setTimeout(() => {
-                      setIsLoading(false);
-                      setShowMapPin(true);
-                      console.warn('[Location] Geolocation timeout - falling back to manual pin drop');
-                    }, 5000);
-                    
                     navigator.geolocation.getCurrentPosition(
                       (pos) => {
-                        if (timeoutId) clearTimeout(timeoutId);
                         const { latitude: lat, longitude: lng } = pos.coords;
                         const geocoder = new google.maps.Geocoder();
                         geocoder.geocode({ location: { lat, lng } }, (results, status) => {
@@ -538,12 +528,7 @@ export default function ChatBot() {
                           handleSend(`My location: ${address} (${lat.toFixed(5)}, ${lng.toFixed(5)})`);
                         });
                       },
-                      (error) => {
-                        if (timeoutId) clearTimeout(timeoutId);
-                        console.warn('[Location] Geolocation error:', error.message);
-                        setIsLoading(false);
-                        setShowMapPin(true); // fallback to map pin
-                      }
+                      () => { setIsLoading(false); setShowMapPin(true); } // fallback to map pin
                     );
                   } else {
                     setShowMapPin(true);
@@ -602,22 +587,11 @@ export default function ChatBot() {
               <MapView
                 onMapReady={(map) => {
                   setMapInstance(map);
-                  // Try to center on user's location (with 3-second timeout)
+                  // Try to center on user's location
                   if (navigator.geolocation) {
-                    let timeoutId: NodeJS.Timeout | null = null;
-                    timeoutId = setTimeout(() => {
-                      map.setCenter({ lat: 20.5937, lng: 78.9629 }); // India center fallback
-                    }, 3000);
-                    
                     navigator.geolocation.getCurrentPosition(
-                      (pos) => {
-                        if (timeoutId) clearTimeout(timeoutId);
-                        map.setCenter({ lat: pos.coords.latitude, lng: pos.coords.longitude });
-                      },
-                      () => {
-                        if (timeoutId) clearTimeout(timeoutId);
-                        map.setCenter({ lat: 20.5937, lng: 78.9629 }); // India center
-                      }
+                      (pos) => map.setCenter({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+                      () => map.setCenter({ lat: 20.5937, lng: 78.9629 }) // India center
                     );
                   }
                   // Click to drop pin
