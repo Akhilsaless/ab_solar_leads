@@ -77,6 +77,7 @@ export default function ChatBot() {
           content: data.response,
           quickReplies: data.quickReplies || [],
           createdAt: new Date(),
+          metadata: data.estimate || {},
         },
       ]);
       setIsLoading(false);
@@ -396,18 +397,18 @@ export default function ChatBot() {
                   const lastBotMsg = messages.filter(m => m.role === 'bot').pop();
                   const metadata = lastBotMsg?.metadata || {};
                   
-                  // Get values from metadata or conversation
-                  const systemSize = metadata.systemSizeKw || '5';
-                  const estimatedCost = metadata.estimatedCost || 'Upon Request';
-                  const monthlyBill = metadata.monthlyBill || 'N/A';
-                  const monthlySavings = metadata.estimatedSavingsMonthly || 'Calculated';
-                  const paybackPeriod = metadata.paybackYears || 'Calculated';
-                  const savings25Year = metadata.estimatedSavings25Year || 'Calculated';
-                  const subsidy = metadata.subsidyAmount || 'Calculated';
-                  const netCost = metadata.netCost || 'Calculated';
-                  const customerName = metadata.customerName || 'Valued Customer';
-                  const customerCity = metadata.customerCity || 'Your City';
-                  const customerState = metadata.customerState || 'Your State';
+                  // Use real data from metadata
+                  const systemSize = metadata.systemSizeKw ? `${metadata.systemSizeKw}` : '';
+                  const estimatedCost = metadata.estimatedCost ? `${metadata.estimatedCost}` : '';
+                  const monthlyBill = metadata.monthlyBill ? `${metadata.monthlyBill}` : '';
+                  const monthlySavings = metadata.estimatedSavingsMonthly ? `${metadata.estimatedSavingsMonthly}` : '';
+                  const paybackPeriod = metadata.paybackYears ? `${metadata.paybackYears}` : '';
+                  const savings25Year = metadata.estimatedSavings25Year ? `${metadata.estimatedSavings25Year}` : '';
+                  const subsidy = metadata.subsidyAmount ? `${metadata.subsidyAmount}` : '';
+                  const netCost = metadata.netCost ? `${metadata.netCost}` : '';
+                  const customerName = metadata.customerName ? `${metadata.customerName}` : '';
+                  const customerCity = metadata.customerCity ? `${metadata.customerCity}` : '';
+                  const customerState = metadata.customerState ? `${metadata.customerState}` : '';
                   
                   const html = `<!DOCTYPE html>
 <html>

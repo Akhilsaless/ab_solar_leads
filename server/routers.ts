@@ -522,7 +522,29 @@ export const appRouter = router({
           cleanContent = aiContent.replace(qrRegex, '').trim();
         }
 
-        return { response: cleanContent, quickReplies };
+        // Get updated conversation with all estimate data
+        const updatedConv = await db.getConversation(input.sessionId);
+        
+        return { 
+          response: cleanContent, 
+          quickReplies,
+          estimate: updatedConv ? {
+            customerName: updatedConv.customerName,
+            customerEmail: updatedConv.customerEmail,
+            customerPhone: updatedConv.customerPhone,
+            customerCity: updatedConv.customerCity,
+            customerState: updatedConv.customerState,
+            monthlyBill: updatedConv.monthlyBill,
+            systemSizeKw: updatedConv.recommendedKw,
+            panelCount: updatedConv.recommendedPanels,
+            estimatedCost: updatedConv.estimatedCost,
+            subsidyAmount: updatedConv.subsidyAmount,
+            netCost: updatedConv.netCost,
+            estimatedSavingsMonthly: updatedConv.estimatedSavingsMonthly,
+            paybackYears: updatedConv.paybackYears,
+            estimatedSavings25Year: updatedConv.estimatedSavings25Year,
+          } : null,
+        };
       }),
 
     // Get conversation history
