@@ -192,6 +192,45 @@ export default function ReferrerDashboard() {
           </div>
         </Card>
 
+        {/* My Referrals */}
+        {referrals && referrals.length > 0 && (
+          <Card className="bg-white/10 border-white/20 p-6">
+            <h2 className="text-xl font-bold text-white mb-4">My Referrals ({referrals.length})</h2>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-white/20">
+                    <th className="text-left py-2 px-3 text-gray-300">Customer</th>
+                    <th className="text-left py-2 px-3 text-gray-300">Email</th>
+                    <th className="text-left py-2 px-3 text-gray-300">System Size</th>
+                    <th className="text-left py-2 px-3 text-gray-300">Status</th>
+                    <th className="text-right py-2 px-3 text-gray-300">Earnings</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {referrals.map((ref: any) => (
+                    <tr key={ref.id} className="border-b border-white/10 hover:bg-white/5">
+                      <td className="py-3 px-3 text-white">{ref.customerName || 'N/A'}</td>
+                      <td className="py-3 px-3 text-gray-300">{ref.customerEmail || 'N/A'}</td>
+                      <td className="py-3 px-3 text-gray-300">{ref.systemSize || 'N/A'} kW</td>
+                      <td className="py-3 px-3">
+                        <span className={`px-2 py-1 rounded text-xs font-semibold ${
+                          ref.status === 'installed' ? 'bg-green-500/20 text-green-300' :
+                          ref.status === 'pending' ? 'bg-yellow-500/20 text-yellow-300' :
+                          'bg-gray-500/20 text-gray-300'
+                        }`}>
+                          {ref.status || 'pending'}
+                        </span>
+                      </td>
+                      <td className="py-3 px-3 text-right text-orange-400 font-bold">₹{ref.commissionAmount || 0}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+        )}
+
         {/* Leaderboard */}
         <Card className="bg-white/10 border-white/20 p-6">
           <h2 className="text-xl font-bold text-white mb-4">Top Referrers</h2>
