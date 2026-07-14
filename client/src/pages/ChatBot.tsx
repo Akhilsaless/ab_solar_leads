@@ -7,8 +7,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Send, Loader2, Sun, Zap, ArrowDown } from "lucide-react";
 import { Streamdown } from "streamdown";
 import { nanoid } from "nanoid";
-import { ROICalculator } from "@/components/ROICalculator";
-import { RoofVisualization } from "@/components/RoofVisualization";
+// ROI and 3D visualization removed - using simple text display
 
 type ChatMessage = {
   role: "bot" | "customer";
@@ -284,32 +283,7 @@ export default function ChatBot() {
                   </div>
                 </div>
 
-                {msg.role === "bot" && msg.metadata?.showROI && (
-                  <div className="ml-11 mt-4 max-w-[85%] md:max-w-[75%]">
-                    <ROICalculator
-                      monthlyBill={msg.metadata.monthlyBill || 0}
-                      systemSizeKw={msg.metadata.systemSizeKw || 0}
-                      totalCost={msg.metadata.totalCost || 0}
-                      subsidyAmount={msg.metadata.subsidyAmount || 0}
-                      netCost={msg.metadata.netCost || 0}
-                      monthlyElectricitySavings={msg.metadata.monthlyElectricitySavings || 0}
-                      paybackYears={msg.metadata.paybackYears || 0}
-                      futureElectricityRate={msg.metadata.futureElectricityRate}
-                      currentRate={msg.metadata.currentRate}
-                      rateIncreasePercentage={msg.metadata.rateIncreasePercentage}
-                    />
-                  </div>
-                )}
-
-                {msg.role === "bot" && msg.metadata?.show3D && (
-                  <div className="ml-11 mt-4 max-w-[85%] md:max-w-[75%]">
-                    <RoofVisualization
-                      panelCount={msg.metadata.panelCount || 0}
-                      systemSizeKw={msg.metadata.systemSizeKw || 0}
-                      panelType={msg.metadata.panelType || "monocrystalline"}
-                    />
-                  </div>
-                )}
+                {/* ROI and 3D visualization removed - using text-based estimates instead */}
 
                 {/* Quick reply buttons - shown below the last bot message only */}
                 {msg.role === "bot" && i === lastBotMsgIndex && msg.quickReplies && msg.quickReplies.length > 0 && !isLoading && (
