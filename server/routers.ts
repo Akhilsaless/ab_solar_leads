@@ -533,16 +533,23 @@ export const appRouter = router({
         // Get updated conversation with all estimate data
         const updatedConv = await db.getConversation(input.sessionId);
         
-        // Detect conversation stage for frontend auto-sequencing
-        const lowerContent = cleanContent.toLowerCase();
+        // Detect conversation stage deterministically using bot message count
+        // Count bot messages in history (before this response) to determine stage
+        const botMsgCount = history.filter(m => m.role === 'bot').length;
+        // botMsgCount 0 = greeting (ask_name), 1 = pitch_a, 2 = pitch_b, 3 = pitch_c/ask_bill
+        // After that, use content cues as fallback
         let stage = 'general';
-        if (lowerContent.includes('may i know your name') || lowerContent.includes('your name?')) stage = 'ask_name';
-        else if (lowerContent.includes('electricity bills in india are rising') || lowerContent.includes('cut that by 80')) stage = 'pitch_a';
-        else if (lowerContent.includes('pm surya ghar') && lowerContent.includes('subsidy')) stage = 'pitch_b';
-        else if (lowerContent.includes('recover their investment') || lowerContent.includes('money-making asset')) stage = 'pitch_c';
-        else if (lowerContent.includes('monthly electricity bill') && lowerContent.includes('skip')) stage = 'ask_bill';
-        else if (lowerContent.includes('personalised solar estimate') || lowerContent.includes('download it as a pdf')) stage = 'show_estimate';
-        else if (lowerContent.includes('free site visit') && lowerContent.includes('book')) stage = 'ask_site_visit';
+        if (botMsgCount === 0) stage = 'ask_name';
+        else if (botMsgCount === 1) stage = 'pitch_a';
+        else if (botMsgCount === 2) stage = 'pitch_b';
+        else if (botMsgCount === 3) stage = 'pitch_c';
+        else if (botMsgCount === 4) stage = 'ask_bill';
+        else {
+          // Fallback content-based detection for later stages
+          const lowerContent = cleanContent.toLowerCase();
+          if (lowerContent.includes('personalised solar estimate') || lowerContent.includes('download it as a pdf')) stage = 'show_estimate';
+          else if (lowerContent.includes('free site visit') && lowerContent.includes('book')) stage = 'ask_site_visit';
+        }
 
         return { 
           response: cleanContent, 

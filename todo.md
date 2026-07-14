@@ -170,12 +170,12 @@
 - [x] ReferralLanding: Change "AB SOLAR" to "Sales Squad" in hero text
 
 ## Chatbot & Referral Fixes (Current Session)
-- [ ] Chatbot: Auto-send all 3 pitch messages in sequence (no waiting for reply between them)
-- [ ] Chatbot: GPS auto-detect location on "Share Location" tap (browser geolocation API)
-- [ ] Chatbot: Estimate displayed in clear separate sections (numbers, savings, why solar, next step)
-- [ ] Chatbot: Goodbye message after PDF download "Our agents will get in touch ASAP"
-- [ ] Verify: Lead email sent correctly after chat ends
-- [ ] ReferralLanding: Remove fake/placeholder names from Recent Payouts section
-- [ ] ReferrerSignup: Add "Get instant ₹50 after signup" incentive copy
-- [ ] ReferrerSignup: Add "Withdrawable after 1 successful referral" note
-- [ ] ReferrerSignup: Add T&C reminder with link before signup button
+- [x] Chatbot: Auto-send all 3 pitch messages in sequence (no waiting for reply between them)
+- [x] Chatbot: GPS auto-detect location on "Share Location" tap (browser geolocation API)
+- [x] Chatbot: Estimate displayed in clear separate sections (numbers, savings, why solar, next step)
+- [x] Chatbot: Goodbye message after PDF download "Our agents will get in touch ASAP"
+- [x] Verify: Lead email sent correctly after chat ends (confirmed via network logs)
+- [x] ReferralLanding: Remove fake/placeholder names from Recent Payouts section
+- [x] ReferrerSignup: Add "Get instant ₹50 after signup" incentive copy
+- [x] ReferrerSignup: Add "Withdrawable after 1 successful referral" note
+- [x] ReferrerSignup: Add T&C reminder with link before signup button
