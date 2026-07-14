@@ -8,6 +8,9 @@ import { sql } from "drizzle-orm";
 
 const otpStore = new Map<string, { otp: string; expiresAt: number; data: any }>();
 
+// For testing: store OTPs temporarily (remove in production)
+const testOtpMap = new Map<string, string>();
+
 export const referrerRouter = router({
   sendOtp: publicProcedure
     .input(z.object({ name: z.string(), phone: z.string(), email: z.string().email() }))
@@ -26,9 +29,9 @@ export const referrerRouter = router({
         html: `<p>Your OTP is: <strong>${otp}</strong></p><p>This OTP will expire in 10 minutes.</p>`,
       });
 
-      // Return OTP for display (email sent in background)
-      console.log(`[OTP] Generated for ${input.phone}: ${otp}`);
-      return { success: true, message: "OTP sent to " + input.email, testOtp: otp };
+      // Return success message (OTP sent via email)
+      console.log(`[OTP] Generated for ${input.phone}`);
+      return { success: true, message: "OTP sent to " + input.email };
     }),
 
   verifyOtpAndSignup: publicProcedure

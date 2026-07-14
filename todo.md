@@ -88,3 +88,17 @@
 - [x] Buttons disappear after customer responds
 - [x] Initial quick replies for first-time visitors
 - [x] Mobile-friendly tappable design
+
+
+## Email System Fixes (Current Session)
+- [x] Verify Titan SMTP configuration and test connectivity
+- [x] Implement lead capture email to akhil@salessquadtech.com
+- [x] Implement customer estimate email delivery
+- [x] Test complete email flow end-to-end
+- [x] Remove OTP display from signup (production mode)
+
+## Email System Production Hardening
+- [x] Add SMTP health verification (transporter.verify) and log result
+- [x] Populate estimate emails with real conversation data (not placeholders)
+- [x] Add emailSent flag to prevent duplicate sends
+- [x] End-to-end test: OTP → signup → lead capture → owner email → customer email

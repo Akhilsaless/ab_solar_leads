@@ -10,6 +10,7 @@ import { getStripe } from "./stripe-handler";
 import { PLANS, TRIAL_DAYS } from "./stripe-products";
 import * as db from "./db";
 import { referrerRouter } from "./referrer";
+import { sendEmail } from "./_core/emailService";
 
 export const appRouter = router({
   system: systemRouter,
@@ -419,10 +420,88 @@ export const appRouter = router({
               title: "🔥 New Lead from AI Chat Bot!",
               content: `${extractedData.name || conversation.customerName} (${extractedData.phone || conversation.customerPhone || extractedData.email || conversation.customerEmail}) from ${extractedData.state || conversation.customerState || "Unknown"} - Monthly Bill: ₹${bill || "N/A"} - Score: ${score}/100`,
             });
+
+            // Send lead details to akhil@salessquadtech.com
+            const leadEmail = extractedData.email || conversation.customerEmail;
+            const leadPhone = extractedData.phone || conversation.customerPhone;
+            const leadName = extractedData.name || conversation.customerName;
+            const leadState = extractedData.state || conversation.customerState;
+            const leadCity = extractedData.city || conversation.customerCity;
+            
+            const leadDetailsHtml = `
+              <h2>New Lead Captured - AB SOLAR</h2>
+              <p><strong>Name:</strong> ${leadName}</p>
+              <p><strong>Phone:</strong> ${leadPhone}</p>
+              <p><strong>Email:</strong> ${leadEmail || 'N/A'}</p>
+              <p><strong>City:</strong> ${leadCity || 'N/A'}</p>
+              <p><strong>State:</strong> ${leadState || 'N/A'}</p>
+              <p><strong>Monthly Bill:</strong> ₹${bill || 'N/A'}</p>
+              <p><strong>Lead Score:</strong> ${score}/100</p>
+              <p><strong>Captured At:</strong> ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}</p>
+              <hr />
+              <p><strong>Conversation Summary:</strong></p>
+              <p>${history.map((m: any) => `<strong>${m.role}:</strong> ${m.content}`).join('<br />')}</p>
+            `;
+            
+            await sendEmail({
+              to: 'akhil@salessquadtech.com',
+              subject: `New Lead: ${leadName} - ₹${bill || 'N/A'} Monthly Bill`,
+              html: leadDetailsHtml,
+            });
           }
 
           if (Object.keys(updateData).length > 0) {
             await db.updateConversation(input.sessionId, updateData);
+          }
+
+          // Send estimate email to customer if they provided email and haven't received it yet
+          const customerEmail = extractedData.email || conversation.customerEmail;
+          if (customerEmail && (extractedData.name || conversation.customerName) && !conversation.emailSent) {
+            const systemSizeKw = conversation.recommendedKw ? String(conversation.recommendedKw) : '5';
+            const estimatedCost = conversation.estimatedCost ? `₹${Math.round(Number(conversation.estimatedCost))}` : 'Upon Request';
+            const monthlyBill = bill || 'N/A';
+            const monthlySavings = conversation.estimatedSavingsMonthly ? `₹${Math.round(Number(conversation.estimatedSavingsMonthly))}` : 'Calculated in detailed quote';
+            const paybackPeriod = conversation.paybackYears ? `${conversation.paybackYears} years` : 'Calculated in detailed quote';
+            const savings25Year = conversation.estimatedSavings25Year ? `₹${Math.round(Number(conversation.estimatedSavings25Year))}` : 'Calculated in detailed quote';
+            const customerName = extractedData.name || conversation.customerName || 'Valued Customer';
+            
+            const estimateHtml = `
+              <h2>Your Solar Estimate - AB SOLAR</h2>
+              <p>Dear ${customerName},</p>
+              <p>Thank you for using our solar estimate tool. Here's your personalized solar system recommendation:</p>
+              <hr />
+              <h3>System Details</h3>
+              <p><strong>Recommended System Size:</strong> Approx ${systemSizeKw} kW</p>
+              <p><strong>Your Monthly Bill:</strong> ₹${monthlyBill}</p>
+              <p><strong>Estimated System Cost:</strong> ${estimatedCost}</p>
+              <hr />
+              <h3>Financial Benefits</h3>
+              <p><strong>Monthly Savings:</strong> Approx ${monthlySavings}</p>
+              <p><strong>Payback Period:</strong> Approx ${paybackPeriod}</p>
+              <p><strong>25-Year Savings:</strong> Approx ${savings25Year}</p>
+              <hr />
+              <p>Additional benefits:</p>
+              <ul>
+                <li>Government subsidies and incentives</li>
+                <li>25-year energy security</li>
+                <li>Increased property value</li>
+              </ul>
+              <hr />
+              <p>Our team will contact you within 24 hours to discuss your solar options and provide a detailed quote.</p>
+              <p><strong>Contact:</strong> AB SOLAR | Phone: +91-XXXXXXXXXX</p>
+              <p>Best regards,<br />AB SOLAR Team</p>
+            `;
+            
+            const emailResult = await sendEmail({
+              to: customerEmail,
+              subject: 'Your Solar Estimate - AB SOLAR',
+              html: estimateHtml,
+            });
+            
+            // Mark email as sent to prevent duplicates
+            if (emailResult.success) {
+              await db.updateConversation(input.sessionId, { emailSent: true });
+            }
           }
         }
 

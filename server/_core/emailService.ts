@@ -2,6 +2,29 @@ import nodemailer from "nodemailer";
 
 let transporter: any = null;
 
+let smtpVerified: boolean | null = null;
+
+async function verifySmtp() {
+  if (smtpVerified !== null) return smtpVerified;
+  
+  try {
+    const transporter = getTransporter();
+    if (!transporter) {
+      smtpVerified = false;
+      return false;
+    }
+    
+    await transporter.verify();
+    console.log("[Email] SMTP connection verified successfully");
+    smtpVerified = true;
+    return true;
+  } catch (error) {
+    console.error("[Email] SMTP verification failed:", error);
+    smtpVerified = false;
+    return false;
+  }
+}
+
 function getTransporter() {
   if (!transporter) {
     // Use environment variables for email configuration
@@ -27,6 +50,10 @@ function getTransporter() {
   }
 
   return transporter;
+}
+
+export async function initializeEmailService() {
+  return await verifySmtp();
 }
 
 export async function sendEmail({
@@ -55,10 +82,10 @@ export async function sendEmail({
       text: text || html?.replace(/<[^>]*>/g, ""),
     });
 
-    console.log(`[Email] Sent to ${to}: ${subject}`);
+    console.log(`[Email] ✓ Sent to ${to}: ${subject}`);
     return { success: true, messageId: result.messageId };
   } catch (error) {
-    console.error(`[Email] Failed to send email to ${to}:`, error);
+    console.error(`[Email] ✗ Failed to send email to ${to}:`, error);
     return { success: false, error };
   }
 }

@@ -7,6 +7,7 @@ import { registerOAuthRoutes } from "./oauth";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
+import { initializeEmailService } from "./emailService";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -60,8 +61,20 @@ async function startServer() {
     console.log(`Port ${preferredPort} is busy, using port ${port} instead`);
   }
 
-  server.listen(port, () => {
+  server.listen(port, async () => {
     console.log(`Server running on http://localhost:${port}/`);
+    
+    // Initialize email service and verify SMTP connection
+    try {
+      const emailReady = await initializeEmailService();
+      if (emailReady) {
+        console.log("[Email] Service initialized and ready");
+      } else {
+        console.warn("[Email] Service initialized but SMTP verification failed - emails may not send");
+      }
+    } catch (error) {
+      console.error("[Email] Failed to initialize email service:", error);
+    }
   });
 }
 
