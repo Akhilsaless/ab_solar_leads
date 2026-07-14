@@ -9,9 +9,11 @@ import { makeRequest, PlacesSearchResult, PlaceDetailsResult } from "./_core/map
 import { getStripe } from "./stripe-handler";
 import { PLANS, TRIAL_DAYS } from "./stripe-products";
 import * as db from "./db";
+import { referrerRouter } from "./referrer";
 
 export const appRouter = router({
   system: systemRouter,
+  referrer: referrerRouter,
   auth: router({
     me: publicProcedure.query(opts => opts.ctx.user),
     logout: publicProcedure.mutation(({ ctx }) => {

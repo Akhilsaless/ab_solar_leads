@@ -12,6 +12,8 @@ import Settings from "@/pages/Settings";
 import ChatBot from "@/pages/ChatBot";
 import BusinessScraper from "@/pages/BusinessScraper";
 import Pricing from "@/pages/Pricing";
+import ReferrerSignup from "@/pages/ReferrerSignup";
+import ReferrerDashboard from "@/pages/ReferrerDashboard";
 import DashboardLayout from "@/components/DashboardLayout";
 import { Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
@@ -45,6 +47,10 @@ function Router() {
     <Switch>
       {/* Public chat route - accessible without login */}
       <Route path="/chat/:slug" component={ChatBot} />
+
+      {/* Referrer signup and dashboard */}
+      <Route path="/referrer-signup" component={ReferrerSignup} />
+      <Route path="/referrer/dashboard" component={ReferrerDashboard} />
 
       {/* Public pricing page */}
       <Route path="/pricing" component={Pricing} />
