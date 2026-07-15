@@ -1,5 +1,5 @@
 /**
- * AB SOLAR Subscription Plans
+ * Sales Squad Subscription Plans
  * Prices in INR (Indian Rupees)
  */
 

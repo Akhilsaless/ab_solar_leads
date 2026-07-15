@@ -293,7 +293,7 @@ export default function ReferrerDashboard() {
               {[
                 { icon: "1️⃣", title: "Share your link", desc: "Send to friends, family & neighbors", earn: "" },
                 { icon: "2️⃣", title: "They apply for govt subsidy", desc: "Customer completes site visit & applies for subsidy", earn: "₹500" },
-                { icon: "3️⃣", title: "Solar is installed", desc: "Installation confirmed by AB SOLAR", earn: "₹1,500" },
+                { icon: "3️⃣", title: "Solar is installed", desc: "Installation confirmed by Sales Squad", earn: "₹1,500" },
                 { icon: "🎯", title: "Complete daily tasks", desc: "Hit milestones for extra bonuses per referral", earn: "₹100–₹500+" },
               ].map((step, i) => (
                 <div key={i} style={{ display: "flex", gap: 12, alignItems: "flex-start", marginBottom: i < 3 ? 14 : 0 }}>

@@ -43,7 +43,7 @@ export default function VerifyReferral() {
             <div style={{ fontSize: 64, marginBottom: 16 }}>✅</div>
             <h2 style={{ color: "#22c55e", margin: "0 0 12px", fontSize: 22 }}>Referral Confirmed!</h2>
             <p style={{ color: "#94a3b8", margin: "0 0 20px", fontSize: 15 }}>
-              Thank you! You've confirmed that <strong style={{ color: "#fff" }}>{referrerName}</strong> referred you to AB SOLAR.
+              Thank you! You've confirmed that <strong style={{ color: "#fff" }}>{referrerName}</strong> referred you to Sales Squad.
             </p>
             <div style={{ background: "rgba(34,197,94,0.1)", border: "1px solid #22c55e", borderRadius: 10, padding: "14px 18px", marginBottom: 24 }}>
               <p style={{ margin: 0, color: "#86efac", fontSize: 14 }}>

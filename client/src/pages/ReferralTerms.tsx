@@ -11,13 +11,13 @@ export default function ReferralTerms() {
           <p style={{ margin: "0 0 32px", color: "#64748b", fontSize: 14 }}>Sales Squad Referral Program — Effective from the date of signup</p>
 
           <Section title="1. Program Overview">
-            The Sales Squad Referral Program allows registered referrers to earn commissions by referring customers who complete a solar installation through AB SOLAR. By joining this program, you agree to all terms listed below.
+            The Sales Squad Referral Program allows registered referrers to earn commissions by referring customers who complete a solar installation through Sales Squad. By joining this program, you agree to all terms listed below.
           </Section>
 
           <Section title="2. Commission Structure">
             <ul style={{ margin: "8px 0", paddingLeft: 20, color: "#94a3b8", fontSize: 14, lineHeight: 1.8 }}>
               <li><strong style={{ color: "#fff" }}>₹500</strong> — Paid when your referred customer completes a site inspection and applies for the government solar subsidy (PM Surya Ghar or state DISCOM scheme).</li>
-              <li><strong style={{ color: "#fff" }}>₹1,500</strong> — Paid when the solar system is fully installed and confirmed by AB SOLAR.</li>
+              <li><strong style={{ color: "#fff" }}>₹1,500</strong> — Paid when the solar system is fully installed and confirmed by Sales Squad.</li>
               <li><strong style={{ color: "#fff" }}>Daily Task Bonuses</strong> — Additional ₹100–₹500+ per referral based on your current task milestone level.</li>
             </ul>
             <p style={{ color: "#94a3b8", fontSize: 14, marginTop: 8 }}>Commissions are credited to your dashboard balance and can be withdrawn via UPI or bank transfer. All payments are subject to admin approval and verification.</p>
@@ -39,7 +39,7 @@ export default function ReferralTerms() {
           </Section>
 
           <Section title="4. Lead Verification">
-            <p style={{ color: "#94a3b8", fontSize: 14 }}>When a customer is referred through your link, they will receive an automatic verification email asking them to confirm the referral. Commission is only eligible for leads where the customer has confirmed the referral. This protects both you and AB SOLAR from fraudulent claims.</p>
+            <p style={{ color: "#94a3b8", fontSize: 14 }}>When a customer is referred through your link, they will receive an automatic verification email asking them to confirm the referral. Commission is only eligible for leads where the customer has confirmed the referral. This protects both you and Sales Squad from fraudulent claims.</p>
             <p style={{ color: "#94a3b8", fontSize: 14, marginTop: 8 }}>Your <strong style={{ color: "#fff" }}>Lead Quality Score</strong> (visible on your dashboard) reflects the percentage of your leads that have been verified. Accounts with a score below 40% will be suspended.</p>
           </Section>
 
@@ -47,33 +47,33 @@ export default function ReferralTerms() {
             <ul style={{ margin: "8px 0", paddingLeft: 20, color: "#94a3b8", fontSize: 14, lineHeight: 1.8 }}>
               <li>Withdrawals are processed within 2–3 business days of approval.</li>
               <li>Minimum withdrawal amount: ₹500.</li>
-              <li>AB SOLAR reserves the right to withhold payment pending investigation of suspected fraud.</li>
+              <li>Sales Squad reserves the right to withhold payment pending investigation of suspected fraud.</li>
               <li>Payments are made via UPI or bank transfer only. No cash payments.</li>
-              <li>AB SOLAR is not responsible for delays caused by incorrect payment details provided by the referrer.</li>
+              <li>Sales Squad is not responsible for delays caused by incorrect payment details provided by the referrer.</li>
             </ul>
           </Section>
 
           <Section title="6. Account Suspension & Termination">
-            <p style={{ color: "#94a3b8", fontSize: 14 }}>AB SOLAR reserves the right to suspend or permanently terminate any referrer account for the following reasons:</p>
+            <p style={{ color: "#94a3b8", fontSize: 14 }}>Sales Squad reserves the right to suspend or permanently terminate any referrer account for the following reasons:</p>
             <ul style={{ margin: "8px 0", paddingLeft: 20, color: "#94a3b8", fontSize: 14, lineHeight: 1.8 }}>
               <li>Submission of fake, duplicate, or fraudulent leads.</li>
               <li>Lead Quality Score falling below 40%.</li>
               <li>Violation of any terms in this agreement.</li>
-              <li>Any activity that damages the reputation of AB SOLAR or Sales Squad.</li>
+              <li>Any activity that damages the reputation of Sales Squad or Sales Squad.</li>
             </ul>
             <p style={{ color: "#94a3b8", fontSize: 14, marginTop: 8 }}>Upon termination for fraud, all pending and unpaid earnings will be forfeited. Legitimate earned and approved amounts already paid will not be clawed back.</p>
           </Section>
 
           <Section title="7. Dispute Resolution">
-            <p style={{ color: "#94a3b8", fontSize: 14 }}>If you believe a commission has been incorrectly withheld or your account has been suspended in error, you may contact AB SOLAR support with supporting evidence. All disputes will be reviewed within 7 business days. AB SOLAR's decision is final.</p>
+            <p style={{ color: "#94a3b8", fontSize: 14 }}>If you believe a commission has been incorrectly withheld or your account has been suspended in error, you may contact Sales Squad support with supporting evidence. All disputes will be reviewed within 7 business days. Sales Squad's decision is final.</p>
           </Section>
 
           <Section title="8. Program Changes">
-            <p style={{ color: "#94a3b8", fontSize: 14 }}>AB SOLAR reserves the right to modify commission rates, task structures, or program terms at any time with 7 days' notice. Continued participation after notice constitutes acceptance of the new terms.</p>
+            <p style={{ color: "#94a3b8", fontSize: 14 }}>Sales Squad reserves the right to modify commission rates, task structures, or program terms at any time with 7 days' notice. Continued participation after notice constitutes acceptance of the new terms.</p>
           </Section>
 
           <Section title="9. Governing Law">
-            <p style={{ color: "#94a3b8", fontSize: 14 }}>This program is governed by the laws of India. Any disputes shall be subject to the jurisdiction of courts in the state where AB SOLAR is registered.</p>
+            <p style={{ color: "#94a3b8", fontSize: 14 }}>This program is governed by the laws of India. Any disputes shall be subject to the jurisdiction of courts in the state where Sales Squad is registered.</p>
           </Section>
 
           <div style={{ marginTop: 32, padding: "16px 20px", background: "#0a0a0a", borderRadius: 10, border: "1px solid #222" }}>

@@ -130,12 +130,12 @@ export async function recordReferralSignup(referrerId: number, conversationId: n
       const verifyUrl = `${appOrigin}/verify-referral?token=${verificationToken}`;
       sendEmail({
         to: customerData.email,
-        subject: `${referrerName} referred you to AB SOLAR — Please Confirm`,
+        subject: `${referrerName} referred you to Sales Squad — Please Confirm`,
         html: `
           <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 24px; background: #1a1a2e; color: #fff; border-radius: 12px;">
             <h2 style="color: #f97316;">Did ${referrerName} refer you? 🌞</h2>
             <p style="color: #ccc;">Hi ${customerData.name || "there"},</p>
-            <p style="color: #ccc;">${referrerName} referred you to AB SOLAR for a free solar estimate. Please confirm this referral by clicking the button below.</p>
+            <p style="color: #ccc;">${referrerName} referred you to Sales Squad for a free solar estimate. Please confirm this referral by clicking the button below.</p>
             <div style="text-align: center; margin: 24px 0;">
               <a href="${verifyUrl}" 
                  style="background: #f97316; color: #fff; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: bold; font-size: 16px;">

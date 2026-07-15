@@ -107,7 +107,7 @@ export async function sendWhatsAppNotification(
 
   switch (notificationType) {
     case "signup":
-      message = `Welcome to AB SOLAR Referral Program! Your code: ${data.referralCode}. Share to earn ₹500+ per referral!`;
+      message = `Welcome to Sales Squad Referral Program! Your code: ${data.referralCode}. Share to earn ₹500+ per referral!`;
       break;
     case "bonus":
       message = `🎉 Bonus credited! ₹${data.amount} added to your account. Total earnings: ₹${data.totalEarnings}`;

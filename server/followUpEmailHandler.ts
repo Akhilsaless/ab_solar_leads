@@ -11,7 +11,7 @@ import * as db from "./db";
 
 function build24hEmailHtml(conv: any): string {
   const name = conv.customerName || "there";
-  const agencyName = conv.agencyName || "AB Solar";
+  const agencyName = conv.agencyName || "Sales Squad";
   const brandColor = conv.brandColor || "#F97316";
   const agencyEmail = conv.agencyEmail || "";
   const agencyPhone = conv.agencyPhone || "";
@@ -47,7 +47,7 @@ function build24hEmailHtml(conv: any): string {
 
 function build72hEmailHtml(conv: any): string {
   const name = conv.customerName || "there";
-  const agencyName = conv.agencyName || "AB Solar";
+  const agencyName = conv.agencyName || "Sales Squad";
   const brandColor = conv.brandColor || "#F97316";
   const agencyEmail = conv.agencyEmail || "";
   const agencyPhone = conv.agencyPhone || "";
