@@ -5,6 +5,7 @@ import { sql } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import { sendEmail } from "./_core/emailService";
 import { notifyOwner } from "./_core/notification";
+import bcrypt from "bcryptjs";
 
 // In-memory OTP store: email -> { otp, expiresAt, data }
 const otpStore = new Map<string, { otp: string; expiresAt: number; data: { name: string; email: string; acceptedTnC: boolean } }>();
@@ -159,7 +160,37 @@ export const referrerRouter = router({
         `,
       }).catch(console.error);
 
-      return { success: true, uniqueCode };
+      return { success: true, uniqueCode, needsPassword: true };
+    }),
+
+  setPassword: publicProcedure
+    .input(z.object({ email: z.string().email(), password: z.string().min(6) }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new Error("Database not available");
+      const result = await db.execute(sql`SELECT id, uniqueCode FROM referrers WHERE email = ${input.email}`);
+      const ref = firstRow(result);
+      if (!ref) throw new Error("Account not found.");
+      const hash = await bcrypt.hash(input.password, 10);
+      const token = nanoid(32);
+      await db.execute(sql`UPDATE referrers SET passwordHash = ${hash}, sessionToken = ${token} WHERE id = ${ref.id}`);
+      return { success: true, uniqueCode: ref.uniqueCode, token };
+    }),
+
+  loginWithPassword: publicProcedure
+    .input(z.object({ email: z.string().email(), password: z.string() }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new Error("Database not available");
+      const result = await db.execute(sql`SELECT id, uniqueCode, passwordHash FROM referrers WHERE email = ${input.email}`);
+      const ref = firstRow(result);
+      if (!ref) throw new Error("No account found with this email. Please sign up first.");
+      if (!ref.passwordHash) throw new Error("Password not set. Please sign up again to set your password.");
+      const valid = await bcrypt.compare(input.password, ref.passwordHash);
+      if (!valid) throw new Error("Incorrect password. Please try again.");
+      const token = nanoid(32);
+      await db.execute(sql`UPDATE referrers SET sessionToken = ${token} WHERE id = ${ref.id}`);
+      return { success: true, uniqueCode: ref.uniqueCode, token };
     }),
 
   getDashboard: publicProcedure
