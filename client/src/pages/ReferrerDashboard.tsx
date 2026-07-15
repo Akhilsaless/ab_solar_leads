@@ -176,36 +176,29 @@ export default function ReferrerDashboard() {
           </div>
         )}
 
-        {/* ₹50 Welcome Bonus Banner */}
-        {!referrer.signupBonusPaid && (
-          <div style={{ background: "linear-gradient(135deg, rgba(16,185,129,0.15), rgba(16,185,129,0.05))", border: `2px solid ${C.green}`, borderRadius: 12, padding: "14px 18px", marginBottom: 16, display: "flex", justifyContent: "space-between", alignItems: "center", boxShadow: `0 0 24px ${C.greenGlow}` }}>
-            <div>
-              <p style={{ margin: 0, fontWeight: 700, color: C.green, fontSize: 15 }}>🎁 Welcome Bonus Credited!</p>
-              <p style={{ margin: "3px 0 0", fontSize: 12, color: C.subtle }}>₹50 added to your account for joining Sales Squad</p>
-            </div>
-            <span style={{ fontSize: 28, fontWeight: 800, color: C.green }}>+₹50</span>
+        {/* ₹50 Welcome Bonus Banner — always visible */}
+        <div style={{ background: "linear-gradient(135deg, rgba(16,185,129,0.15), rgba(16,185,129,0.05))", border: `2px solid ${C.green}`, borderRadius: 12, padding: "14px 18px", marginBottom: 16, display: "flex", justifyContent: "space-between", alignItems: "center", boxShadow: `0 0 24px ${C.greenGlow}` }}>
+          <div>
+            <p style={{ margin: 0, fontWeight: 700, color: C.green, fontSize: 15 }}>🎁 Welcome Bonus Credited!</p>
+            <p style={{ margin: "3px 0 0", fontSize: 12, color: C.subtle }}>₹50 added to your account for joining Sales Squad</p>
+            <p style={{ margin: "3px 0 0", fontSize: 11, color: C.muted }}>Withdrawable after your 1st successful referral</p>
           </div>
-        )}
-        {referrer.signupBonusPaid && Number(referrer.totalEarnings || 0) <= 50 && (
-          <div style={{ background: "rgba(16,185,129,0.06)", border: `1px solid ${C.borderGreen}`, borderRadius: 12, padding: "12px 16px", marginBottom: 16, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <div>
-              <p style={{ margin: 0, fontWeight: 600, color: C.green, fontSize: 14 }}>🎁 Welcome Bonus</p>
-              <p style={{ margin: "2px 0 0", fontSize: 12, color: C.subtle }}>Already credited to your account</p>
-            </div>
-            <span style={{ fontWeight: 700, color: C.green }}>₹50 ✓</span>
-          </div>
-        )}
+          <span style={{ fontSize: 28, fontWeight: 800, color: C.green }}>+₹50</span>
+        </div>
 
-        {/* Reward Pool */}
+        {/* Reward Pool — prominent card */}
         {potData && (
-          <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: "12px 16px", marginBottom: 16, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div style={{ background: "linear-gradient(135deg, rgba(16,185,129,0.08), rgba(0,0,0,0))", border: `1px solid ${C.borderGreen}`, borderRadius: 12, padding: "14px 18px", marginBottom: 16, display: "flex", justifyContent: "space-between", alignItems: "center", boxShadow: `0 0 16px ${C.greenGlow}` }}>
             <div>
-              <p style={{ margin: 0, fontSize: 13, color: C.subtle }}>💰 Reward Pool Available</p>
-              <p style={{ margin: "2px 0 0", fontSize: 11, color: C.muted }}>Funds set aside for your payouts</p>
+              <p style={{ margin: 0, fontSize: 14, fontWeight: 600, color: C.text }}>💰 Reward Pool</p>
+              <p style={{ margin: "2px 0 0", fontSize: 12, color: C.subtle }}>Funds reserved for referrer payouts</p>
+              <div style={{ marginTop: 8, height: 4, borderRadius: 4, background: "#222", width: 140 }}>
+                <div style={{ height: "100%", borderRadius: 4, background: Number(potData.balance) > 5000 ? C.green : C.orange, width: `${Math.min(100, Math.round(Number(potData.balance) / 100))}%`, transition: "width 0.5s" }} />
+              </div>
             </div>
             <div style={{ textAlign: "right" }}>
-              <p style={{ margin: 0, fontSize: 18, fontWeight: 700, color: Number(potData.balance) > 2000 ? C.green : C.orange }}>₹{Number(potData.balance).toLocaleString()}</p>
-              <p style={{ margin: 0, fontSize: 10, color: C.muted }}>remaining</p>
+              <p style={{ margin: 0, fontSize: 22, fontWeight: 800, color: Number(potData.balance) > 2000 ? C.green : C.orange }}>₹{Number(potData.balance).toLocaleString()}</p>
+              <p style={{ margin: 0, fontSize: 11, color: C.muted }}>available</p>
             </div>
           </div>
         )}
@@ -248,6 +241,15 @@ export default function ReferrerDashboard() {
         {/* ── OVERVIEW TAB ── */}
         {activeTab === "overview" && (
           <div>
+            {/* ⚠️ IMPORTANT: Residential Houses Only */}
+            <div style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.3)", borderRadius: 12, padding: 14, marginBottom: 16, display: "flex", gap: 12, alignItems: "flex-start" }}>
+              <span style={{ fontSize: 18, flexShrink: 0 }}>⚠️</span>
+              <div>
+                <p style={{ margin: "0 0 4px", color: "#fca5a5", fontWeight: 600, fontSize: 14 }}>Important: Residential Houses Only</p>
+                <p style={{ margin: 0, color: C.subtle, fontSize: 12 }}>This solar program is for <strong>independent residential houses with own roofs</strong>. Do NOT refer apartment dwellers, shared buildings, or renters without landlord approval. Verify before sharing your link!</p>
+              </div>
+            </div>
+
             {/* Share Link */}
             <div style={{ background: C.surface, border: `1px solid ${C.borderGreen}`, borderRadius: 12, padding: 20, marginBottom: 16, boxShadow: `0 0 30px ${C.greenGlow}` }}>
               <h3 style={{ margin: "0 0 12px", color: C.green, fontSize: 15 }}>📤 Share Your Referral Link</h3>
