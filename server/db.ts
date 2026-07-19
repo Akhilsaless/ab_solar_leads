@@ -292,7 +292,7 @@ export async function createLeadFromConversation(data: {
   propertyAddress?: string; city?: string; state?: string;
   monthlyEnergyBill?: string; estimatedSavings?: string;
   source?: string; leadScore?: number; priority?: "low" | "medium" | "high" | "urgent";
-  conversationId?: number; notes?: string;
+  conversationId?: number; notes?: string; referrerCode?: string;
 }) {
   const db = await getDb();
   if (!db) return null;
@@ -308,7 +308,7 @@ export async function getLeadsByAgency(agencyId: number) {
   if (!db) return [];
   // Get leads that have a conversationId linked to this agency
   const result = await db.execute(sql`
-    SELECT l.* FROM leads2 l
+    SELECT l.*, COALESCE(l.referrerCode, c.referrerCode) as referrerCode FROM leads2 l
     INNER JOIN conversations3 c ON l.conversationId = c.id
     WHERE c.agencyId = ${agencyId}
     ORDER BY l.createdAt DESC

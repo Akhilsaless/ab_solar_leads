@@ -1,55 +1,39 @@
 import nodemailer from "nodemailer";
 
-let transporter: any = null;
-
-let smtpVerified: boolean | null = null;
-
 async function verifySmtp() {
-  if (smtpVerified !== null) return smtpVerified;
-  
   try {
     const transporter = getTransporter();
-    if (!transporter) {
-      smtpVerified = false;
-      return false;
-    }
-    
+    if (!transporter) return false;
     await transporter.verify();
     console.log("[Email] SMTP connection verified successfully");
-    smtpVerified = true;
     return true;
   } catch (error) {
     console.error("[Email] SMTP verification failed:", error);
-    smtpVerified = false;
     return false;
   }
 }
 
 function getTransporter() {
-  if (!transporter) {
-    // Use environment variables for email configuration
-    const emailUser = process.env.EMAIL_USER;
-    const emailPassword = process.env.EMAIL_PASSWORD;
-    const emailHost = process.env.EMAIL_HOST || "smtp.gmail.com";
-    const emailPort = parseInt(process.env.EMAIL_PORT || "587");
+  // Always create fresh transporter so env var changes are picked up
+  const emailUser = process.env.EMAIL_USER;
+  const emailPassword = process.env.EMAIL_PASSWORD;
+  const emailHost = process.env.EMAIL_HOST || "smtp.gmail.com";
+  const emailPort = parseInt(process.env.EMAIL_PORT || "587");
 
-    if (!emailUser || !emailPassword) {
-      console.warn("[Email] Email credentials not configured. Emails will not be sent.");
-      return null;
-    }
-
-    transporter = nodemailer.createTransport({
-      host: emailHost,
-      port: emailPort,
-      secure: emailPort === 465,
-      auth: {
-        user: emailUser,
-        pass: emailPassword,
-      },
-    });
+  if (!emailUser || !emailPassword) {
+    console.warn("[Email] Email credentials not configured. Emails will not be sent.");
+    return null;
   }
 
-  return transporter;
+  return nodemailer.createTransport({
+    host: emailHost,
+    port: emailPort,
+    secure: emailPort === 465,
+    auth: {
+      user: emailUser,
+      pass: emailPassword,
+    },
+  });
 }
 
 export async function initializeEmailService() {

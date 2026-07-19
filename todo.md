@@ -198,3 +198,11 @@
 - [x] Add 3-second timeout to map centering geolocation
 - [x] Better error handling for geolocation failures
 - [x] All 153 tests still passing
+
+## Bug Fixes — Leads Dashboard + Chatbot (Jul 15 2026)
+- [x] Add referrerCode to schema.ts conversations table so Drizzle picks it up
+- [x] Pass referrerCode from conversation to createLeadFromConversation + leads table
+- [x] Update getLeadsByAgency to join referrerCode from conversations
+- [x] Leads page: show phone + email as visible text, add Referrer ID column
+- [x] Fix stage detection to be keyword-independent (bot message count)
+- [x] Strengthen pitch A→B→C sequence in system prompt before estimate

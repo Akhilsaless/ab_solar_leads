@@ -7,8 +7,7 @@ import { sendEmail } from "./_core/emailService";
 import { notifyOwner } from "./_core/notification";
 import bcrypt from "bcryptjs";
 
-// In-memory OTP store: email -> { otp, expiresAt, data }
-const otpStore = new Map<string, { otp: string; expiresAt: number; data: { name: string; email: string; acceptedTnC: boolean } }>();
+// DB-backed OTP store (survives server restarts)
 
 // Helper: extract rows from mysql2 execute result
 function rows(result: any): any[] {
@@ -74,11 +73,14 @@ export const referrerRouter = router({
       const otp = Math.floor(100000 + Math.random() * 900000).toString();
       const expiresAt = Date.now() + 10 * 60 * 1000;
 
-      otpStore.set(input.email, {
-        otp,
-        expiresAt,
-        data: { name: input.name, email: input.email, acceptedTnC: true },
-      });
+      const db = await getDb();
+      if (!db) throw new Error("Database not available");
+      // Upsert OTP into persistent store
+      await db.execute(
+        sql`INSERT INTO otp_store (email, otp, name, acceptedTnC, expiresAt)
+            VALUES (${input.email}, ${otp}, ${input.name}, 1, ${expiresAt})
+            ON DUPLICATE KEY UPDATE otp = ${otp}, name = ${input.name}, expiresAt = ${expiresAt}`
+      );
 
       await sendEmail({
         to: input.email,
@@ -101,23 +103,26 @@ export const referrerRouter = router({
   verifyOtpAndSignup: publicProcedure
     .input(z.object({ email: z.string().email(), otp: z.string() }))
     .mutation(async ({ input }) => {
-      const stored = otpStore.get(input.email);
+      const db = await getDb();
+      if (!db) throw new Error("Database not available");
+      const storedResult = await db.execute(
+        sql`SELECT otp, name, expiresAt FROM otp_store WHERE email = ${input.email}`
+      );
+      const stored = firstRow(storedResult);
       if (!stored) throw new Error("OTP expired or not found. Please request a new one.");
-      if (Date.now() > stored.expiresAt) {
-        otpStore.delete(input.email);
+      if (Date.now() > Number(stored.expiresAt)) {
+        await db.execute(sql`DELETE FROM otp_store WHERE email = ${input.email}`);
         throw new Error("OTP expired. Please request a new one.");
       }
       if (stored.otp !== input.otp) throw new Error("Invalid OTP. Please check and try again.");
 
-      const { name, email } = stored.data;
-      const db = await getDb();
-      if (!db) throw new Error("Database not available");
+      const { name, email } = { name: stored.name as string, email: input.email };
 
       // Return existing account if already registered
       const existingResult = await db.execute(sql`SELECT id, uniqueCode FROM referrers WHERE email = ${email}`);
       const existing = firstRow(existingResult);
       if (existing) {
-        otpStore.delete(input.email);
+        await db.execute(sql`DELETE FROM otp_store WHERE email = ${input.email}`);
         return { success: true, uniqueCode: existing.uniqueCode, alreadyExists: true };
       }
 
@@ -141,7 +146,7 @@ export const referrerRouter = router({
         );
       }
 
-      otpStore.delete(input.email);
+      await db.execute(sql`DELETE FROM otp_store WHERE email = ${input.email}`);
 
       sendEmail({
         to: email,

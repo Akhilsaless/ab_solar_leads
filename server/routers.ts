@@ -431,6 +431,7 @@ export const appRouter = router({
               leadScore: score,
               priority: getPriority(score),
               conversationId: conversation.id,
+              referrerCode: (conversation as any).referrerCode || undefined,
               notes: `Lead captured via AI chat bot. Session: ${input.sessionId}`,
             });
 
@@ -552,16 +553,20 @@ export const appRouter = router({
         // Get updated conversation with all estimate data
         const updatedConv = await db.getConversation(input.sessionId);
         
-        // Detect conversation stage for frontend auto-sequencing
-        const lowerContent = cleanContent.toLowerCase();
+        // Detect conversation stage using bot message count (robust, not phrase-dependent)
+        const botMsgCount = history.filter(m => m.role === 'bot').length;
         let stage = 'general';
-        if (lowerContent.includes('may i know your name') || lowerContent.includes('your name?')) stage = 'ask_name';
-        else if (lowerContent.includes('electricity bills in india are rising') || lowerContent.includes('cut that by 80')) stage = 'pitch_a';
-        else if (lowerContent.includes('pm surya ghar') && lowerContent.includes('subsidy')) stage = 'pitch_b';
-        else if (lowerContent.includes('recover their investment') || lowerContent.includes('money-making asset')) stage = 'pitch_c';
-        else if (lowerContent.includes('monthly electricity bill') && lowerContent.includes('skip')) stage = 'ask_bill';
-        else if (lowerContent.includes('personalised solar estimate') || lowerContent.includes('download it as a pdf')) stage = 'show_estimate';
-        else if (lowerContent.includes('free site visit') && lowerContent.includes('book')) stage = 'ask_site_visit';
+        if (botMsgCount === 0) stage = 'ask_name';
+        else if (botMsgCount === 1) stage = 'pitch_a';
+        else if (botMsgCount === 2) stage = 'pitch_b';
+        else if (botMsgCount === 3) stage = 'pitch_c';
+        else if (botMsgCount === 4) stage = 'ask_bill';
+        else {
+          // For later stages, use lightweight keyword hints
+          const lc = cleanContent.toLowerCase();
+          if (lc.includes('site visit') || lc.includes('book') || lc.includes('free visit')) stage = 'ask_site_visit';
+          else if (conversation.estimatedCost || lc.includes('kw') || lc.includes('subsidy') || lc.includes('savings')) stage = 'show_estimate';
+        }
 
         return { 
           response: cleanContent, 
@@ -1151,13 +1156,18 @@ ANSWER ANY QUESTION:
 - "What about at night?" → Use grid power or battery
 - ANY OTHER QUESTION: Answer honestly, then ask how to help with solar
 
-NATURAL PROGRESSION (flexible, not rigid):
-1. Get name
-2. Ask about electricity bill when relevant
-3. Show estimate
-4. Offer free site visit
-5. If yes → collect location + phone + email
-6. If no → "Feel free to reach out anytime"
+MANDATORY PITCH SEQUENCE (do NOT skip or reorder):
+1. Get name first
+2. Deliver Pitch A: Rising electricity bills ("Bills in India rise 8-10% every year — solar cuts that by 80%")
+3. Deliver Pitch B: Government subsidy ("PM Surya Ghar gives up to ₹78,000 subsidy — limited time")
+4. Deliver Pitch C: ROI / money-making asset ("Customers recover investment in 3-5 years, then 20+ years of free electricity")
+5. Ask about electricity bill amount
+6. Show estimate (ONLY after all 3 pitch points are delivered)
+7. Offer free site visit
+8. If yes → collect location + phone + email
+9. If no → "Feel free to reach out anytime"
+
+⚠️ CRITICAL: If a customer asks about cost or price BEFORE you have delivered all 3 pitch points, do NOT show the estimate yet. Instead say: "Great question! Before I give you exact numbers, let me share 3 quick things that will make the numbers much more exciting..." — then continue the pitch sequence. Only show the estimate after pitch C is done AND you have their bill amount.
 
 ESTIMATE FORMAT (present this when you have bill amount — use EXACTLY this format with clear section breaks):
 

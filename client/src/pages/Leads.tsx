@@ -81,11 +81,13 @@ export default function Leads() {
             <thead>
               <tr className="border-b border-border bg-card/50">
                 <th className="text-left text-xs font-medium text-muted-foreground px-4 py-3">Name</th>
-                <th className="text-left text-xs font-medium text-muted-foreground px-4 py-3 hidden md:table-cell">Contact</th>
+                <th className="text-left text-xs font-medium text-muted-foreground px-4 py-3 hidden md:table-cell">Phone</th>
+                <th className="text-left text-xs font-medium text-muted-foreground px-4 py-3 hidden lg:table-cell">Email</th>
                 <th className="text-left text-xs font-medium text-muted-foreground px-4 py-3">Status</th>
                 <th className="text-left text-xs font-medium text-muted-foreground px-4 py-3 hidden sm:table-cell">Priority</th>
                 <th className="text-left text-xs font-medium text-muted-foreground px-4 py-3 hidden lg:table-cell">Score</th>
                 <th className="text-left text-xs font-medium text-muted-foreground px-4 py-3 hidden lg:table-cell">State</th>
+                <th className="text-left text-xs font-medium text-muted-foreground px-4 py-3 hidden xl:table-cell">Referrer</th>
                 <th className="text-right text-xs font-medium text-muted-foreground px-4 py-3">Actions</th>
               </tr>
             </thead>
@@ -93,14 +95,14 @@ export default function Leads() {
               {leads.isLoading ? (
                 Array.from({ length: 5 }).map((_, i) => (
                   <tr key={i} className="border-b border-border/50">
-                    <td colSpan={7} className="px-4 py-4">
+                    <td colSpan={9} className="px-4 py-4">
                       <div className="h-4 bg-muted rounded animate-pulse" />
                     </td>
                   </tr>
                 ))
               ) : allLeads.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="text-center py-12 text-muted-foreground">
+                  <td colSpan={9} className="text-center py-12 text-muted-foreground">
                     <Users className="w-10 h-10 mx-auto mb-3 opacity-30" />
                     <p className="font-medium">No leads found</p>
                     <p className="text-sm mt-1">Leads are automatically captured when customers chat with your AI bot.</p>
@@ -125,10 +127,20 @@ export default function Leads() {
                       </div>
                     </td>
                     <td className="px-4 py-3 hidden md:table-cell">
-                      <div className="flex items-center gap-2">
-                        {lead.email && <span className="channel-badge channel-email"><Mail className="w-3 h-3" /></span>}
-                        {lead.phone && <span className="channel-badge channel-phone"><Phone className="w-3 h-3" /></span>}
-                      </div>
+                      {lead.phone ? (
+                        <a href={`tel:${lead.phone}`} onClick={e => e.stopPropagation()} className="flex items-center gap-1.5 text-xs text-foreground hover:text-primary transition-colors">
+                          <Phone className="w-3 h-3 text-muted-foreground shrink-0" />
+                          <span className="font-mono">{lead.phone}</span>
+                        </a>
+                      ) : <span className="text-xs text-muted-foreground">&mdash;</span>}
+                    </td>
+                    <td className="px-4 py-3 hidden lg:table-cell">
+                      {lead.email ? (
+                        <a href={`mailto:${lead.email}`} onClick={e => e.stopPropagation()} className="flex items-center gap-1.5 text-xs text-foreground hover:text-primary transition-colors">
+                          <Mail className="w-3 h-3 text-muted-foreground shrink-0" />
+                          <span className="truncate max-w-[160px]">{lead.email}</span>
+                        </a>
+                      ) : <span className="text-xs text-muted-foreground">&mdash;</span>}
                     </td>
                     <td className="px-4 py-3">
                       <span className={`status-badge status-${lead.status}`}>{lead.status}</span>
@@ -147,7 +159,14 @@ export default function Leads() {
                       </div>
                     </td>
                     <td className="px-4 py-3 hidden lg:table-cell">
-                      <span className="text-xs text-muted-foreground capitalize">{lead.state || "-"}</span>
+                      <span className="text-xs text-muted-foreground capitalize">{lead.state || "—"}</span>
+                    </td>
+                    <td className="px-4 py-3 hidden xl:table-cell">
+                      {lead.referrerCode ? (
+                        <span className="inline-flex items-center text-xs bg-amber-500/10 text-amber-600 dark:text-amber-400 px-2 py-0.5 rounded-full font-mono">
+                          {lead.referrerCode}
+                        </span>
+                      ) : <span className="text-xs text-muted-foreground">Direct</span>}
                     </td>
                     <td className="px-4 py-3 text-right">
                       <DropdownMenu>

@@ -122,6 +122,10 @@ export const conversations = mysqlTable("conversations3", {
   utmCampaign: varchar("utmCampaign", { length: 200 }),
   emailSent: boolean("emailSent").default(false),
   companyEmailSent: boolean("companyEmailSent").default(false),
+  referrerCode: varchar("referrerCode", { length: 100 }),
+  isReturning: boolean("isReturning").default(false),
+  followUp24Sent: boolean("followUp24Sent").default(false),
+  followUp72Sent: boolean("followUp72Sent").default(false),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
@@ -213,6 +217,7 @@ export const leads = mysqlTable("leads2", {
   notes: text("notes"),
   lastContactedAt: timestamp("lastContactedAt"),
   conversationId: int("conversationId"),
+  referrerCode: varchar("referrerCode", { length: 100 }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
