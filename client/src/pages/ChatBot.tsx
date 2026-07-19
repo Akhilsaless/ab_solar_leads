@@ -46,9 +46,11 @@ export default function ChatBot() {
   const utmCampaign = urlParams.get("utm_campaign") || undefined;
   const autoCloseMinutes = urlParams.get("autoClose") ? parseInt(urlParams.get("autoClose")!) : null;
   
-  // Extract referrer code from URL path (e.g., /refer/REF_ABC123)
+  // Extract referrer code from URL path (/refer/REF_ABC123) OR query param (?ref=REF_ABC123)
   const pathParts = window.location.pathname.split("/");
-  const referrerCode = pathParts.includes("refer") ? pathParts[pathParts.indexOf("refer") + 1] : undefined;
+  const referrerCodeFromPath = pathParts.includes("refer") ? pathParts[pathParts.indexOf("refer") + 1] : undefined;
+  const referrerCodeFromQuery = urlParams.get("ref") || undefined;
+  const referrerCode = referrerCodeFromPath || referrerCodeFromQuery;
   
   const [isClosed, setIsClosed] = useState(false);
   const [showMapPin, setShowMapPin] = useState(false);

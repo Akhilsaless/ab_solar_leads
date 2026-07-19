@@ -85,10 +85,11 @@ export default function ReferrerDashboard() {
     onError: (e) => setWithdrawMsg(`❌ ${e.message}`),
   });
 
-  const referralLink = uniqueCode ? `${window.location.origin}/referral-landing/${uniqueCode}` : "";
+  // Bot link: direct to chatbot with referrer code as query param
+  const referralLink = uniqueCode ? `${window.location.origin}/chat/ab-solar?ref=${uniqueCode}` : "";
   const copyLink = () => { navigator.clipboard.writeText(referralLink); setCopied(true); setTimeout(() => setCopied(false), 2000); };
   const shareWhatsApp = () => {
-    const msg = encodeURIComponent(`🌞 Save on electricity bills with Solar!\nGet a FREE estimate and see how much you can save.\n\nClick here: ${referralLink}`);
+    const msg = encodeURIComponent(`🌞 *Save on your electricity bill with Solar!*\n\nHi! I'm sharing this with you because I think you'll find it useful.\n\nGet a FREE solar estimate in 2 minutes — no forms, just chat with our AI advisor:\n👉 ${referralLink}\n\nSee how much you can save every month! ☀️`);
     window.open(`https://wa.me/?text=${msg}`, "_blank");
   };
 

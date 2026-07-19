@@ -123,10 +123,10 @@ export default function ReferrerSignup() {
           <div style={{ background: "#0a0a0a", border: "1px solid #222", borderRadius: 10, padding: 16, marginBottom: 20 }}>
             <p style={{ color: "#555", fontSize: 12, margin: "0 0 6px" }}>Your Referral Link:</p>
             <p style={{ color: "#60a5fa", fontSize: 12, wordBreak: "break-all", fontFamily: "monospace", margin: "0 0 12px" }}>
-              {window.location.origin}/referral-landing/{uniqueCode}
+              {window.location.origin}/chat/ab-solar?ref={uniqueCode}
             </p>
             <button
-              onClick={() => navigator.clipboard.writeText(`${window.location.origin}/referral-landing/${uniqueCode}`)}
+              onClick={() => navigator.clipboard.writeText(`${window.location.origin}/chat/ab-solar?ref=${uniqueCode}`)}
               style={{ width: "100%", background: "#1a1a1a", color: "#fff", border: "1px solid #333", borderRadius: 8, padding: "10px 0", cursor: "pointer", fontWeight: 600, fontSize: 14 }}>
               📋 Copy Link
             </button>
