@@ -84,6 +84,14 @@ export default function PartnerOutreach() {
     searchMutation.mutate({ businessType: selectedType, location: selectedCity });
   };
 
+  const openMessenger = (business: any) => {
+    const pitch = DEFAULT_WHATSAPP_PITCH(business.businessName, partnerUrl);
+    navigator.clipboard.writeText(pitch);
+    // Try to open their Facebook page if website is a FB URL, else open Messenger
+    const fbUrl = business.website?.includes("facebook.com") ? business.website : `https://www.messenger.com/`;
+    window.open(fbUrl, "_blank");
+    toast.success("Pitch copied! Find the company on Messenger and paste to send.");
+  };
   const openOutreachDialog = (business: any, mode: "email" | "whatsapp") => {
     setSelectedBusiness(business);
     setOutreachMode(mode);
@@ -307,6 +315,14 @@ export default function PartnerOutreach() {
                             <MessageSquare className="w-3.5 h-3.5 mr-1" />WhatsApp
                           </Button>
                         )}
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => openMessenger(business)}
+                          className="text-xs h-7 border-blue-500/40 text-blue-400 hover:bg-blue-500/10"
+                        >
+                          <Building2 className="w-3.5 h-3.5 mr-1" />Messenger
+                        </Button>
                         {hasEmail && (
                           <Button
                             size="sm"

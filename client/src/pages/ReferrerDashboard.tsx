@@ -95,6 +95,16 @@ export default function ReferrerDashboard() {
     const msg = encodeURIComponent(`🌞 *Save on your electricity bill with Solar!*\n\nHi! I'm sharing this with you because I think you'll find it useful.\n\nGet a FREE solar estimate in 2 minutes — no forms, just chat with our AI advisor:\n👉 ${referralLink}\n\nWorks for homes AND businesses too! 🏠🏢\nSee how much you can save every month! ☀️`);
     window.open(`https://wa.me/?text=${msg}`, "_blank");
   };
+  const shareFacebook = () => {
+    const url = encodeURIComponent(referralLink);
+    const quote = encodeURIComponent(`🌞 Save on your electricity bill with Solar! Get a FREE estimate in 2 minutes — works for homes AND businesses! ☀️`);
+    window.open(`https://www.facebook.com/sharer/sharer.php?u=${url}&quote=${quote}`, "_blank", "width=600,height=400");
+  };
+  const shareInstagram = () => {
+    const caption = `🌞 Save on your electricity bill with Solar!\n\nGet a FREE solar estimate in 2 minutes:\n👉 ${referralLink}\n\nWorks for homes AND businesses! ☀️ #Solar #SolarEnergy #SaveElectricity #GreenEnergy`;
+    navigator.clipboard.writeText(caption);
+    alert("Caption copied! Open Instagram, create a post or story, and paste the caption.");
+  };
 
   if (!uniqueCode) return null;
 
@@ -261,12 +271,18 @@ export default function ReferrerDashboard() {
               <div style={{ background: C.bg, borderRadius: 8, padding: "10px 14px", marginBottom: 12, wordBreak: "break-all", fontSize: 12, color: C.subtle, border: `1px solid ${C.border}` }}>
                 {referralLink}
               </div>
-              <div style={{ display: "flex", gap: 10 }}>
-                <button onClick={copyLink} style={{ flex: 1, background: copied ? C.green : C.surface2, color: copied ? "#000" : C.text, border: `1px solid ${copied ? C.green : C.border}`, borderRadius: 8, padding: "10px 0", cursor: "pointer", fontWeight: 600, fontSize: 14, transition: "all 0.2s" }}>
-                  {copied ? "✅ Copied!" : "📋 Copy Link"}
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <button onClick={copyLink} style={{ flex: 1, minWidth: 100, background: copied ? C.green : C.surface2, color: copied ? "#000" : C.text, border: `1px solid ${copied ? C.green : C.border}`, borderRadius: 8, padding: "10px 0", cursor: "pointer", fontWeight: 600, fontSize: 13, transition: "all 0.2s" }}>
+                  {copied ? "✅ Copied!" : "📋 Copy"}
                 </button>
-                <button onClick={shareWhatsApp} style={{ flex: 1, background: "#16a34a", color: "#fff", border: "none", borderRadius: 8, padding: "10px 0", cursor: "pointer", fontWeight: 600, fontSize: 14 }}>
+                <button onClick={shareWhatsApp} style={{ flex: 1, minWidth: 90, background: "#16a34a", color: "#fff", border: "none", borderRadius: 8, padding: "10px 0", cursor: "pointer", fontWeight: 600, fontSize: 13 }}>
                   📱 WhatsApp
+                </button>
+                <button onClick={shareFacebook} style={{ flex: 1, minWidth: 90, background: "#1877f2", color: "#fff", border: "none", borderRadius: 8, padding: "10px 0", cursor: "pointer", fontWeight: 600, fontSize: 13 }}>
+                  📘 Facebook
+                </button>
+                <button onClick={shareInstagram} style={{ flex: 1, minWidth: 90, background: "linear-gradient(45deg,#f09433,#e6683c,#dc2743,#cc2366,#bc1888)", color: "#fff", border: "none", borderRadius: 8, padding: "10px 0", cursor: "pointer", fontWeight: 600, fontSize: 13 }}>
+                  📸 Instagram
                 </button>
               </div>
             </div>
@@ -347,9 +363,11 @@ export default function ReferrerDashboard() {
                   <div style={{ fontSize: 48, marginBottom: 12 }}>🎯</div>
                   <p style={{ color: C.subtle, margin: "0 0 8px", fontWeight: 600 }}>No referrals yet!</p>
                   <p style={{ color: C.muted, fontSize: 13, margin: "0 0 20px" }}>Share your link to start earning. Every installation earns you ₹1,500!</p>
-                  <button onClick={shareWhatsApp} style={{ background: "#16a34a", color: "#fff", border: "none", borderRadius: 8, padding: "10px 20px", cursor: "pointer", fontWeight: 600 }}>
-                    📱 Share on WhatsApp
-                  </button>
+                  <div style={{ display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap" }}>
+                    <button onClick={shareWhatsApp} style={{ background: "#16a34a", color: "#fff", border: "none", borderRadius: 8, padding: "10px 16px", cursor: "pointer", fontWeight: 600 }}>📱 WhatsApp</button>
+                    <button onClick={shareFacebook} style={{ background: "#1877f2", color: "#fff", border: "none", borderRadius: 8, padding: "10px 16px", cursor: "pointer", fontWeight: 600 }}>📘 Facebook</button>
+                    <button onClick={shareInstagram} style={{ background: "linear-gradient(45deg,#f09433,#e6683c,#dc2743,#cc2366,#bc1888)", color: "#fff", border: "none", borderRadius: 8, padding: "10px 16px", cursor: "pointer", fontWeight: 600 }}>📸 Instagram</button>
+                  </div>
                 </div>
               ) : (
                 <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
@@ -403,9 +421,9 @@ export default function ReferrerDashboard() {
                 <button onClick={copyLink} style={{ background: C.surface2, color: C.text, border: `1px solid ${C.border}`, borderRadius: 8, padding: "10px 20px", cursor: "pointer", fontWeight: 600 }}>
                   {copied ? "✅ Copied!" : "📋 Copy Link"}
                 </button>
-                <button onClick={shareWhatsApp} style={{ background: "#16a34a", color: "#fff", border: "none", borderRadius: 8, padding: "10px 20px", cursor: "pointer", fontWeight: 600 }}>
-                  📱 WhatsApp
-                </button>
+                <button onClick={shareWhatsApp} style={{ background: "#16a34a", color: "#fff", border: "none", borderRadius: 8, padding: "10px 16px", cursor: "pointer", fontWeight: 600 }}>📱 WhatsApp</button>
+                <button onClick={shareFacebook} style={{ background: "#1877f2", color: "#fff", border: "none", borderRadius: 8, padding: "10px 16px", cursor: "pointer", fontWeight: 600 }}>📘 Facebook</button>
+                <button onClick={shareInstagram} style={{ background: "linear-gradient(45deg,#f09433,#e6683c,#dc2743,#cc2366,#bc1888)", color: "#fff", border: "none", borderRadius: 8, padding: "10px 16px", cursor: "pointer", fontWeight: 600 }}>📸 Instagram</button>
               </div>
             </div>
           </div>
