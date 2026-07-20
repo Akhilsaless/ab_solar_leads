@@ -66,7 +66,7 @@ export default function ForPartners() {
                 step: "03",
                 icon: <TrendingUp className="w-8 h-8 text-orange-400" />,
                 title: "You Close the Deal",
-                desc: "You get the lead's full details — call them, visit their site, and close the installation. We handle the marketing."
+                desc: "You get the lead's full details — call them, visit their site, and close the installation. A commission per kW is paid to Sales Squad upon successful installation."
               }
             ].map((item) => (
               <div key={item.step} className="bg-slate-800/50 border border-slate-700 rounded-xl p-8 relative">
@@ -118,7 +118,7 @@ export default function ForPartners() {
               "Customers already know their savings estimate",
               "No marketing spend required from your side",
               "Leads come with full contact details",
-              "You only pay when you get results",
+              "Commission per kW paid to Sales Squad only on successful installations",
               "Works across all major Indian cities",
               "AI filters out low-quality leads automatically",
               "Direct WhatsApp quick-call button on every lead",

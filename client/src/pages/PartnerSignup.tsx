@@ -182,9 +182,10 @@ export default function PartnerSignup() {
             {/* Info Box */}
             <div className="bg-slate-700/50 border border-slate-600 rounded p-4">
               <p className="text-sm text-gray-300">
-                ✅ Once registered, you'll receive qualified leads from our AI chatbot<br/>
-                ✅ Leads include customer contact info, bill amount, and location<br/>
-                ✅ You handle the installation and earn commission
+                ✅ Once registered, you'll receive qualified solar leads from our AI chatbot<br/>
+                ✅ Leads include customer contact info, monthly bill amount, and location<br/>
+                ✅ You handle the installation — Sales Squad earns a commission per kW installed<br/>
+                ✅ Commission rate is finalized upon agreement with Sales Squad
               </p>
             </div>
 
