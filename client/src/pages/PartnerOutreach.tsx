@@ -30,7 +30,7 @@ const DEFAULT_EMAIL_PITCH = (companyName: string, partnerUrl: string) =>
 
 export default function PartnerOutreach() {
   const [selectedCity, setSelectedCity] = useState("");
-  const [selectedType, setSelectedType] = useState("");
+  const [selectedType, setSelectedType] = useState("all");
   const [showOutreachDialog, setShowOutreachDialog] = useState(false);
   const [selectedBusiness, setSelectedBusiness] = useState<any>(null);
   const [outreachMode, setOutreachMode] = useState<"email" | "whatsapp">("email");
@@ -40,7 +40,7 @@ export default function PartnerOutreach() {
   const partnerUrl = `${window.location.origin}/for-partners`;
 
   const searchQuery = trpc.partner.searchBusinesses.useQuery(
-    { city: selectedCity, businessType: selectedType },
+    { city: selectedCity, businessType: selectedType === "all" ? undefined : selectedType },
     { enabled: !!selectedCity }
   );
 
@@ -187,7 +187,7 @@ export default function PartnerOutreach() {
                   <SelectValue placeholder="All types" />
                 </SelectTrigger>
                 <SelectContent className="bg-slate-700 border-slate-600">
-                  <SelectItem value="" className="text-white">All types</SelectItem>
+                  <SelectItem value="all" className="text-white">All types</SelectItem>
                   {BUSINESS_TYPES.map(type => (
                     <SelectItem key={type} value={type} className="text-white">{type}</SelectItem>
                   ))}
