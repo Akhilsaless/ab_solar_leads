@@ -11,7 +11,7 @@ import {
   UserPlus, Loader2, Factory, Hotel, School, Hospital,
   ShoppingBag, Warehouse, Utensils, Dumbbell, Building,
   ExternalLink, Download, MessageCircle, CheckSquare,
-  Square, Sparkles, Linkedin, TrendingUp
+  Square, Sparkles, Linkedin, TrendingUp, Sun
 } from "lucide-react";
 
 const BUSINESS_TYPES = [
@@ -27,6 +27,7 @@ const BUSINESS_TYPES = [
   { value: "dairy farms", label: "Dairy & Agriculture", icon: Building2 },
   { value: "textile mills", label: "Textile Mills", icon: Factory },
   { value: "cold storage", label: "Cold Storage Facilities", icon: Warehouse },
+  { value: "solar companies", label: "Solar Companies & Installers", icon: Sun },
 ];
 
 const INDIAN_STATES = [
