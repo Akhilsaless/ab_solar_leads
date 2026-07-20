@@ -2,9 +2,15 @@ import { useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Mail, MapPin, CheckCircle, Clock, AlertCircle, MessageSquare, Sparkles, ExternalLink, Search } from "lucide-react";
+import {
+  Mail, MapPin, CheckCircle, Clock, AlertCircle,
+  MessageSquare, Sparkles, ExternalLink, Search,
+  Phone, Globe, Star, Loader2, Building2
+} from "lucide-react";
 import { toast } from "sonner";
 
 const INDIAN_CITIES = [
@@ -22,11 +28,12 @@ const BUSINESS_TYPES = [
   { value: "construction companies", label: "Construction Companies" },
 ];
 
+// Default pitches — about Sales Squad, NOT about solar panels
 const DEFAULT_WHATSAPP_PITCH = (companyName: string, partnerUrl: string) =>
-  `Hi ${companyName} Team 👋\n\nI'm reaching out from *Sales Squad* — we generate qualified solar leads using AI, 24/7.\n\nEvery lead includes:\n✅ Customer name, phone & email\n✅ Monthly electricity bill amount\n✅ Location & GPS coordinates\n✅ AI-calculated lead score\n\nCustomers are already interested — our chatbot qualifies them before we send the lead to you. You just close the deal.\n\n👉 Learn more & sign up free: ${partnerUrl}\n\nLet me know if you'd like to discuss!`;
+  `Hi ${companyName} Team 👋\n\nI'm reaching out from *Sales Squad* — we generate qualified solar leads using AI, 24/7.\n\nEvery lead we send you includes:\n✅ Customer name, phone & email\n✅ Monthly electricity bill amount\n✅ Location & GPS coordinates\n✅ AI-calculated lead score\n\nOur AI chatbot qualifies customers before we send the lead to you. You just close the deal — no cold calling, no marketing spend.\n\n👉 Sign up free as a partner: ${partnerUrl}\n\nLet me know if you'd like to discuss!`;
 
 const DEFAULT_EMAIL_PITCH = (companyName: string, partnerUrl: string) =>
-  `Hi ${companyName} Team,\n\nI'm reaching out from Sales Squad — we help solar companies grow by generating qualified leads using AI.\n\nHere's how it works:\n1. A property owner chats with our AI bot\n2. The bot qualifies them (bill amount, location, intent)\n3. We send you the lead with full details — name, phone, email, bill, location\n\nYou get leads that are already interested. No cold calling, no marketing spend from your side.\n\nSign up free here: ${partnerUrl}\n\nLooking forward to partnering with you!\n\nBest regards,\nSales Squad Team`;
+  `Hi ${companyName} Team,\n\nI'm reaching out from Sales Squad — an AI-powered lead generation platform built specifically for solar companies like yours.\n\nHere's how it works:\n1. A homeowner or business owner chats with our AI bot\n2. The bot qualifies them — captures their monthly electricity bill, location, and intent\n3. We send you the lead with full details: name, phone, email, bill amount, and GPS location\n\nYou receive leads that are already interested in solar. No cold calling, no marketing budget required from your side.\n\nWe're currently onboarding solar companies in ${companyName.includes("Hyderabad") ? "Hyderabad" : "your city"} — and the signup is completely free.\n\n👉 Sign up as a partner here: ${partnerUrl}\n\nLooking forward to partnering with you!\n\nBest regards,\nSales Squad Team`;
 
 export default function PartnerOutreach() {
   const [selectedCity, setSelectedCity] = useState("");
@@ -36,12 +43,13 @@ export default function PartnerOutreach() {
   const [outreachMode, setOutreachMode] = useState<"email" | "whatsapp">("email");
   const [customMessage, setCustomMessage] = useState("");
   const [isGeneratingPitch, setIsGeneratingPitch] = useState(false);
-  const [searchTriggered, setSearchTriggered] = useState(false);
+  const [hasSearched, setHasSearched] = useState(false);
 
   const partnerUrl = `${window.location.origin}/for-partners`;
 
-  // Live search using the same scraper.search mutation as BusinessScraper
-  const searchMutation = trpc.scraper.search.useMutation();
+  const searchMutation = trpc.scraper.search.useMutation({
+    onError: (err) => toast.error(err.message || "Search failed"),
+  });
 
   const partnersQuery = trpc.partner.getPartners.useQuery();
 
@@ -52,9 +60,7 @@ export default function PartnerOutreach() {
       setCustomMessage("");
       partnersQuery.refetch();
     },
-    onError: (err) => {
-      toast.error(err.message || "Failed to send email");
-    },
+    onError: (err) => toast.error(err.message || "Failed to send email"),
   });
 
   const generateAIPitch = trpc.partner.generateOutreachPitch.useMutation({
@@ -63,6 +69,7 @@ export default function PartnerOutreach() {
       setIsGeneratingPitch(false);
     },
     onError: () => {
+      // Fall back to default pitch
       const pitch = outreachMode === "whatsapp"
         ? DEFAULT_WHATSAPP_PITCH(selectedBusiness?.businessName || "", partnerUrl)
         : DEFAULT_EMAIL_PITCH(selectedBusiness?.businessName || "", partnerUrl);
@@ -73,7 +80,7 @@ export default function PartnerOutreach() {
 
   const handleSearch = () => {
     if (!selectedCity) { toast.error("Please select a city"); return; }
-    setSearchTriggered(true);
+    setHasSearched(true);
     searchMutation.mutate({ businessType: selectedType, location: selectedCity });
   };
 
@@ -107,7 +114,7 @@ export default function PartnerOutreach() {
       window.open(waUrl, "_blank");
       sendEmailMutation.mutate({
         companyName: selectedBusiness.businessName,
-        email: selectedBusiness.email || "",
+        email: selectedBusiness.email || "noemail@placeholder.com",
         phone: selectedBusiness.phone,
         serviceAreas: [selectedCity],
         customMessage: `[WhatsApp sent] ${customMessage}`,
@@ -134,57 +141,68 @@ export default function PartnerOutreach() {
   };
 
   const getStatusBadge = (status: string | null) => {
-    if (status === "signed_up") return <span className="flex items-center gap-1 text-green-400 text-xs"><CheckCircle className="w-3 h-3" /> Signed Up</span>;
-    if (status === "email_sent") return <span className="flex items-center gap-1 text-yellow-400 text-xs"><Clock className="w-3 h-3" /> Contacted</span>;
-    return <span className="text-gray-500 text-xs">Not contacted</span>;
+    if (status === "signed_up") return (
+      <Badge variant="outline" className="text-green-400 border-green-500/30 bg-green-500/10 text-xs">
+        <CheckCircle className="w-3 h-3 mr-1" />Signed Up
+      </Badge>
+    );
+    if (status === "email_sent") return (
+      <Badge variant="outline" className="text-yellow-400 border-yellow-500/30 bg-yellow-500/10 text-xs">
+        <Clock className="w-3 h-3 mr-1" />Contacted
+      </Badge>
+    );
+    return null;
   };
 
-  const businesses: any[] = searchMutation.data?.businesses || [];
+  // Safely extract businesses from mutation result
+  const businesses: any[] = (searchMutation.data as any)?.businesses ?? [];
+  const isSearching = searchMutation.isPending;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-6">
-      <div className="max-w-6xl mx-auto">
-
-        {/* Header */}
-        <div className="flex items-start justify-between mb-8">
-          <div>
-            <h1 className="text-4xl font-bold text-white mb-2">Partner Outreach</h1>
-            <p className="text-gray-400">Search solar companies live from Google Maps and reach out via Email or WhatsApp</p>
-          </div>
-          <a
-            href="/for-partners"
-            target="_blank"
-            className="flex items-center gap-2 text-sm text-orange-400 hover:text-orange-300 bg-orange-500/10 border border-orange-500/20 rounded-lg px-4 py-2"
-          >
-            <ExternalLink className="w-4 h-4" /> View Partner Page
-          </a>
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">Partner Outreach</h1>
+          <p className="text-muted-foreground text-sm mt-1">
+            Find solar companies on Google Maps and recruit them as Sales Squad partners.
+          </p>
         </div>
+        <a
+          href="/for-partners"
+          target="_blank"
+          className="flex items-center gap-1.5 text-sm text-orange-400 hover:text-orange-300 bg-orange-500/10 border border-orange-500/20 rounded-lg px-3 py-2"
+        >
+          <ExternalLink className="w-3.5 h-3.5" /> Partner Page
+        </a>
+      </div>
 
-        {/* Search */}
-        <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-6 mb-8">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      {/* Search */}
+      <Card className="border-border/30 bg-card/60">
+        <CardContent className="pt-5 pb-5">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">City</label>
+              <label className="block text-xs font-medium text-muted-foreground mb-1.5">City</label>
               <Select value={selectedCity} onValueChange={setSelectedCity}>
-                <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
+                <SelectTrigger>
                   <SelectValue placeholder="Select city" />
                 </SelectTrigger>
-                <SelectContent className="bg-slate-700 border-slate-600">
+                <SelectContent>
                   {INDIAN_CITIES.map(city => (
-                    <SelectItem key={city} value={city} className="text-white">{city}</SelectItem>
+                    <SelectItem key={city} value={city}>{city}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">Business Type</label>
+              <label className="block text-xs font-medium text-muted-foreground mb-1.5">Business Type</label>
               <Select value={selectedType} onValueChange={setSelectedType}>
-                <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
-                  <SelectValue placeholder="Select type" />
+                <SelectTrigger>
+                  <SelectValue />
                 </SelectTrigger>
-                <SelectContent className="bg-slate-700 border-slate-600">
+                <SelectContent>
                   {BUSINESS_TYPES.map(type => (
-                    <SelectItem key={type.value} value={type.value} className="text-white">{type.label}</SelectItem>
+                    <SelectItem key={type.value} value={type.value}>{type.label}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -192,170 +210,216 @@ export default function PartnerOutreach() {
             <div className="flex items-end">
               <Button
                 onClick={handleSearch}
-                disabled={!selectedCity || searchMutation.isPending}
+                disabled={!selectedCity || isSearching}
                 className="w-full bg-orange-500 hover:bg-orange-600 text-white"
               >
-                <Search className="w-4 h-4 mr-2" />
-                {searchMutation.isPending ? "Searching Google Maps..." : "Search Live"}
+                {isSearching
+                  ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Searching...</>
+                  : <><Search className="w-4 h-4 mr-2" />Search Live</>
+                }
               </Button>
             </div>
           </div>
-          {searchMutation.isPending && (
-            <p className="text-gray-400 text-sm mt-3 text-center">Searching Google Maps for {selectedType} in {selectedCity}... This may take 10-20 seconds.</p>
+          {isSearching && (
+            <p className="text-muted-foreground text-sm mt-3 text-center">
+              Searching Google Maps for {selectedType} in {selectedCity}... This may take 15-30 seconds.
+            </p>
           )}
+        </CardContent>
+      </Card>
+
+      {/* Results */}
+      {isSearching ? (
+        <div className="flex flex-col items-center justify-center py-16 gap-4">
+          <Loader2 className="w-10 h-10 animate-spin text-orange-400" />
+          <p className="text-muted-foreground text-sm">Fetching companies and extracting contact details...</p>
         </div>
+      ) : businesses.length > 0 ? (
+        <div className="space-y-3">
+          <p className="text-sm text-muted-foreground">
+            <span className="font-semibold text-foreground">{businesses.length}</span> companies found in {selectedCity}
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {businesses.map((business: any, idx: number) => {
+              const status = getPartnerStatus(business.email || "", business.phone || "");
+              const hasEmail = !!business.email;
+              const hasPhone = !!business.phone;
+              return (
+                <Card key={business.id || idx} className="border-border/30 bg-card/60">
+                  <CardContent className="p-4 space-y-3">
+                    {/* Name + status */}
+                    <div className="flex items-start justify-between gap-2">
+                      <h3 className="font-semibold text-foreground text-sm leading-tight">{business.businessName}</h3>
+                      {getStatusBadge(status)}
+                    </div>
 
-        {/* Results */}
-        {businesses.length > 0 && (
-          <div className="bg-slate-800/50 border border-slate-700 rounded-lg overflow-hidden">
-            <div className="px-5 py-3 border-b border-slate-700 flex items-center justify-between">
-              <span className="text-white font-semibold">{businesses.length} companies found in {selectedCity}</span>
-              <span className="text-gray-400 text-sm">Click Email or WhatsApp to start outreach</span>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-slate-700/50 border-b border-slate-600">
-                  <tr>
-                    <th className="px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase">Company</th>
-                    <th className="px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase">Phone</th>
-                    <th className="px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase">Email</th>
-                    <th className="px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase">Status</th>
-                    <th className="px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase">Outreach</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-700">
-                  {businesses.map((business: any, idx: number) => {
-                    const status = getPartnerStatus(business.email || "", business.phone || "");
-                    const hasEmail = !!business.email;
-                    const hasPhone = !!business.phone;
-                    return (
-                      <tr key={business.id || idx} className="hover:bg-slate-700/20 transition">
-                        <td className="px-5 py-4">
-                          <div className="text-sm text-white font-medium">{business.businessName}</div>
-                          <div className="text-xs text-gray-500 mt-0.5">{business.address}</div>
-                        </td>
-                        <td className="px-5 py-4 text-sm text-gray-400">{business.phone || <span className="text-gray-600 italic">No phone</span>}</td>
-                        <td className="px-5 py-4 text-sm text-gray-400">{business.email || <span className="text-gray-600 italic">No email</span>}</td>
-                        <td className="px-5 py-4">{getStatusBadge(status)}</td>
-                        <td className="px-5 py-4">
-                          {status === "signed_up" ? (
-                            <span className="text-green-400 text-sm font-medium">✅ Active Partner</span>
-                          ) : (
-                            <div className="flex gap-2 flex-wrap">
-                              {hasPhone && (
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => openOutreachDialog(business, "whatsapp")}
-                                  className="border-green-500/50 text-green-400 hover:bg-green-500/10 text-xs px-3"
-                                >
-                                  <MessageSquare className="w-3 h-3 mr-1" /> WhatsApp
-                                </Button>
-                              )}
-                              {hasEmail && (
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => openOutreachDialog(business, "email")}
-                                  className="border-blue-500/50 text-blue-400 hover:bg-blue-500/10 text-xs px-3"
-                                >
-                                  <Mail className="w-3 h-3 mr-1" /> Email
-                                </Button>
-                              )}
-                              {!hasEmail && !hasPhone && (
-                                <span className="text-gray-600 text-xs italic">No contact info</span>
-                              )}
-                            </div>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+                    {/* Details */}
+                    <div className="space-y-1.5">
+                      {business.address && (
+                        <div className="flex items-start gap-2 text-muted-foreground">
+                          <MapPin className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                          <span className="text-xs line-clamp-1">{business.address}</span>
+                        </div>
+                      )}
+                      {business.phone && (
+                        <div className="flex items-center gap-2">
+                          <Phone className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
+                          <a href={`tel:${business.phone}`} className="text-xs font-medium text-foreground hover:text-orange-400">{business.phone}</a>
+                        </div>
+                      )}
+                      {business.email && (
+                        <div className="flex items-center gap-2">
+                          <Mail className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
+                          <a href={`mailto:${business.email}`} className="text-xs text-orange-400 hover:underline truncate">{business.email}</a>
+                        </div>
+                      )}
+                      {business.website && (
+                        <div className="flex items-center gap-2 text-muted-foreground">
+                          <Globe className="w-3.5 h-3.5 shrink-0" />
+                          <a href={business.website} target="_blank" rel="noopener noreferrer" className="text-xs text-orange-400 hover:underline truncate">
+                            {business.website.replace(/^https?:\/\//, "").slice(0, 35)}
+                          </a>
+                        </div>
+                      )}
+                      {business.rating && (
+                        <div className="flex items-center gap-1.5">
+                          <Star className="w-3.5 h-3.5 text-yellow-400 fill-yellow-400" />
+                          <span className="text-sm font-medium text-foreground">{business.rating}</span>
+                          {business.reviewCount > 0 && <span className="text-xs text-muted-foreground">({business.reviewCount} reviews)</span>}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Outreach buttons */}
+                    {status === "signed_up" ? (
+                      <div className="flex items-center gap-1.5 text-green-400 text-xs font-medium">
+                        <CheckCircle className="w-4 h-4" /> Active Partner
+                      </div>
+                    ) : (
+                      <div className="flex flex-wrap gap-2 pt-1">
+                        {hasPhone && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => openOutreachDialog(business, "whatsapp")}
+                            className="text-xs h-7 border-green-500/40 text-green-400 hover:bg-green-500/10"
+                          >
+                            <MessageSquare className="w-3.5 h-3.5 mr-1" />WhatsApp
+                          </Button>
+                        )}
+                        {hasEmail && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => openOutreachDialog(business, "email")}
+                            className="text-xs h-7 border-blue-500/40 text-blue-400 hover:bg-blue-500/10"
+                          >
+                            <Mail className="w-3.5 h-3.5 mr-1" />Email
+                          </Button>
+                        )}
+                        {!hasEmail && !hasPhone && (
+                          <span className="text-muted-foreground text-xs italic">No contact info found</span>
+                        )}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              );
+            })}
           </div>
-        )}
+        </div>
+      ) : hasSearched && !isSearching ? (
+        <Card className="border-border/30 bg-card/60">
+          <CardContent className="p-12 text-center">
+            <AlertCircle className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+            <p className="text-muted-foreground">No companies found in {selectedCity}. Try a different city or business type.</p>
+          </CardContent>
+        </Card>
+      ) : (
+        <Card className="border-border/30 bg-card/60">
+          <CardContent className="p-12 text-center">
+            <Building2 className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+            <p className="text-foreground font-medium mb-1">Find Solar Companies to Partner With</p>
+            <p className="text-muted-foreground text-sm max-w-md mx-auto">
+              Select a city and click "Search Live" to find solar companies from Google Maps. Then pitch them to sign up as Sales Squad partners.
+            </p>
+          </CardContent>
+        </Card>
+      )}
 
-        {searchTriggered && businesses.length === 0 && !searchMutation.isPending && (
-          <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-12 text-center">
-            <AlertCircle className="w-12 h-12 text-gray-500 mx-auto mb-4" />
-            <p className="text-gray-400">No companies found in {selectedCity}. Try a different city or business type.</p>
-          </div>
-        )}
-
-        {!searchTriggered && (
-          <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-12 text-center">
-            <MapPin className="w-12 h-12 text-gray-500 mx-auto mb-4" />
-            <p className="text-gray-400 font-medium">Select a city and click "Search Live" to find solar companies from Google Maps</p>
-            <p className="text-gray-500 text-sm mt-2">Results are fetched live — no pre-loading needed</p>
-          </div>
-        )}
-
-        {/* Outreach Dialog */}
-        <Dialog open={showOutreachDialog} onOpenChange={setShowOutreachDialog}>
-          <DialogContent className="bg-slate-800 border-slate-700 text-white max-w-2xl">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                {outreachMode === "whatsapp"
-                  ? <><MessageSquare className="w-5 h-5 text-green-400" /> WhatsApp Outreach</>
-                  : <><Mail className="w-5 h-5 text-blue-400" /> Email Outreach</>
-                }
-              </DialogTitle>
-            </DialogHeader>
-            {selectedBusiness && (
-              <div className="space-y-4">
-                <div className="bg-slate-700/50 rounded-lg p-3 text-sm text-gray-300">
-                  <span className="font-semibold text-white">{selectedBusiness.businessName}</span>
-                  {outreachMode === "email" && selectedBusiness.email && (
-                    <span className="text-gray-400 ml-2">→ {selectedBusiness.email}</span>
-                  )}
-                  {outreachMode === "whatsapp" && selectedBusiness.phone && (
-                    <span className="text-gray-400 ml-2">→ {selectedBusiness.phone}</span>
-                  )}
-                </div>
-
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <label className="text-sm font-medium text-gray-300">Message</label>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={handleGenerateAIPitch}
-                      disabled={isGeneratingPitch}
-                      className="border-orange-500/50 text-orange-400 hover:bg-orange-500/10 text-xs"
-                    >
-                      <Sparkles className="w-3 h-3 mr-1" />
-                      {isGeneratingPitch ? "Generating..." : "AI Generate Pitch"}
-                    </Button>
-                  </div>
-                  <Textarea
-                    value={customMessage}
-                    onChange={(e) => setCustomMessage(e.target.value)}
-                    rows={10}
-                    className="bg-slate-700 border-slate-600 text-white text-sm resize-none"
-                    placeholder="Your outreach message..."
-                  />
-                </div>
-
-                <div className="flex gap-3 justify-end">
-                  <Button variant="outline" onClick={() => setShowOutreachDialog(false)} className="border-slate-600 text-gray-300">
-                    Cancel
-                  </Button>
-                  <Button
-                    onClick={handleSend}
-                    disabled={sendEmailMutation.isPending || !customMessage.trim()}
-                    className={outreachMode === "whatsapp" ? "bg-green-600 hover:bg-green-700 text-white" : "bg-blue-600 hover:bg-blue-700 text-white"}
-                  >
-                    {sendEmailMutation.isPending ? "Sending..." : outreachMode === "whatsapp" ? "Open WhatsApp" : "Send Email"}
-                  </Button>
-                </div>
+      {/* Outreach Dialog */}
+      <Dialog open={showOutreachDialog} onOpenChange={setShowOutreachDialog}>
+        <DialogContent className="bg-card border-border text-foreground max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              {outreachMode === "whatsapp"
+                ? <><MessageSquare className="w-5 h-5 text-green-400" />WhatsApp Outreach</>
+                : <><Mail className="w-5 h-5 text-blue-400" />Email Outreach</>
+              }
+            </DialogTitle>
+          </DialogHeader>
+          {selectedBusiness && (
+            <div className="space-y-4">
+              <div className="bg-muted/30 rounded-lg p-3 text-sm">
+                <span className="font-semibold text-foreground">{selectedBusiness.businessName}</span>
+                {outreachMode === "email" && selectedBusiness.email && (
+                  <span className="text-muted-foreground ml-2">→ {selectedBusiness.email}</span>
+                )}
+                {outreachMode === "whatsapp" && selectedBusiness.phone && (
+                  <span className="text-muted-foreground ml-2">→ {selectedBusiness.phone}</span>
+                )}
               </div>
-            )}
-          </DialogContent>
-        </Dialog>
 
-      </div>
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="text-sm font-medium text-foreground">Message</label>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={handleGenerateAIPitch}
+                    disabled={isGeneratingPitch}
+                    className="border-orange-500/50 text-orange-400 hover:bg-orange-500/10 text-xs"
+                  >
+                    {isGeneratingPitch
+                      ? <><Loader2 className="w-3 h-3 mr-1 animate-spin" />Generating...</>
+                      : <><Sparkles className="w-3 h-3 mr-1" />AI Personalise</>
+                    }
+                  </Button>
+                </div>
+                <Textarea
+                  value={customMessage}
+                  onChange={(e) => setCustomMessage(e.target.value)}
+                  rows={10}
+                  className="text-sm resize-none"
+                  placeholder="Your outreach message..."
+                />
+                <p className="text-xs text-muted-foreground mt-1.5">
+                  This message pitches Sales Squad's lead generation platform to recruit them as a partner.
+                </p>
+              </div>
+
+              <div className="flex gap-3 justify-end">
+                <Button variant="outline" onClick={() => setShowOutreachDialog(false)}>
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleSend}
+                  disabled={sendEmailMutation.isPending || !customMessage.trim()}
+                  className={outreachMode === "whatsapp"
+                    ? "bg-green-600 hover:bg-green-700 text-white"
+                    : "bg-blue-600 hover:bg-blue-700 text-white"
+                  }
+                >
+                  {sendEmailMutation.isPending
+                    ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Sending...</>
+                    : outreachMode === "whatsapp" ? "Open WhatsApp" : "Send Email"
+                  }
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
