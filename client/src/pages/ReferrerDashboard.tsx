@@ -105,6 +105,85 @@ export default function ReferrerDashboard() {
     navigator.clipboard.writeText(caption);
     alert("Caption copied! Open Instagram, create a post or story, and paste the caption.");
   };
+  const shareWhatsAppStatus = () => {
+    // WhatsApp Status share — opens wa.me with the link so user can copy to Status
+    const msg = encodeURIComponent(`🌞 *Save on electricity with Solar!*\n\nGet a FREE estimate in 2 minutes — chat with our AI advisor:\n👉 ${referralLink}\n\nWorks for homes & businesses! ☀️`);
+    window.open(`https://wa.me/?text=${msg}`, "_blank");
+  };
+  const shareInstagramWithGraphic = () => {
+    // Generate a solar savings graphic as a canvas image and copy caption
+    const canvas = document.createElement("canvas");
+    canvas.width = 1080;
+    canvas.height = 1080;
+    const ctx = canvas.getContext("2d")!;
+    // Background gradient
+    const grad = ctx.createLinearGradient(0, 0, 1080, 1080);
+    grad.addColorStop(0, "#0a0a0a");
+    grad.addColorStop(1, "#0d2b1a");
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, 1080, 1080);
+    // Sun circle
+    const sunGrad = ctx.createRadialGradient(540, 320, 0, 540, 320, 200);
+    sunGrad.addColorStop(0, "#fbbf24");
+    sunGrad.addColorStop(0.5, "#f97316");
+    sunGrad.addColorStop(1, "rgba(249,115,22,0)");
+    ctx.fillStyle = sunGrad;
+    ctx.beginPath();
+    ctx.arc(540, 320, 200, 0, Math.PI * 2);
+    ctx.fill();
+    // Sun rays
+    ctx.strokeStyle = "rgba(251,191,36,0.3)";
+    ctx.lineWidth = 3;
+    for (let i = 0; i < 12; i++) {
+      const angle = (i / 12) * Math.PI * 2;
+      ctx.beginPath();
+      ctx.moveTo(540 + Math.cos(angle) * 210, 320 + Math.sin(angle) * 210);
+      ctx.lineTo(540 + Math.cos(angle) * 280, 320 + Math.sin(angle) * 280);
+      ctx.stroke();
+    }
+    // Main headline
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "bold 72px Arial";
+    ctx.textAlign = "center";
+    ctx.fillText("☀️ Switch to Solar", 540, 600);
+    ctx.font = "bold 52px Arial";
+    ctx.fillStyle = "#10b981";
+    ctx.fillText("Save ₹2,000-5,000/month", 540, 680);
+    // Sub text
+    ctx.font = "36px Arial";
+    ctx.fillStyle = "#9ca3af";
+    ctx.fillText("Free estimate in 2 minutes", 540, 750);
+    ctx.fillText("Works for homes & businesses", 540, 800);
+    // CTA box
+    ctx.fillStyle = "rgba(16,185,129,0.2)";
+    ctx.strokeStyle = "#10b981";
+    ctx.lineWidth = 3;
+    const boxX = 140, boxY = 840, boxW = 800, boxH = 100;
+    ctx.beginPath();
+    ctx.roundRect(boxX, boxY, boxW, boxH, 16);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = "#10b981";
+    ctx.font = "bold 32px Arial";
+    ctx.fillText("👉 Chat with our AI advisor now", 540, 900);
+    ctx.fillStyle = "#6b7280";
+    ctx.font = "24px Arial";
+    ctx.fillText("Sales Squad • AI-Powered Solar Leads", 540, 980);
+    // Download the image
+    canvas.toBlob((blob) => {
+      if (!blob) return;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "solar-share.png";
+      a.click();
+      URL.revokeObjectURL(url);
+    }, "image/png");
+    // Copy caption
+    const caption = `🌞 Switch to Solar & Save ₹2,000-5,000/month!\n\nGet a FREE solar estimate in 2 minutes:\n👉 ${referralLink}\n\nWorks for homes AND businesses! ☀️ #Solar #SolarEnergy #GreenEnergy #SaveElectricity #PMSuryaGhar`;
+    navigator.clipboard.writeText(caption);
+    alert("Image downloaded & caption copied! Post on Instagram.");
+  };
 
   if (!uniqueCode) return null;
 
@@ -284,6 +363,12 @@ export default function ReferrerDashboard() {
                 <button onClick={shareInstagram} style={{ flex: 1, minWidth: 90, background: "linear-gradient(45deg,#f09433,#e6683c,#dc2743,#cc2366,#bc1888)", color: "#fff", border: "none", borderRadius: 8, padding: "10px 0", cursor: "pointer", fontWeight: 600, fontSize: 13 }}>
                   📸 Instagram
                 </button>
+                <button onClick={shareWhatsAppStatus} style={{ flex: 1, minWidth: 110, background: "#075e54", color: "#fff", border: "none", borderRadius: 8, padding: "10px 0", cursor: "pointer", fontWeight: 600, fontSize: 13 }}>
+                  📱 WA Status
+                </button>
+                <button onClick={shareInstagramWithGraphic} style={{ flex: 1, minWidth: 120, background: "linear-gradient(45deg,#833ab4,#fd1d1d,#fcb045)", color: "#fff", border: "none", borderRadius: 8, padding: "10px 0", cursor: "pointer", fontWeight: 600, fontSize: 13 }}>
+                  🎨 IG Graphic
+                </button>
               </div>
             </div>
 
@@ -367,6 +452,8 @@ export default function ReferrerDashboard() {
                     <button onClick={shareWhatsApp} style={{ background: "#16a34a", color: "#fff", border: "none", borderRadius: 8, padding: "10px 16px", cursor: "pointer", fontWeight: 600 }}>📱 WhatsApp</button>
                     <button onClick={shareFacebook} style={{ background: "#1877f2", color: "#fff", border: "none", borderRadius: 8, padding: "10px 16px", cursor: "pointer", fontWeight: 600 }}>📘 Facebook</button>
                     <button onClick={shareInstagram} style={{ background: "linear-gradient(45deg,#f09433,#e6683c,#dc2743,#cc2366,#bc1888)", color: "#fff", border: "none", borderRadius: 8, padding: "10px 16px", cursor: "pointer", fontWeight: 600 }}>📸 Instagram</button>
+                    <button onClick={shareWhatsAppStatus} style={{ background: "#075e54", color: "#fff", border: "none", borderRadius: 8, padding: "10px 16px", cursor: "pointer", fontWeight: 600 }}>📱 WA Status</button>
+                    <button onClick={shareInstagramWithGraphic} style={{ background: "linear-gradient(45deg,#833ab4,#fd1d1d,#fcb045)", color: "#fff", border: "none", borderRadius: 8, padding: "10px 16px", cursor: "pointer", fontWeight: 600 }}>🎨 IG Graphic</button>
                   </div>
                 </div>
               ) : (
@@ -424,6 +511,8 @@ export default function ReferrerDashboard() {
                 <button onClick={shareWhatsApp} style={{ background: "#16a34a", color: "#fff", border: "none", borderRadius: 8, padding: "10px 16px", cursor: "pointer", fontWeight: 600 }}>📱 WhatsApp</button>
                 <button onClick={shareFacebook} style={{ background: "#1877f2", color: "#fff", border: "none", borderRadius: 8, padding: "10px 16px", cursor: "pointer", fontWeight: 600 }}>📘 Facebook</button>
                 <button onClick={shareInstagram} style={{ background: "linear-gradient(45deg,#f09433,#e6683c,#dc2743,#cc2366,#bc1888)", color: "#fff", border: "none", borderRadius: 8, padding: "10px 16px", cursor: "pointer", fontWeight: 600 }}>📸 Instagram</button>
+                <button onClick={shareWhatsAppStatus} style={{ background: "#075e54", color: "#fff", border: "none", borderRadius: 8, padding: "10px 16px", cursor: "pointer", fontWeight: 600 }}>📱 WA Status</button>
+                <button onClick={shareInstagramWithGraphic} style={{ background: "linear-gradient(45deg,#833ab4,#fd1d1d,#fcb045)", color: "#fff", border: "none", borderRadius: 8, padding: "10px 16px", cursor: "pointer", fontWeight: 600 }}>🎨 IG Graphic</button>
               </div>
             </div>
           </div>
