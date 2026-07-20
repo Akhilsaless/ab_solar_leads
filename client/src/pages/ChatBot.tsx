@@ -423,13 +423,7 @@ export default function ChatBot() {
         setHandoffShown(true);
       }
 
-      // Auto-advance pitch sequence
-      if (data.stage === "pitch_a" || data.stage === "pitch_b") {
-        autoSequenceRef.current = setTimeout(() => {
-          setIsLoading(true);
-          sendMsg.mutate({ sessionId, message: "__auto_continue__" });
-        }, 1200);
-      }
+      // No auto-continue — Klaus asks one question and waits for the customer to reply
     },
     onError: () => {
       setMessages(prev => [...prev, { role: "bot", content: "Sorry, I'm having trouble right now. Please try again.", quickReplies: ["Try again"], createdAt: new Date() }]);

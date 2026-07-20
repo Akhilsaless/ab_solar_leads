@@ -243,9 +243,9 @@
 - [x] Fix referral link to use dynamic agency slug from DB
 
 ## Bot Personality Rewrite (Jul 20 2026)
-- [ ] Rewrite system prompt with Option A+C pitch (shock the bill + free money hook)
-- [ ] Remove "ji" from all objection handling examples
-- [ ] Remove repeated "Why Solar Now" section from estimate format
-- [ ] Add persistent location quick reply from bill stage onwards
-- [ ] Fix auto-continue timer: cancel if customer sends message first
-- [ ] Keep animated estimate card and agent handoff exactly as-is
+- [x] Rewrite system prompt with Option A+C pitch (shock the bill + free money hook)
+- [x] Remove "ji" from all objection handling examples
+- [x] Remove repeated "Why Solar Now" section from estimate format
+- [x] Add persistent location quick reply from bill stage onwards
+- [x] Fix auto-continue timer: cancel if customer sends message first
+- [x] Keep animated estimate card and agent handoff exactly as-is
