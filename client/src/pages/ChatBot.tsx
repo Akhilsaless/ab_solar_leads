@@ -266,6 +266,85 @@ function BillUploadButton({ onUpload, brandColor, disabled }: { onUpload: (url: 
   );
 }
 
+// ─── Location Modal (GPS auto-detect + manual text fallback) ────────────────────
+function LocationModal({ onConfirm, onClose }: { onConfirm: (address: string) => void; onClose: () => void }) {
+  const [step, setStep] = useState<"detecting" | "detected" | "manual">("detecting");
+  const [detectedAddress, setDetectedAddress] = useState("");
+  const [manualAddress, setManualAddress] = useState("");
+
+  useEffect(() => {
+    if (!navigator.geolocation) { setStep("manual"); return; }
+    const tid = setTimeout(() => setStep("manual"), 8000);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        clearTimeout(tid);
+        const { latitude: lat, longitude: lng } = pos.coords;
+        // Try Google Geocoder if available, else use coords
+        if (typeof google !== "undefined" && google.maps?.Geocoder) {
+          new google.maps.Geocoder().geocode({ location: { lat, lng } }, (results, status) => {
+            const addr = status === "OK" && results?.[0] ? results[0].formatted_address : `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+            setDetectedAddress(addr);
+            setStep("detected");
+          });
+        } else {
+          setDetectedAddress(`${lat.toFixed(4)}, ${lng.toFixed(4)}`);
+          setStep("detected");
+        }
+      },
+      () => { clearTimeout(tid); setStep("manual"); },
+      { timeout: 7000, enableHighAccuracy: true }
+    );
+  }, []);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/80 p-4">
+      <div className="bg-gray-900 rounded-2xl border border-white/10 w-full max-w-sm overflow-hidden">
+        <div className="flex items-center justify-between p-4 border-b border-white/10">
+          <div className="flex items-center gap-2">
+            <MapPin className="w-4 h-4 text-emerald-400" />
+            <h3 className="text-white font-semibold text-sm">Share Your Location</h3>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-white"><X className="w-5 h-5" /></button>
+        </div>
+        <div className="p-4">
+          {step === "detecting" && (
+            <div className="flex flex-col items-center gap-3 py-4">
+              <Loader2 className="w-8 h-8 text-emerald-400 animate-spin" />
+              <p className="text-gray-400 text-sm">Detecting your location...</p>
+              <button onClick={() => setStep("manual")} className="text-xs text-gray-500 underline">Enter manually instead</button>
+            </div>
+          )}
+          {step === "detected" && (
+            <div className="flex flex-col gap-3">
+              <div className="bg-emerald-900/30 border border-emerald-500/20 rounded-xl p-3">
+                <p className="text-emerald-400 text-xs font-medium">📍 {detectedAddress}</p>
+              </div>
+              <p className="text-gray-500 text-xs">Is this your address? Confirm or enter it manually.</p>
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={() => setStep("manual")} className="flex-1 border-white/20 text-gray-300 bg-transparent hover:bg-white/10 text-sm h-9">Edit</Button>
+                <Button onClick={() => onConfirm(detectedAddress)} className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white border-0 text-sm h-9">Confirm</Button>
+              </div>
+            </div>
+          )}
+          {step === "manual" && (
+            <div className="flex flex-col gap-3">
+              <p className="text-gray-400 text-sm">Enter your full address:</p>
+              <Textarea
+                value={manualAddress}
+                onChange={(e) => setManualAddress(e.target.value)}
+                placeholder="e.g. 12 MG Road, Koramangala, Bengaluru, Karnataka 560034"
+                className="bg-white/[0.06] border-white/10 text-white placeholder:text-gray-500 rounded-xl text-sm resize-none"
+                rows={3}
+              />
+              <Button onClick={() => { if (manualAddress.trim()) onConfirm(manualAddress.trim()); }} disabled={!manualAddress.trim()} className="w-full bg-emerald-600 hover:bg-emerald-700 text-white border-0 text-sm h-9">Share Address</Button>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Main ChatBot ─────────────────────────────────────────────────────────────
 export default function ChatBot() {
   const params = useParams<{ slug: string }>();
@@ -693,46 +772,8 @@ export default function ChatBot() {
       </div>
 
       {/* Map Pin Modal */}
-      {showMapPin && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
-          <div className="bg-gray-900 rounded-2xl border border-white/10 w-full max-w-lg overflow-hidden">
-            <div className="flex items-center justify-between p-4 border-b border-white/10">
-              <div>
-                <h3 className="text-white font-semibold">Drop Your Location Pin</h3>
-                <p className="text-gray-400 text-xs mt-0.5">Tap on the map to mark your home</p>
-              </div>
-              <button onClick={() => setShowMapPin(false)} className="text-gray-400 hover:text-white"><X className="w-5 h-5" /></button>
-            </div>
-            <div className="h-72">
-              <MapView onMapReady={(map) => {
-                if (navigator.geolocation) {
-                  let tid: NodeJS.Timeout | null = setTimeout(() => map.setCenter({ lat: 20.5937, lng: 78.9629 }), 3000);
-                  navigator.geolocation.getCurrentPosition(
-                    (pos) => { if (tid) clearTimeout(tid); map.setCenter({ lat: pos.coords.latitude, lng: pos.coords.longitude }); },
-                    () => { if (tid) clearTimeout(tid); map.setCenter({ lat: 20.5937, lng: 78.9629 }); }
-                  );
-                }
-                map.addListener("click", (e: google.maps.MapMouseEvent) => {
-                  if (!e.latLng) return;
-                  const lat = e.latLng.lat(); const lng = e.latLng.lng();
-                  if (pinMarker) pinMarker.setMap(null);
-                  const marker = new google.maps.Marker({ position: { lat, lng }, map, animation: google.maps.Animation.DROP });
-                  setPinMarker(marker);
-                  new google.maps.Geocoder().geocode({ location: { lat, lng } }, (results, status) => {
-                    const address = status === "OK" && results?.[0] ? results[0].formatted_address : `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
-                    setPinnedLocation({ lat, lng, address });
-                  });
-                });
-              }} />
-            </div>
-            {pinnedLocation && <div className="p-3 bg-emerald-900/30 border-t border-emerald-500/20"><p className="text-emerald-400 text-xs font-medium">📍 {pinnedLocation.address}</p></div>}
-            <div className="p-4 flex gap-3">
-              <Button variant="outline" onClick={() => { setShowMapPin(false); setPinnedLocation(null); }} className="flex-1 border-white/20 text-white bg-transparent hover:bg-white/10">Cancel</Button>
-              <Button onClick={() => { if (pinnedLocation) { setShowMapPin(false); handleSend(`My location: ${pinnedLocation.address}`); } }} disabled={!pinnedLocation} className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white border-0">Confirm Location</Button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Location Modal — GPS auto-detect + manual text fallback */}
+      {showMapPin && <LocationModal onConfirm={(address) => { setShowMapPin(false); handleSend(`My location: ${address}`); }} onClose={() => setShowMapPin(false)} />}
     </div>
   );
 }

@@ -249,3 +249,11 @@
 - [x] Add persistent location quick reply from bill stage onwards
 - [x] Fix auto-continue timer: cancel if customer sends message first
 - [x] Keep animated estimate card and agent handoff exactly as-is
+
+## Final Launch Fixes (Jul 20 2026)
+- [ ] Fix location on mobile: replace map-pin with GPS auto-detect + manual text fallback
+- [ ] Remove __auto_continue__ handling from server routers.ts
+- [ ] Site visit: collect address + phone + email in one message + frontend form card
+- [ ] Stage-aware quick replies on frontend (not LLM-generated)
+- [ ] Add state question after bill, before estimate
+- [ ] Add brief solar explanation (1-2 lines) woven into hook message
