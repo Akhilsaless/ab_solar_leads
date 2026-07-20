@@ -6,7 +6,7 @@ import {
 } from "lucide-react";
 
 // Replace with your actual WhatsApp number
-const SALES_SQUAD_WHATSAPP = "919876543210";
+const SALES_SQUAD_WHATSAPP = "919133731003";
 
 export default function ForPartners() {
   const [, setLocation] = useLocation();
