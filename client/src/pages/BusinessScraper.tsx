@@ -76,7 +76,7 @@ function SolarScoreBadge({ score }: { score: number }) {
 export default function BusinessScraper() {
   const [businessType, setBusinessType] = useState("");
   const [location, setLocation] = useState("");
-  const [state, setState] = useState("");
+  const [state, setState] = useState("all");
   const [sizeFilter, setSizeFilter] = useState("all");
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [generatingPitch, setGeneratingPitch] = useState<number | null>(null);
@@ -90,7 +90,7 @@ export default function BusinessScraper() {
   const resultsQuery = trpc.scraper.results.useQuery({
     businessType: businessType || undefined,
     businessSize: sizeFilter !== "all" ? sizeFilter : undefined,
-    state: state || undefined,
+    state: (state && state !== "all") ? state : undefined,
   });
 
   const importMutation = trpc.scraper.importAsLead.useMutation({
@@ -192,14 +192,14 @@ export default function BusinessScraper() {
               <Select value={state} onValueChange={setState}>
                 <SelectTrigger><SelectValue placeholder="All states" /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All States</SelectItem>
+                  <SelectItem value="all">All States</SelectItem>
                   {INDIAN_STATES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
           </div>
           <div className="flex gap-3 mt-4">
-            <Button onClick={() => searchMutation.mutate({ businessType, location, state })}
+            <Button onClick={() => searchMutation.mutate({ businessType, location, state: state !== "all" ? state : "" })}
               disabled={searchMutation.isPending || !businessType || !location}
               className="bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white">
               {searchMutation.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Search className="w-4 h-4 mr-2" />}
