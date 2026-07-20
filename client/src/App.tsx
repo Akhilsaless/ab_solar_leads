@@ -18,6 +18,8 @@ import ReferralManagement from "@/pages/ReferralManagement";
 import ReferralLanding from "@/pages/ReferralLanding";
 import ReferralTerms from "@/pages/ReferralTerms";
 import VerifyReferral from "@/pages/VerifyReferral";
+import PartnerOutreach from "@/pages/PartnerOutreach";
+import PartnerSignup from "@/pages/PartnerSignup";
 import DashboardLayout from "@/components/DashboardLayout";
 import { Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
@@ -61,6 +63,10 @@ function Router() {
       <Route path="/admin/referrals" component={ReferralManagement} />
       <Route path="/terms-referral" component={ReferralTerms} />
       <Route path="/verify-referral" component={VerifyReferral} />
+
+      {/* Partner outreach and signup */}
+      <Route path="/partner-outreach" component={PartnerOutreach} />
+      <Route path="/partner-signup" component={PartnerSignup} />
 
       {/* Public pricing page */}
       <Route path="/pricing" component={Pricing} />

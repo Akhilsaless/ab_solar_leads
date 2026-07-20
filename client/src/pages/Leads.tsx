@@ -37,6 +37,19 @@ export default function Leads() {
     },
   });
 
+  const assignLead = trpc.partner.assignLeadToPartner.useMutation({
+    onSuccess: () => {
+      leads.refetch();
+      toast.success("Lead assigned to partner");
+    },
+    onError: (err) => {
+      toast.error(err.message || "Failed to assign lead");
+    },
+  });
+
+  const partnersQuery = trpc.partner.getPartners.useQuery();
+  const partners = (partnersQuery.data as any[]) || [];
+
   const allLeads = leads.data || [];
 
   return (
@@ -88,6 +101,7 @@ export default function Leads() {
                 <th className="text-left text-xs font-medium text-muted-foreground px-4 py-3 hidden lg:table-cell">Score</th>
                 <th className="text-left text-xs font-medium text-muted-foreground px-4 py-3 hidden lg:table-cell">State</th>
                 <th className="text-left text-xs font-medium text-muted-foreground px-4 py-3 hidden xl:table-cell">Referrer</th>
+                <th className="text-left text-xs font-medium text-muted-foreground px-4 py-3 hidden lg:table-cell">Assigned To</th>
                 <th className="text-right text-xs font-medium text-muted-foreground px-4 py-3">Actions</th>
               </tr>
             </thead>
@@ -167,6 +181,21 @@ export default function Leads() {
                           {lead.referrerCode}
                         </span>
                       ) : <span className="text-xs text-muted-foreground">Direct</span>}
+                    </td>
+                    <td className="px-4 py-3 hidden lg:table-cell">
+                      <Select value={lead.assignedPartnerId?.toString() || ""} onValueChange={(val) => {
+                        assignLead.mutate({ leadId: lead.id, partnerId: val ? parseInt(val) : null });
+                      }}>
+                        <SelectTrigger className="w-[140px] text-xs" onClick={(e: any) => e.stopPropagation()}>
+                          <SelectValue placeholder="Unassigned" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="">Unassigned</SelectItem>
+                          {partners.map((p: any) => (
+                            <SelectItem key={p.id} value={p.id.toString()}>{p.companyName}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </td>
                     <td className="px-4 py-3 text-right">
                       <DropdownMenu>

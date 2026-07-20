@@ -11,11 +11,13 @@ import { getStripe } from "./stripe-handler";
 import { PLANS, TRIAL_DAYS } from "./stripe-products";
 import * as db from "./db";
 import { referrerRouter } from "./referrer";
+import { partnerRouter } from "./partner";
 import { sendEmail } from "./_core/emailService";
 
 export const appRouter = router({
   system: systemRouter,
   referrer: referrerRouter,
+  partner: partnerRouter,
   auth: router({
     me: publicProcedure.query(opts => opts.ctx.user),
     logout: publicProcedure.mutation(({ ctx }) => {
