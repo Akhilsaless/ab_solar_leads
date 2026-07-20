@@ -7,7 +7,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Send, Loader2, Sun, Zap, ArrowDown, Download, MapPin, X, Upload, Image as ImageIcon, MessageCircle, BarChart2, Play, PhoneCall } from "lucide-react";
 import { Streamdown } from "streamdown";
 import { nanoid } from "nanoid";
-import jsPDF from "jspdf";
+import { jsPDF } from "jspdf";
 import { MapView } from "@/components/Map";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
 
