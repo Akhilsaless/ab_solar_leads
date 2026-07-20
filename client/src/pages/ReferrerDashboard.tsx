@@ -445,11 +445,20 @@ export default function ReferrerDashboard() {
                 <span style={{ color: C.subtle, fontSize: 13 }}>🎁 Signup Bonus (credited on join)</span>
                 <span style={{ color: C.green, fontWeight: 700, fontSize: 15 }}>+₹50</span>
               </div>
+              <div style={{ background: C.bg, borderRadius: 8, padding: 14, border: `1px solid ${C.border}`, marginBottom: 12 }}>
+                <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: C.text, marginBottom: 10 }}>💰 How You Earn:</p>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, fontSize: 12 }}>
+                  <div><span style={{ color: "#10b981", fontWeight: 600 }}>₹20</span> <span style={{ color: C.muted }}>per verified lead</span></div>
+                  <div><span style={{ color: "#f97316", fontWeight: 600 }}>₹500</span> <span style={{ color: C.muted }}>when subsidy applied</span></div>
+                  <div><span style={{ color: "#a78bfa", fontWeight: 600 }}>₹1,500</span> <span style={{ color: C.muted }}>when installed</span></div>
+                  <div><span style={{ color: "#fbbf24", fontWeight: 600 }}>₹100-₹500</span> <span style={{ color: C.muted }}>daily task bonus</span></div>
+                </div>
+              </div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
                 {[
-                  { label: "Subsidy Bonuses (₹500)", value: `₹${(completedReferrals * 500 + subsidyReferrals * 500).toLocaleString()}`, color: "#60a5fa" },
+                  { label: "Verified Leads (₹20 each)", value: `₹${((referrals?.filter((r: any) => r.customerVerified)?.length || 0) * 20).toLocaleString()}`, color: "#10b981" },
+                  { label: "Subsidy Bonuses (₹500)", value: `₹${(subsidyReferrals * 500).toLocaleString()}`, color: "#60a5fa" },
                   { label: "Install Bonuses (₹1,500)", value: `₹${(completedReferrals * 1500).toLocaleString()}`, color: "#a78bfa" },
-                  { label: "Subsidy Applied", value: subsidyReferrals.toString(), color: C.orange },
                   { label: "Potential Earn", value: `₹${(subsidyReferrals * 1500).toLocaleString()}`, color: C.green },
                 ].map((item, i) => (
                   <div key={i} style={{ background: C.bg, borderRadius: 8, padding: 12, border: `1px solid ${C.border}` }}>
