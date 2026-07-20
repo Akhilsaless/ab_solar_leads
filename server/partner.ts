@@ -4,6 +4,7 @@ import * as db from "./db";
 import { sql } from "drizzle-orm";
 import { sendEmail } from "./_core/emailService";
 import { nanoid } from "nanoid";
+import { invokeLLM } from "./_core/llm";
 
 export const partnerRouter = router({
   // Search scraped businesses to add as partners
@@ -46,6 +47,7 @@ export const partnerRouter = router({
       whatsappNumber: z.string().optional(),
       serviceAreas: z.array(z.string()).optional(),
       customMessage: z.string().optional(),
+      skipEmail: z.boolean().optional(),
     }))
     .mutation(async ({ input }) => {
       try {
@@ -103,11 +105,13 @@ export const partnerRouter = router({
           </div>
         `;
 
-        await sendEmail({
-          to: input.email,
-          subject: "Earn Commission with Sales Squad — Qualified Solar Leads",
-          html: emailHtml,
-        });
+        if (!input.skipEmail) {
+          await sendEmail({
+            to: input.email,
+            subject: "Earn Commission with Sales Squad — Qualified Solar Leads",
+            html: emailHtml,
+          });
+        }
 
         return { success: true, partnerId, signupLink };
       } catch (error) {
@@ -213,6 +217,32 @@ export const partnerRouter = router({
         convertedLeads: converted,
         conversionRate: total > 0 ? ((converted / total) * 100).toFixed(1) : "0",
       };
+    }),
+
+  // Generate AI outreach pitch
+  generateOutreachPitch: protectedProcedure
+    .input(z.object({
+      companyName: z.string(),
+      city: z.string(),
+      mode: z.enum(["email", "whatsapp"]),
+      partnerUrl: z.string(),
+    }))
+    .mutation(async ({ input }) => {
+      const systemPrompt = input.mode === "whatsapp"
+        ? `You are a sales expert writing a WhatsApp message to a solar company. Write a short, friendly, persuasive WhatsApp message (max 200 words) explaining that Sales Squad generates qualified solar leads using AI and sends them to solar installers. Include: what they get (name, phone, email, bill amount, location of customer), that customers are pre-qualified, and end with the signup link. Use emojis sparingly. Be conversational, not corporate.`
+        : `You are a sales expert writing a cold outreach email to a solar company. Write a professional, persuasive email (max 250 words) explaining that Sales Squad generates qualified solar leads using AI and sends them to solar installers. Include: what they get (name, phone, email, bill amount, location of customer), that customers are pre-qualified, and end with the signup link. Be professional but warm.`;
+
+      const userPrompt = `Company: ${input.companyName}\nCity: ${input.city}\nSignup link: ${input.partnerUrl}\n\nWrite the ${input.mode === "whatsapp" ? "WhatsApp message" : "email"} now.`;
+
+      const response = await invokeLLM({
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ],
+      });
+
+      const pitch = response.choices?.[0]?.message?.content || "";
+      return { pitch };
     }),
 
   // Assign lead to partner

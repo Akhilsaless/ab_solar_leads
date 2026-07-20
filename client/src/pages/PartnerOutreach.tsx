@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Mail, Phone, MapPin, CheckCircle, Clock, AlertCircle } from "lucide-react";
+import { Mail, Phone, MapPin, CheckCircle, Clock, AlertCircle, MessageSquare, Sparkles, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
 
 const INDIAN_CITIES = [
@@ -22,12 +22,22 @@ const BUSINESS_TYPES = [
   "Construction Companies"
 ];
 
+const DEFAULT_WHATSAPP_PITCH = (companyName: string, partnerUrl: string) =>
+  `Hi ${companyName} Team 👋\n\nI'm reaching out from *Sales Squad* — we generate qualified solar leads using AI, 24/7.\n\nEvery lead includes:\n✅ Customer name, phone & email\n✅ Monthly electricity bill amount\n✅ Location & GPS coordinates\n✅ AI-calculated lead score\n\nCustomers are already interested — our chatbot qualifies them before we send the lead to you. You just close the deal.\n\n👉 Learn more & sign up free: ${partnerUrl}\n\nLet me know if you'd like to discuss — happy to share more details!`;
+
+const DEFAULT_EMAIL_PITCH = (companyName: string, partnerUrl: string) =>
+  `Hi ${companyName} Team,\n\nI'm reaching out from Sales Squad — we help solar companies grow by generating qualified leads using AI.\n\nHere's how it works:\n1. A property owner chats with our AI bot\n2. The bot qualifies them (bill amount, location, intent)\n3. We send you the lead with full details — name, phone, email, bill, location\n\nYou get leads that are already interested. No cold calling, no marketing spend from your side.\n\nSign up free here: ${partnerUrl}\n\nLooking forward to partnering with you!\n\nBest regards,\nSales Squad Team`;
+
 export default function PartnerOutreach() {
   const [selectedCity, setSelectedCity] = useState("");
   const [selectedType, setSelectedType] = useState("");
-  const [showEmailDialog, setShowEmailDialog] = useState(false);
+  const [showOutreachDialog, setShowOutreachDialog] = useState(false);
   const [selectedBusiness, setSelectedBusiness] = useState<any>(null);
+  const [outreachMode, setOutreachMode] = useState<"email" | "whatsapp">("email");
   const [customMessage, setCustomMessage] = useState("");
+  const [isGeneratingPitch, setIsGeneratingPitch] = useState(false);
+
+  const partnerUrl = `${window.location.origin}/for-partners`;
 
   const searchQuery = trpc.partner.searchBusinesses.useQuery(
     { city: selectedCity, businessType: selectedType },
@@ -35,10 +45,11 @@ export default function PartnerOutreach() {
   );
 
   const partnersQuery = trpc.partner.getPartners.useQuery();
+
   const sendEmailMutation = trpc.partner.sendOutreachEmail.useMutation({
     onSuccess: () => {
       toast.success("Email sent successfully!");
-      setShowEmailDialog(false);
+      setShowOutreachDialog(false);
       setCustomMessage("");
       partnersQuery.refetch();
     },
@@ -47,41 +58,114 @@ export default function PartnerOutreach() {
     },
   });
 
-  const handleSendEmail = () => {
+  const generateAIPitch = trpc.partner.generateOutreachPitch.useMutation({
+    onSuccess: (data: any) => {
+      setCustomMessage(data.pitch);
+      setIsGeneratingPitch(false);
+    },
+    onError: () => {
+      // Fallback to default pitch
+      const pitch = outreachMode === "whatsapp"
+        ? DEFAULT_WHATSAPP_PITCH(selectedBusiness?.businessName || "", partnerUrl)
+        : DEFAULT_EMAIL_PITCH(selectedBusiness?.businessName || "", partnerUrl);
+      setCustomMessage(pitch);
+      setIsGeneratingPitch(false);
+    },
+  });
+
+  const openOutreachDialog = (business: any, mode: "email" | "whatsapp") => {
+    setSelectedBusiness(business);
+    setOutreachMode(mode);
+    const pitch = mode === "whatsapp"
+      ? DEFAULT_WHATSAPP_PITCH(business.businessName, partnerUrl)
+      : DEFAULT_EMAIL_PITCH(business.businessName, partnerUrl);
+    setCustomMessage(pitch);
+    setShowOutreachDialog(true);
+  };
+
+  const handleGenerateAIPitch = () => {
     if (!selectedBusiness) return;
-    sendEmailMutation.mutate({
+    setIsGeneratingPitch(true);
+    generateAIPitch.mutate({
       companyName: selectedBusiness.businessName,
-      email: selectedBusiness.email,
-      phone: selectedBusiness.phone,
-      serviceAreas: [selectedCity],
-      customMessage: customMessage || undefined,
+      city: selectedCity,
+      mode: outreachMode,
+      partnerUrl,
     });
   };
 
-  const getPartnerStatus = (email: string) => {
-    const partners = partnersQuery.data as any[] || [];
-    const partner = partners.find((p: any) => p.email === email);
+  const handleSend = () => {
+    if (!selectedBusiness) return;
+    if (outreachMode === "whatsapp") {
+      const phone = selectedBusiness.phone?.replace(/\D/g, "");
+      if (!phone) {
+        toast.error("No phone number available for this company");
+        return;
+      }
+      const waUrl = `https://wa.me/${phone.startsWith("91") ? phone : "91" + phone}?text=${encodeURIComponent(customMessage)}`;
+      window.open(waUrl, "_blank");
+      // Mark as contacted
+      sendEmailMutation.mutate({
+        companyName: selectedBusiness.businessName,
+        email: selectedBusiness.email || "",
+        phone: selectedBusiness.phone,
+        serviceAreas: [selectedCity],
+        customMessage: `[WhatsApp sent] ${customMessage}`,
+        skipEmail: true,
+      });
+      toast.success("WhatsApp opened! Send the message to complete outreach.");
+      setShowOutreachDialog(false);
+    } else {
+      if (!selectedBusiness.email) {
+        toast.error("No email available for this company");
+        return;
+      }
+      sendEmailMutation.mutate({
+        companyName: selectedBusiness.businessName,
+        email: selectedBusiness.email,
+        phone: selectedBusiness.phone,
+        serviceAreas: [selectedCity],
+        customMessage: customMessage || undefined,
+      });
+    }
+  };
+
+  const getPartnerStatus = (email: string, phone: string) => {
+    const partners = (partnersQuery.data as any[]) || [];
+    const partner = partners.find((p: any) => p.email === email || p.phone === phone);
     if (!partner) return null;
     return partner.status;
   };
 
-  const getStatusIcon = (status: string) => {
-    if (status === "signed_up") return <CheckCircle className="w-4 h-4 text-green-500" />;
-    if (status === "email_sent") return <Clock className="w-4 h-4 text-yellow-500" />;
-    return <AlertCircle className="w-4 h-4 text-gray-400" />;
+  const getStatusBadge = (status: string | null) => {
+    if (status === "signed_up") return <span className="flex items-center gap-1 text-green-400 text-xs"><CheckCircle className="w-3 h-3" /> Signed Up</span>;
+    if (status === "email_sent") return <span className="flex items-center gap-1 text-yellow-400 text-xs"><Clock className="w-3 h-3" /> Contacted</span>;
+    return <span className="text-gray-500 text-xs">Not contacted</span>;
   };
+
+  const businesses = (searchQuery.data as any[]) || [];
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-6">
       <div className="max-w-6xl mx-auto">
+
         {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-4xl font-bold text-white mb-2">Partner Outreach</h1>
-          <p className="text-gray-400">Search and email solar companies to become Sales Squad partners</p>
+        <div className="flex items-start justify-between mb-8">
+          <div>
+            <h1 className="text-4xl font-bold text-white mb-2">Partner Outreach</h1>
+            <p className="text-gray-400">Find solar companies and reach out via Email or WhatsApp</p>
+          </div>
+          <a
+            href="/for-partners"
+            target="_blank"
+            className="flex items-center gap-2 text-sm text-orange-400 hover:text-orange-300 bg-orange-500/10 border border-orange-500/20 rounded-lg px-4 py-2"
+          >
+            <ExternalLink className="w-4 h-4" /> View Partner Page
+          </a>
         </div>
 
-        {/* Search Section */}
-        <div className="bg-slate-800/50 backdrop-blur border border-slate-700 rounded-lg p-6 mb-8">
+        {/* Search */}
+        <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-6 mb-8">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-2">City</label>
@@ -91,14 +175,11 @@ export default function PartnerOutreach() {
                 </SelectTrigger>
                 <SelectContent className="bg-slate-700 border-slate-600">
                   {INDIAN_CITIES.map(city => (
-                    <SelectItem key={city} value={city} className="text-white hover:bg-slate-600">
-                      {city}
-                    </SelectItem>
+                    <SelectItem key={city} value={city} className="text-white">{city}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
-
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-2">Business Type</label>
               <Select value={selectedType} onValueChange={setSelectedType}>
@@ -106,16 +187,13 @@ export default function PartnerOutreach() {
                   <SelectValue placeholder="All types" />
                 </SelectTrigger>
                 <SelectContent className="bg-slate-700 border-slate-600">
-                  <SelectItem value="" className="text-white hover:bg-slate-600">All types</SelectItem>
+                  <SelectItem value="" className="text-white">All types</SelectItem>
                   {BUSINESS_TYPES.map(type => (
-                    <SelectItem key={type} value={type} className="text-white hover:bg-slate-600">
-                      {type}
-                    </SelectItem>
+                    <SelectItem key={type} value={type} className="text-white">{type}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
-
             <div className="flex items-end">
               <Button
                 onClick={() => searchQuery.refetch()}
@@ -129,54 +207,59 @@ export default function PartnerOutreach() {
         </div>
 
         {/* Results */}
-        {searchQuery.data && searchQuery.data.length > 0 && (
-          <div className="bg-slate-800/50 backdrop-blur border border-slate-700 rounded-lg overflow-hidden">
+        {businesses.length > 0 && (
+          <div className="bg-slate-800/50 border border-slate-700 rounded-lg overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead className="bg-slate-700/50 border-b border-slate-600">
                   <tr>
-                    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-300">Company</th>
-                    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-300">Email</th>
-                    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-300">Phone</th>
-                    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-300">Status</th>
-                    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-300">Action</th>
+                    <th className="px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase">Company</th>
+                    <th className="px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase">Email</th>
+                    <th className="px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase">Phone</th>
+                    <th className="px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase">Status</th>
+                    <th className="px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase">Outreach</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-700">
-                  {(searchQuery.data as any[])?.map((business: any) => {
-                    const status = getPartnerStatus(business.email);
+                  {businesses.map((business: any) => {
+                    const status = getPartnerStatus(business.email, business.phone);
+                    const hasEmail = !!business.email;
+                    const hasPhone = !!business.phone;
                     return (
-                      <tr key={business.id} className="hover:bg-slate-700/30 transition">
-                        <td className="px-6 py-4 text-sm text-white font-medium">{business.businessName}</td>
-                        <td className="px-6 py-4 text-sm text-gray-400">{business.email}</td>
-                        <td className="px-6 py-4 text-sm text-gray-400">{business.phone}</td>
-                        <td className="px-6 py-4 text-sm">
-                          <div className="flex items-center gap-2">
-                            {status && getStatusIcon(status)}
-                            <span className="text-gray-400">
-                              {status === "signed_up" && "✅ Signed Up"}
-                              {status === "email_sent" && "⏳ Pending"}
-                              {!status && "Not contacted"}
-                            </span>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 text-sm">
+                      <tr key={business.id} className="hover:bg-slate-700/20 transition">
+                        <td className="px-5 py-4 text-sm text-white font-medium">{business.businessName}</td>
+                        <td className="px-5 py-4 text-sm text-gray-400">{business.email || <span className="text-gray-600 italic">No email</span>}</td>
+                        <td className="px-5 py-4 text-sm text-gray-400">{business.phone || <span className="text-gray-600 italic">No phone</span>}</td>
+                        <td className="px-5 py-4">{getStatusBadge(status)}</td>
+                        <td className="px-5 py-4">
                           {status === "signed_up" ? (
-                            <span className="text-green-400 font-medium">Active Partner</span>
+                            <span className="text-green-400 text-sm font-medium">✅ Active Partner</span>
                           ) : (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => {
-                                setSelectedBusiness(business);
-                                setShowEmailDialog(true);
-                              }}
-                              disabled={sendEmailMutation.isPending}
-                              className="border-orange-500 text-orange-500 hover:bg-orange-500/10"
-                            >
-                              <Mail className="w-4 h-4 mr-1" />
-                              Send Email
-                            </Button>
+                            <div className="flex gap-2">
+                              {hasEmail && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => openOutreachDialog(business, "email")}
+                                  className="border-blue-500/50 text-blue-400 hover:bg-blue-500/10 text-xs px-3"
+                                >
+                                  <Mail className="w-3 h-3 mr-1" /> Email
+                                </Button>
+                              )}
+                              {hasPhone && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => openOutreachDialog(business, "whatsapp")}
+                                  className="border-green-500/50 text-green-400 hover:bg-green-500/10 text-xs px-3"
+                                >
+                                  <MessageSquare className="w-3 h-3 mr-1" /> WhatsApp
+                                </Button>
+                              )}
+                              {!hasEmail && !hasPhone && (
+                                <span className="text-gray-600 text-xs italic">No contact info</span>
+                              )}
+                            </div>
                           )}
                         </td>
                       </tr>
@@ -188,73 +271,95 @@ export default function PartnerOutreach() {
           </div>
         )}
 
-        {searchQuery.data && searchQuery.data.length === 0 && selectedCity && (
-          <div className="bg-slate-800/50 backdrop-blur border border-slate-700 rounded-lg p-12 text-center">
+        {businesses.length === 0 && selectedCity && !searchQuery.isLoading && (
+          <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-12 text-center">
             <AlertCircle className="w-12 h-12 text-gray-500 mx-auto mb-4" />
-            <p className="text-gray-400">No businesses found in {selectedCity}</p>
+            <p className="text-gray-400">No businesses found in {selectedCity}. Try searching first via the Business Scraper to populate data.</p>
           </div>
         )}
 
         {!selectedCity && (
-          <div className="bg-slate-800/50 backdrop-blur border border-slate-700 rounded-lg p-12 text-center">
+          <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-12 text-center">
             <MapPin className="w-12 h-12 text-gray-500 mx-auto mb-4" />
-            <p className="text-gray-400">Select a city to search for solar companies</p>
+            <p className="text-gray-400">Select a city to find solar companies</p>
           </div>
         )}
 
-        {/* Email Dialog */}
-        <Dialog open={showEmailDialog} onOpenChange={setShowEmailDialog}>
+        {/* Outreach Dialog */}
+        <Dialog open={showOutreachDialog} onOpenChange={setShowOutreachDialog}>
           <DialogContent className="bg-slate-800 border-slate-700 text-white max-w-2xl">
             <DialogHeader>
-              <DialogTitle>Send Outreach Email</DialogTitle>
+              <DialogTitle className="flex items-center gap-2">
+                {outreachMode === "whatsapp"
+                  ? <><MessageSquare className="w-5 h-5 text-green-400" /> WhatsApp Outreach</>
+                  : <><Mail className="w-5 h-5 text-blue-400" /> Email Outreach</>
+                }
+              </DialogTitle>
             </DialogHeader>
             {selectedBusiness && (
               <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">Company</label>
-                  <Input
-                    value={selectedBusiness.businessName}
-                    disabled
-                    className="bg-slate-700 border-slate-600 text-white"
-                  />
+                <div className="bg-slate-700/50 rounded-lg p-3 text-sm text-gray-300">
+                  <span className="font-semibold text-white">{selectedBusiness.businessName}</span>
+                  {outreachMode === "email" && selectedBusiness.email && (
+                    <span className="text-gray-400 ml-2">→ {selectedBusiness.email}</span>
+                  )}
+                  {outreachMode === "whatsapp" && selectedBusiness.phone && (
+                    <span className="text-gray-400 ml-2">→ {selectedBusiness.phone}</span>
+                  )}
                 </div>
+
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">Email</label>
-                  <Input
-                    value={selectedBusiness.email}
-                    disabled
-                    className="bg-slate-700 border-slate-600 text-white"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">Custom Message (Optional)</label>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="text-sm font-medium text-gray-300">Message</label>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={handleGenerateAIPitch}
+                      disabled={isGeneratingPitch}
+                      className="border-purple-500/50 text-purple-400 hover:bg-purple-500/10 text-xs"
+                    >
+                      <Sparkles className="w-3 h-3 mr-1" />
+                      {isGeneratingPitch ? "Generating..." : "AI Generate Pitch"}
+                    </Button>
+                  </div>
                   <Textarea
-                    placeholder="Leave blank to use default message"
                     value={customMessage}
                     onChange={(e) => setCustomMessage(e.target.value)}
-                    className="bg-slate-700 border-slate-600 text-white min-h-32"
+                    className="bg-slate-700 border-slate-600 text-white min-h-48 text-sm"
+                    placeholder="Message will appear here..."
                   />
                 </div>
+
+                {outreachMode === "whatsapp" && (
+                  <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-3 text-sm text-green-300">
+                    WhatsApp will open with this message pre-filled. Just hit Send.
+                  </div>
+                )}
+
                 <div className="flex gap-3 justify-end">
                   <Button
                     variant="outline"
-                    onClick={() => setShowEmailDialog(false)}
+                    onClick={() => setShowOutreachDialog(false)}
                     className="border-slate-600 text-gray-300 hover:bg-slate-700"
                   >
                     Cancel
                   </Button>
                   <Button
-                    onClick={handleSendEmail}
-                    disabled={sendEmailMutation.isPending}
-                    className="bg-orange-500 hover:bg-orange-600 text-white"
+                    onClick={handleSend}
+                    disabled={sendEmailMutation.isPending || !customMessage.trim()}
+                    className={outreachMode === "whatsapp"
+                      ? "bg-green-600 hover:bg-green-700 text-white"
+                      : "bg-blue-600 hover:bg-blue-700 text-white"
+                    }
                   >
-                    {sendEmailMutation.isPending ? "Sending..." : "Send Email"}
+                    {sendEmailMutation.isPending ? "Sending..." : outreachMode === "whatsapp" ? "Open WhatsApp" : "Send Email"}
                   </Button>
                 </div>
               </div>
             )}
           </DialogContent>
         </Dialog>
+
       </div>
     </div>
   );

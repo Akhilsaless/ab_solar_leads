@@ -3,6 +3,123 @@ import { trpc } from "@/lib/trpc";
 import { useLocation } from "wouter";
 import { SalesSquadLogo } from "@/components/SalesSquadLogo";
 
+// ── Find Leads Tab Component ──
+const CITIES = ["Hyderabad", "Bengaluru", "Mumbai", "Delhi", "Pune", "Chennai", "Kolkata", "Ahmedabad", "Jaipur", "Lucknow", "Indore", "Chandigarh", "Surat"];
+const BTYPES = ["Factories", "Hotels", "Hospitals", "Housing Societies", "Apartments", "IT Companies", "Schools", "Shopping Malls", "Restaurants", "Warehouses"];
+
+function FindLeadsTab({ referralLink, uniqueCode }: { referralLink: string; uniqueCode: string }) {
+  const [city, setCity] = useState("");
+  const [btype, setBtype] = useState("");
+  const [pitchBusiness, setPitchBusiness] = useState<any>(null);
+  const [pitchText, setPitchText] = useState("");
+
+  const searchQ = trpc.scraper.search.useMutation();
+  const resultsQ = trpc.scraper.results.useQuery(
+    { city, businessType: btype || undefined },
+    { enabled: !!city }
+  );
+  const genPitch = trpc.scraper.generateAIPitch.useMutation({
+    onSuccess: (d: any) => setPitchText(d.pitch || ""),
+  });
+
+  const handleSearch = () => {
+    if (!city) return;
+    searchQ.mutate({ location: city, businessType: btype || "" });
+  };
+
+  const handlePitch = (b: any) => {
+    setPitchBusiness(b);
+    const defaultPitch = `Hi ${b.businessName}! \u{1F31E}\n\nI'm reaching out because I think solar could save your business a lot on electricity.\n\nGet a FREE solar savings estimate in 2 minutes:\n\u{1F449} ${referralLink}\n\nNo forms, just a quick chat with our AI advisor. See how much you can save every month!`;
+    setPitchText(defaultPitch);
+    genPitch.mutate({ businessId: b.id });
+  };
+
+  const sendWhatsApp = (b: any) => {
+    const phone = (b.phone || "").replace(/\D/g, "");
+    if (!phone) { alert("No phone number for this business"); return; }
+    const msg = pitchBusiness?.id === b.id ? pitchText : `Hi ${b.businessName}! Get a FREE solar estimate: ${referralLink}`;
+    window.open(`https://wa.me/${phone.startsWith("91") ? phone : "91" + phone}?text=${encodeURIComponent(msg)}`, "_blank");
+  };
+
+  const businesses = (resultsQ.data as any[]) || [];
+
+  return (
+    <div>
+      <div style={{ background: "rgba(249,115,22,0.08)", border: "1px solid rgba(249,115,22,0.3)", borderRadius: 12, padding: "14px 18px", marginBottom: 16 }}>
+        <p style={{ margin: 0, fontWeight: 700, color: "#fb923c", fontSize: 14 }}>🔍 Find Leads — Business Outreach</p>
+        <p style={{ margin: "4px 0 0", fontSize: 12, color: "#888" }}>Search for businesses in your city. Send them your referral link via WhatsApp. When they sign up, you earn!</p>
+      </div>
+
+      {/* Search */}
+      <div style={{ display: "flex", gap: 8, marginBottom: 14, flexWrap: "wrap" }}>
+        <select value={city} onChange={e => setCity(e.target.value)} style={{ flex: 1, minWidth: 130, background: "#1a1a1a", color: "#fff", border: "1px solid #333", borderRadius: 8, padding: "9px 12px", fontSize: 13 }}>
+          <option value="">Select city</option>
+          {CITIES.map(c => <option key={c} value={c}>{c}</option>)}
+        </select>
+        <select value={btype} onChange={e => setBtype(e.target.value)} style={{ flex: 1, minWidth: 130, background: "#1a1a1a", color: "#fff", border: "1px solid #333", borderRadius: 8, padding: "9px 12px", fontSize: 13 }}>
+          <option value="">All types</option>
+          {BTYPES.map(t => <option key={t} value={t}>{t}</option>)}
+        </select>
+        <button onClick={handleSearch} disabled={!city || searchQ.isPending} style={{ background: "#f97316", color: "#000", border: "none", borderRadius: 8, padding: "9px 18px", fontWeight: 700, fontSize: 13, cursor: "pointer", opacity: !city ? 0.5 : 1 }}>
+          {searchQ.isPending ? "Searching..." : "Search"}
+        </button>
+      </div>
+
+      {/* Results */}
+      {businesses.length > 0 && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          {businesses.map((b: any) => (
+            <div key={b.id} style={{ background: "#141414", border: "1px solid #222", borderRadius: 10, padding: "12px 14px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
+                <div style={{ flex: 1 }}>
+                  <p style={{ margin: 0, fontWeight: 600, fontSize: 14, color: "#fff" }}>{b.businessName}</p>
+                  <p style={{ margin: "2px 0 0", fontSize: 12, color: "#666" }}>{b.businessType} • {b.city}</p>
+                  {b.phone && <p style={{ margin: "2px 0 0", fontSize: 12, color: "#555" }}>{b.phone}</p>}
+                </div>
+                <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                  <button onClick={() => handlePitch(b)} style={{ background: "rgba(139,92,246,0.15)", color: "#a78bfa", border: "1px solid rgba(139,92,246,0.3)", borderRadius: 6, padding: "6px 10px", fontSize: 11, cursor: "pointer", fontWeight: 600 }}>
+                    ✨ AI Pitch
+                  </button>
+                  {b.phone && (
+                    <button onClick={() => sendWhatsApp(b)} style={{ background: "#16a34a", color: "#fff", border: "none", borderRadius: 6, padding: "6px 10px", fontSize: 11, cursor: "pointer", fontWeight: 600 }}>
+                      📱 WhatsApp
+                    </button>
+                  )}
+                </div>
+              </div>
+              {pitchBusiness?.id === b.id && (
+                <div style={{ marginTop: 10 }}>
+                  <textarea
+                    value={genPitch.isPending ? "Generating AI pitch..." : pitchText}
+                    onChange={e => setPitchText(e.target.value)}
+                    rows={5}
+                    style={{ width: "100%", background: "#0a0a0a", color: "#ccc", border: "1px solid #333", borderRadius: 8, padding: "10px 12px", fontSize: 12, resize: "vertical" }}
+                  />
+                  <button onClick={() => sendWhatsApp(b)} style={{ marginTop: 6, background: "#16a34a", color: "#fff", border: "none", borderRadius: 6, padding: "8px 16px", fontSize: 12, cursor: "pointer", fontWeight: 600 }}>
+                    📱 Send via WhatsApp
+                  </button>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {businesses.length === 0 && city && !resultsQ.isLoading && !searchQ.isPending && (
+        <div style={{ textAlign: "center", padding: "32px 0", color: "#555" }}>
+          <p>No businesses found yet. Click Search to load businesses in {city}.</p>
+        </div>
+      )}
+
+      {!city && (
+        <div style={{ textAlign: "center", padding: "32px 0", color: "#555" }}>
+          <p>Select a city and click Search to find businesses to reach out to.</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Design tokens (Option B: Emerald Green on Pure Black) ──
 const C = {
   bg: "#0a0a0a",
@@ -60,7 +177,7 @@ export default function ReferrerDashboard() {
   const [withdrawAmount, setWithdrawAmount] = useState("");
   const [upiId, setUpiId] = useState("");
   const [withdrawMsg, setWithdrawMsg] = useState("");
-  const [activeTab, setActiveTab] = useState<"overview" | "referrals" | "tasks" | "withdraw">("overview");
+  const [activeTab, setActiveTab] = useState<"overview" | "referrals" | "tasks" | "withdraw" | "findleads">("overview");
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -239,6 +356,7 @@ export default function ReferrerDashboard() {
           <button style={tabStyle("referrals")} onClick={() => setActiveTab("referrals")}>👥 Referrals{referrals?.length > 0 ? ` (${referrals.length})` : ""}</button>
           <button style={tabStyle("tasks")} onClick={() => setActiveTab("tasks")}>🎯 Tasks</button>
           <button style={tabStyle("withdraw")} onClick={() => setActiveTab("withdraw")}>💰 Withdraw</button>
+          <button style={{...tabStyle("findleads"), background: activeTab === "findleads" ? C.orange : C.surface2, color: activeTab === "findleads" ? "#000" : C.subtle, boxShadow: activeTab === "findleads" ? `0 0 12px ${C.orange}40` : "none"}} onClick={() => setActiveTab("findleads")}>🔍 Find Leads</button>
         </div>
 
         {/* ── OVERVIEW TAB ── */}
@@ -545,6 +663,11 @@ export default function ReferrerDashboard() {
               )}
             </div>
           </div>
+        )}
+
+        {/* ── FIND LEADS TAB ── */}
+        {activeTab === "findleads" && (
+          <FindLeadsTab referralLink={referralLink} uniqueCode={uniqueCode} />
         )}
 
         {/* Footer */}
