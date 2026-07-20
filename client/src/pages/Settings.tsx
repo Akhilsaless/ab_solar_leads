@@ -2,7 +2,7 @@ import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Settings as SettingsIcon, User, Building2, Bot, Copy, ExternalLink } from "lucide-react";
+import { Settings as SettingsIcon, User, Building2, Bot, Copy, ExternalLink, MessageCircle, Linkedin } from "lucide-react";
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
 
@@ -22,6 +22,7 @@ export default function Settings() {
     agencyName: "", phone: "", email: "", website: "", address: "",
     city: "", state: "", installationChargePerKw: "", marginPercent: "",
     botGreeting: "", botTone: "friendly", brandColor: "#F97316",
+    whatsappNumber: "", linkedinUrl: "",
   });
 
   useEffect(() => {
@@ -35,6 +36,8 @@ export default function Settings() {
         marginPercent: agency.marginPercent || "15",
         botGreeting: agency.botGreeting || "", botTone: agency.botTone || "friendly",
         brandColor: agency.brandColor || "#F97316",
+        whatsappNumber: (agency as any).whatsappNumber || "",
+        linkedinUrl: (agency as any).linkedinUrl || "",
       });
     }
   }, [agency]);
@@ -84,6 +87,14 @@ export default function Settings() {
             <Field label="State" value={form.state} onChange={(v) => setForm({ ...form, state: v })} />
           </div>
           <Field label="Address" value={form.address} onChange={(v) => setForm({ ...form, address: v })} />
+          <div className="pt-2 border-t border-border/30">
+            <p className="text-xs text-muted-foreground mb-2 flex items-center gap-1.5"><MessageCircle className="w-3.5 h-3.5 text-green-400" />WhatsApp number for agent handoff (customers connect here)</p>
+            <Field label="WhatsApp Number (with country code, e.g. 919876543210)" value={form.whatsappNumber} onChange={(v) => setForm({ ...form, whatsappNumber: v })} />
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground mb-2 flex items-center gap-1.5"><Linkedin className="w-3.5 h-3.5 text-blue-400" />LinkedIn company page (used in scraper outreach)</p>
+            <Field label="LinkedIn URL (e.g. https://linkedin.com/company/ab-solar)" value={form.linkedinUrl} onChange={(v) => setForm({ ...form, linkedinUrl: v })} />
+          </div>
         </CardContent>
       </Card>
 

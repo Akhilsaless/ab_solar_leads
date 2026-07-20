@@ -3,6 +3,7 @@ import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
 import { z } from "zod";
+import { sql } from "drizzle-orm";
 import { invokeLLM } from "./_core/llm";
 import { notifyOwner } from "./_core/notification";
 import { makeRequest, PlacesSearchResult, PlaceDetailsResult } from "./_core/map";
@@ -29,6 +30,14 @@ export const appRouter = router({
     get: protectedProcedure.query(async ({ ctx }) => {
       if (!ctx.user) return null;
       return await db.getAgencyByUserId(ctx.user.id);
+    }),
+
+    getFirst: publicProcedure.query(async () => {
+      const dbConn = await db.getDb();
+      if (!dbConn) return "ab-solar";
+      const agencies = await dbConn.execute(sql`SELECT agencySlug FROM agencyConfig3 WHERE isActive = 1 LIMIT 1`) as any[];
+      const row = Array.isArray(agencies[0]) ? agencies[0][0] : agencies[0];
+      return (row as any)?.agencySlug || "ab-solar";
     }),
 
     getBySlug: publicProcedure
@@ -90,6 +99,8 @@ export const appRouter = router({
         logoUrl: z.string().optional(),
         website: z.string().optional(),
         address: z.string().optional(),
+        whatsappNumber: z.string().optional(),
+        linkedinUrl: z.string().optional(),
       }))
       .mutation(async ({ input, ctx }) => {
         if (!ctx.user) throw new Error("Not authenticated");
@@ -466,6 +477,7 @@ export const appRouter = router({
                   <tr><td style="padding: 8px 0; color: #374151; font-weight: bold;">Source</td><td style="padding: 8px 0; color: #111827;">${referrerInfo}</td></tr>
                 </table>
                 <hr style="border: 1px solid #e5e7eb; margin: 16px 0;" />
+                ${leadPhone ? `<a href="https://wa.me/${leadPhone.replace(/[^0-9]/g, '')}?text=Hi%20${encodeURIComponent(leadName || 'there')}%2C%20I%20saw%20you%20were%20interested%20in%20solar%20panels.%20Can%20we%20schedule%20a%20quick%20call%3F" style="display:inline-block;background:#25D366;color:#fff;padding:10px 20px;border-radius:8px;text-decoration:none;font-weight:bold;margin-bottom:12px;">💬 WhatsApp ${leadName || 'Lead'}</a>` : ''}
                 <p style="color: #6b7280; font-size: 13px;">Login to your Sales Squad admin panel to view full conversation and take action.</p>
               </div>
             `;
@@ -956,6 +968,109 @@ export const appRouter = router({
       if (!ctx.user) return [];
       return await db.getScrapeJobsByAgency(ctx.user.id);
     }),
+
+    bulkImport: protectedProcedure
+      .input(z.object({ businessIds: z.array(z.number()) }))
+      .mutation(async ({ input, ctx }) => {
+        if (!ctx.user) throw new Error("Not authenticated");
+        const results = [];
+        for (const businessId of input.businessIds) {
+          const biz = await db.getScrapedBusinessById(businessId);
+          if (!biz || biz.isImported) continue;
+          const leadId = await db.createLeadFromConversation({
+            firstName: biz.ownerName?.split(" ")[0] || biz.businessName,
+            lastName: biz.ownerName?.split(" ").slice(1).join(" ") || "",
+            phone: biz.phone || undefined,
+            email: biz.email || undefined,
+            city: biz.city || undefined,
+            state: biz.state || undefined,
+            propertyAddress: biz.address || undefined,
+            source: "scraper",
+            notes: `Scraped from Google Maps. Business: ${biz.businessName} (${biz.businessType}). Size: ${biz.businessSize}. Rating: ${biz.rating}/5 (${biz.reviewCount} reviews).`,
+          });
+          await db.markBusinessImported(businessId);
+          results.push({ businessId, leadId });
+        }
+        return { success: true, imported: results.length };
+      }),
+
+    updateContactStatus: protectedProcedure
+      .input(z.object({
+        businessId: z.number(),
+        contactStatus: z.enum(["not_contacted", "contacted", "interested", "converted"]),
+      }))
+      .mutation(async ({ input }) => {
+        await db.updateScrapedBusiness(input.businessId, { contactStatus: input.contactStatus });
+        return { success: true };
+      }),
+
+    generateAIPitch: protectedProcedure
+      .input(z.object({ businessId: z.number() }))
+      .mutation(async ({ input }) => {
+        const biz = await db.getScrapedBusinessById(input.businessId);
+        if (!biz) throw new Error("Business not found");
+        const response = await invokeLLM({
+          messages: [
+            { role: "system", content: "You are a solar sales expert. Write a short, punchy WhatsApp message (max 3 sentences) pitching solar energy to a business owner. Be specific to their business type. Mention PM Surya Ghar subsidy and ROI. No emojis. Professional tone." },
+            { role: "user", content: `Business: ${biz.businessName}, Type: ${biz.businessType}, Size: ${biz.businessSize}, Location: ${biz.city}, ${biz.state}. Monthly electricity bill estimate for a ${biz.businessSize} ${biz.businessType}: ${biz.businessSize === 'large' ? '₹80,000-1,20,000' : biz.businessSize === 'medium' ? '₹20,000-50,000' : '₹5,000-15,000'}/month.` },
+          ] as any,
+        });
+        const pitch = response.choices[0]?.message?.content as string || "";
+        await db.updateScrapedBusiness(input.businessId, { aiPitch: pitch });
+        return { success: true, pitch };
+      }),
+  }),
+
+  // ===== BILL PHOTO READING =====
+  billReader: router({
+    readBillImage: publicProcedure
+      .input(z.object({ imageUrl: z.string() }))
+      .mutation(async ({ input }) => {
+        try {
+          const response = await invokeLLM({
+            messages: [
+              {
+                role: "user",
+                content: [
+                  {
+                    type: "image_url",
+                    image_url: { url: input.imageUrl, detail: "high" },
+                  },
+                  {
+                    type: "text",
+                    text: "This is an Indian electricity bill. Extract: 1) Total amount due (in INR), 2) Units consumed (kWh), 3) DISCOM/utility name, 4) State. Return JSON with fields: amount (number), units (number), discom (string), state (string). If you cannot read a field clearly, return null for that field.",
+                  },
+                ],
+              },
+            ] as any,
+            response_format: {
+              type: "json_schema",
+              json_schema: {
+                name: "bill_data",
+                strict: true,
+                schema: {
+                  type: "object",
+                  properties: {
+                    amount: { type: ["number", "null"] },
+                    units: { type: ["number", "null"] },
+                    discom: { type: ["string", "null"] },
+                    state: { type: ["string", "null"] },
+                  },
+                  required: ["amount", "units", "discom", "state"],
+                  additionalProperties: false,
+                },
+              },
+            },
+          });
+          const content = response.choices[0]?.message?.content;
+          if (typeof content === "string") {
+            return { success: true, data: JSON.parse(content) };
+          }
+          return { success: false, data: null };
+        } catch (e) {
+          return { success: false, data: null };
+        }
+      }),
   }),
 });
 
@@ -1124,26 +1239,26 @@ ${returningContext}
 This customer has chatted with you before. Greet them warmly by name, reference their previous conversation, and pick up where you left off. Skip the basic pitch if they already know it.
 ` : '';
 
-  return `You are Agent Klaus, a friendly solar energy advisor from Sales Squad. You are NOT an AI — you are a human advisor. Your tone is warm, respectful, and conversational — like a knowledgeable friend, not a salesperson.
+  return `You are Agent Klaus, a sharp solar energy consultant from Sales Squad. You are NOT an AI — you are a human advisor. Your tone is confident, direct, and professional — like a trusted financial advisor, not a salesperson.
 
-YOUR MISSION: You are Agent Klaus, a friendly solar advisor. Answer ANY question customers ask honestly and naturally guide them toward a free site visit.
+YOUR MISSION: Help customers understand the financial case for solar and guide them toward a free site visit. Answer every question honestly.
 
 ${returningSection}
 CORE RULES:
-1. Be conversational and human-like — answer what they ask, don't dodge
+1. Be direct and professional — no filler words, no over-enthusiasm
 2. ALWAYS use customer's first name once you know it
-3. Keep responses SHORT — 1-3 sentences max
-4. Use ₹ (INR) for prices
+3. Keep responses SHORT — 2-3 sentences max per message
+4. Use ₹ (INR) for all prices
 5. NEVER say you're AI or a bot
-6. Use "ji" for respectful Indian touch
+6. NEVER use "ji" — address customers by their first name only
 7. Answer ANY question honestly: cost, maintenance, reliability, how it works, etc.
 8. Naturally steer toward: name → bill → estimate → site visit
-9. If they say "no" to site visit, respect it: "No problem! You can reach out anytime"
+9. If they say "no" to site visit, respect it: "No problem. You can reach out anytime."
 10. Include quick reply buttons at end of EVERY message
 
 FLEXIBLE CONVERSATION:
 
-START: Get their name ("Namaste! I'm Agent Klaus. What's your name?")
+START: Get their name ("I'm Agent Klaus from Sales Squad. Who am I speaking with?")
 
 ANSWER ANY QUESTION:
 - "How much does solar cost?" → Explain cost, subsidy, payback
@@ -1156,18 +1271,18 @@ ANSWER ANY QUESTION:
 - "What about at night?" → Use grid power or battery
 - ANY OTHER QUESTION: Answer honestly, then ask how to help with solar
 
-MANDATORY PITCH SEQUENCE (do NOT skip or reorder):
+PITCH SEQUENCE (deliver naturally, not as a checklist):
 1. Get name first
-2. Deliver Pitch A: Rising electricity bills ("Bills in India rise 8-10% every year — solar cuts that by 80%")
-3. Deliver Pitch B: Government subsidy ("PM Surya Ghar gives up to ₹78,000 subsidy — limited time")
-4. Deliver Pitch C: ROI / money-making asset ("Customers recover investment in 3-5 years, then 20+ years of free electricity")
-5. Ask about electricity bill amount
-6. Show estimate (ONLY after all 3 pitch points are delivered)
+2. Pitch A: "Electricity bills in India rise 8-10% every year. Solar cuts your bill by 80%."
+3. Pitch B: "The PM Surya Ghar scheme gives up to ₹78,000 in government subsidy. That's real money back."
+4. Pitch C: "Most customers recover their investment in 3-5 years. After that, 20+ years of near-free electricity."
+5. Ask for their monthly electricity bill
+6. Show estimate (ONLY after all 3 pitch points delivered)
 7. Offer free site visit
 8. If yes → collect location + phone + email
-9. If no → "Feel free to reach out anytime"
+9. If no → "No problem. You can reach out anytime."
 
-⚠️ CRITICAL: If a customer asks about cost or price BEFORE you have delivered all 3 pitch points, do NOT show the estimate yet. Instead say: "Great question! Before I give you exact numbers, let me share 3 quick things that will make the numbers much more exciting..." — then continue the pitch sequence. Only show the estimate after pitch C is done AND you have their bill amount.
+⚠️ CRITICAL: If a customer asks about cost BEFORE all 3 pitch points are delivered, say: "Good question. Let me give you 3 quick facts first that will make the numbers much more meaningful." Then continue the pitch. Only show the estimate after pitch C AND after you have their bill amount.
 
 ESTIMATE FORMAT (present this when you have bill amount — use EXACTLY this format with clear section breaks):
 

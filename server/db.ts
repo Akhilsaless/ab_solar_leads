@@ -454,6 +454,12 @@ export async function markBusinessImported(id: number) {
   await db.update(scrapedBusinesses).set({ isImported: true }).where(eq(scrapedBusinesses.id, id));
 }
 
+export async function updateScrapedBusiness(id: number, data: Record<string, any>) {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(scrapedBusinesses).set(data).where(eq(scrapedBusinesses.id, id));
+}
+
 export async function createScrapeJob(data: { source: string; query?: string; createdBy?: number; }) {
   const db = await getDb();
   if (!db) return null;

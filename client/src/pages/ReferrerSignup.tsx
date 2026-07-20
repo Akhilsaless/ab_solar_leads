@@ -22,6 +22,9 @@ export default function ReferrerSignup() {
   const [error, setError] = useState("");
   const [uniqueCode, setUniqueCode] = useState("");
   const [acceptedTnC, setAcceptedTnC] = useState(false);
+  const [resendCooldown, setResendCooldown] = useState(0);
+  const agencySlugQuery = trpc.agency.getFirst.useQuery();
+  const agencySlug = agencySlugQuery.data || "ab-solar";
 
   // Auto-login if session token exists
   useEffect(() => {
@@ -32,9 +35,17 @@ export default function ReferrerSignup() {
     }
   }, []);
 
+  const startCooldown = () => {
+    setResendCooldown(60);
+    const t = setInterval(() => setResendCooldown(c => { if (c <= 1) { clearInterval(t); return 0; } return c - 1; }), 1000);
+  };
   const sendOtp = trpc.referrer.sendOtp.useMutation({
-    onSuccess: () => { setStep("otp"); setError(""); },
+    onSuccess: () => { setStep("otp"); setError(""); startCooldown(); },
     onError: (err: any) => setError(err.message || "Failed to send OTP"),
+  });
+  const resendOtp = trpc.referrer.sendOtp.useMutation({
+    onSuccess: () => { setError(""); startCooldown(); },
+    onError: (err: any) => setError(err.message || "Failed to resend OTP"),
   });
 
   const verifyOtp = trpc.referrer.verifyOtpAndSignup.useMutation({
@@ -123,10 +134,10 @@ export default function ReferrerSignup() {
           <div style={{ background: "#0a0a0a", border: "1px solid #222", borderRadius: 10, padding: 16, marginBottom: 20 }}>
             <p style={{ color: "#555", fontSize: 12, margin: "0 0 6px" }}>Your Referral Link:</p>
             <p style={{ color: "#60a5fa", fontSize: 12, wordBreak: "break-all", fontFamily: "monospace", margin: "0 0 12px" }}>
-              {window.location.origin}/chat/ab-solar?ref={uniqueCode}
+              {window.location.origin}/chat/{agencySlug}?ref={uniqueCode}
             </p>
             <button
-              onClick={() => navigator.clipboard.writeText(`${window.location.origin}/chat/ab-solar?ref=${uniqueCode}`)}
+              onClick={() => navigator.clipboard.writeText(`${window.location.origin}/chat/${agencySlug}?ref=${uniqueCode}`)}
               style={{ width: "100%", background: "#1a1a1a", color: "#fff", border: "1px solid #333", borderRadius: 8, padding: "10px 0", cursor: "pointer", fontWeight: 600, fontSize: 14 }}>
               📋 Copy Link
             </button>
@@ -221,9 +232,13 @@ export default function ReferrerSignup() {
               className="w-full hover:opacity-90">
               {verifyOtp.isPending ? <Loader2 style={{ width: 18, height: 18, animation: "spin 1s linear infinite" }} /> : "Verify OTP"}
             </Button>
-            <Button onClick={() => setStep("form")} variant="outline" className="w-full border-[#333] text-[#888] hover:bg-[#1a1a1a] hover:text-white">
-              ← Back
-            </Button>
+            <div style={{ display: "flex", gap: 8 }}>
+              <Button onClick={() => setStep("form")} variant="outline" className="flex-1 border-[#333] text-[#888] hover:bg-[#1a1a1a] hover:text-white">← Back</Button>
+              <Button onClick={() => resendOtp.mutate({ name, email, acceptedTnC: true })} disabled={resendCooldown > 0 || resendOtp.isPending} variant="outline"
+                className="flex-1 border-[#333] text-[#10b981] hover:bg-[#1a1a1a]">
+                {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : resendOtp.isPending ? "Sending..." : "Resend OTP"}
+              </Button>
+            </div>
           </div>
         )}
 

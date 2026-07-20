@@ -206,3 +206,38 @@
 - [x] Leads page: show phone + email as visible text, add Referrer ID column
 - [x] Fix stage detection to be keyword-independent (bot message count)
 - [x] Strengthen pitch A→B→C sequence in system prompt before estimate
+
+## Launch Build — All Features (Jul 20 2026)
+
+### Schema & Backend
+- [x] Add whatsappNumber + linkedinUrl fields to agencyConfig schema
+- [x] Add contactStatus + solarScore + aiPitch + linkedinUrl fields to scraped_businesses table
+- [x] Backend: bill photo AI reading procedure (vision LLM reads bill image)
+- [x] Backend: dynamic agency slug in referral links (agency.getFirst public procedure)
+- [x] Backend: register follow-up email cron at server startup
+- [x] Backend: lead notification to agency WhatsApp (wa.me link in email)
+
+### Chatbot UI
+- [x] Remove "ji" from system prompt, make Klaus professional and punchy
+- [x] Rewrite pitch to feel natural (not rigid A→B→C checklist)
+- [x] Bill photo upload button in chat input
+- [x] AI reads bill photo and auto-fills electricity amount
+- [x] Video pitch card rendered in chat (solar image card with skip button)
+- [x] Animated estimate card (numbers count up on render)
+- [x] Competitor comparison bar chart in chat
+- [x] Optional agent handoff button (WhatsApp deep link, only shown after estimate)
+
+### Scraper Upgrades
+- [x] Bulk select + bulk import
+- [x] Export to CSV
+- [x] Solar potential score (1-10) per business
+- [x] WhatsApp outreach button per business (placeholder number)
+- [x] AI pitch generator per business (one click)
+- [x] Contact status tracking (Not Contacted → Contacted → Interested → Converted)
+- [x] LinkedIn slot per business (placeholder)
+
+### Settings & Config
+- [x] Add WhatsApp number field to Settings page
+- [x] Add LinkedIn URL field to Settings page
+- [x] Resend OTP button with 60s cooldown on signup page
+- [x] Fix referral link to use dynamic agency slug from DB

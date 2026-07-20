@@ -1,9 +1,8 @@
 import { useState, useMemo } from "react";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
@@ -11,7 +10,8 @@ import {
   Search, Building2, MapPin, Phone, Globe, Star,
   UserPlus, Loader2, Factory, Hotel, School, Hospital,
   ShoppingBag, Warehouse, Utensils, Dumbbell, Building,
-  Filter, ChevronDown, ChevronUp, ExternalLink
+  ExternalLink, Download, MessageCircle, CheckSquare,
+  Square, Sparkles, Linkedin, TrendingUp
 } from "lucide-react";
 
 const BUSINESS_TYPES = [
@@ -30,26 +30,60 @@ const BUSINESS_TYPES = [
 ];
 
 const INDIAN_STATES = [
-  "Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chhattisgarh",
-  "Delhi", "Goa", "Gujarat", "Haryana", "Himachal Pradesh", "Jharkhand",
-  "Karnataka", "Kerala", "Madhya Pradesh", "Maharashtra", "Manipur",
-  "Meghalaya", "Mizoram", "Nagaland", "Odisha", "Punjab", "Rajasthan",
-  "Sikkim", "Tamil Nadu", "Telangana", "Tripura", "Uttar Pradesh",
-  "Uttarakhand", "West Bengal",
+  "Andhra Pradesh","Arunachal Pradesh","Assam","Bihar","Chhattisgarh",
+  "Delhi","Goa","Gujarat","Haryana","Himachal Pradesh","Jharkhand",
+  "Karnataka","Kerala","Madhya Pradesh","Maharashtra","Manipur",
+  "Meghalaya","Mizoram","Nagaland","Odisha","Punjab","Rajasthan",
+  "Sikkim","Tamil Nadu","Telangana","Tripura","Uttar Pradesh",
+  "Uttarakhand","West Bengal",
 ];
+
+const CONTACT_STATUS_OPTIONS = [
+  { value: "not_contacted", label: "Not Contacted", color: "text-gray-400 border-gray-500/30 bg-gray-500/10" },
+  { value: "contacted", label: "Contacted", color: "text-blue-400 border-blue-500/30 bg-blue-500/10" },
+  { value: "interested", label: "Interested", color: "text-yellow-400 border-yellow-500/30 bg-yellow-500/10" },
+  { value: "converted", label: "Converted", color: "text-green-400 border-green-500/30 bg-green-500/10" },
+];
+
+function solarScore(biz: any): number {
+  let score = 0;
+  if (biz.businessSize === "large") score += 40;
+  else if (biz.businessSize === "medium") score += 25;
+  else score += 10;
+  const highTypes = ["factor","textile","cold storage","warehouse","hospital","hotel"];
+  if (highTypes.some(t => (biz.businessType || "").toLowerCase().includes(t))) score += 30;
+  else score += 15;
+  if (biz.rating && biz.rating >= 4) score += 15;
+  else if (biz.rating && biz.rating >= 3) score += 8;
+  if (biz.phone) score += 10;
+  if (biz.website) score += 5;
+  return Math.min(score, 100);
+}
+
+function SolarScoreBadge({ score }: { score: number }) {
+  const color = score >= 70 ? "text-green-400 border-green-500/30 bg-green-500/10"
+    : score >= 45 ? "text-yellow-400 border-yellow-500/30 bg-yellow-500/10"
+    : "text-gray-400 border-gray-500/30 bg-gray-500/10";
+  const label = score >= 70 ? "High" : score >= 45 ? "Medium" : "Low";
+  return (
+    <Badge variant="outline" className={`text-xs ${color} flex items-center gap-1`}>
+      <TrendingUp className="w-3 h-3" />
+      {label} ({score})
+    </Badge>
+  );
+}
 
 export default function BusinessScraper() {
   const [businessType, setBusinessType] = useState("");
   const [location, setLocation] = useState("");
   const [state, setState] = useState("");
   const [sizeFilter, setSizeFilter] = useState("all");
-  const [showFilters, setShowFilters] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [generatingPitch, setGeneratingPitch] = useState<number | null>(null);
+  const [expandedPitch, setExpandedPitch] = useState<number | null>(null);
 
   const searchMutation = trpc.scraper.search.useMutation({
-    onSuccess: (data) => {
-      toast.success(`Found ${data.total} businesses!`);
-      resultsQuery.refetch();
-    },
+    onSuccess: (data) => { toast.success(`Found ${data.total} businesses!`); resultsQuery.refetch(); setSelectedIds(new Set()); },
     onError: (err) => toast.error(err.message),
   });
 
@@ -60,253 +94,276 @@ export default function BusinessScraper() {
   });
 
   const importMutation = trpc.scraper.importAsLead.useMutation({
-    onSuccess: () => {
-      toast.success("Business imported as lead!");
-      resultsQuery.refetch();
-    },
+    onSuccess: () => { toast.success("Imported as lead!"); resultsQuery.refetch(); },
     onError: (err) => toast.error(err.message),
   });
 
-  const jobsQuery = trpc.scraper.jobs.useQuery();
+  const bulkImportMutation = trpc.scraper.bulkImport.useMutation({
+    onSuccess: (data) => { toast.success(`${data.imported} businesses imported!`); resultsQuery.refetch(); setSelectedIds(new Set()); },
+    onError: (err) => toast.error(err.message),
+  });
 
-  const handleSearch = () => {
-    if (!businessType) return toast.error("Select a business type");
-    if (!location) return toast.error("Enter a location");
-    searchMutation.mutate({ businessType, location, state });
+  const updateStatusMutation = trpc.scraper.updateContactStatus.useMutation({
+    onSuccess: () => resultsQuery.refetch(),
+    onError: (err) => toast.error(err.message),
+  });
+
+  const generatePitchMutation = trpc.scraper.generateAIPitch.useMutation({
+    onSuccess: (_data, vars) => { toast.success("AI pitch ready!"); setGeneratingPitch(null); setExpandedPitch(vars.businessId); resultsQuery.refetch(); },
+    onError: (err) => { toast.error(err.message); setGeneratingPitch(null); },
+  });
+
+  const businesses: any[] = resultsQuery.data || [];
+
+  const sortedBusinesses = useMemo(() => [...businesses].sort((a, b) => solarScore(b) - solarScore(a)), [businesses]);
+
+  const toggleSelect = (id: number) => {
+    setSelectedIds(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
   };
 
-  const businesses = resultsQuery.data || [];
-  const filteredBusinesses = useMemo(() => {
-    if (sizeFilter === "all") return businesses;
-    return businesses.filter((b: any) => b.businessSize === sizeFilter);
-  }, [businesses, sizeFilter]);
+  const toggleSelectAll = () => {
+    const ids = sortedBusinesses.filter(b => !b.isImported).map(b => b.id);
+    setSelectedIds(selectedIds.size === ids.length ? new Set() : new Set(ids));
+  };
+
+  const exportCSV = () => {
+    const rows = sortedBusinesses.map(b => [
+      b.businessName, b.businessType, b.businessSize, b.phone || "", b.email || "",
+      b.address || "", b.city || "", b.state || "", b.rating || "", b.reviewCount || "",
+      b.website || "", solarScore(b), b.contactStatus || "not_contacted", b.isImported ? "Yes" : "No"
+    ]);
+    const headers = ["Name","Type","Size","Phone","Email","Address","City","State","Rating","Reviews","Website","SolarScore","Status","Imported"];
+    const csv = [headers.join(","), ...rows.map(r => r.map(v => `"${v}"`).join(","))].join("\n");
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
+    a.download = "solar-leads.csv"; a.click();
+    toast.success("CSV exported!");
+  };
+
+  const openWhatsApp = (biz: any, pitch?: string) => {
+    const msg = pitch || `Hi, I'm from AB Solar. We help ${biz.businessType} like ${biz.businessName} cut electricity bills by up to 80% with solar. Govt subsidy up to Rs 78,000 available. Can we discuss?`;
+    const phone = biz.phone?.replace(/[^0-9]/g, "");
+    if (phone) window.open(`https://wa.me/91${phone}?text=${encodeURIComponent(msg)}`, "_blank");
+    else { navigator.clipboard.writeText(msg); toast.success("No phone — pitch copied to clipboard!"); }
+  };
+
+  const openLinkedIn = (biz: any) => {
+    const url = biz.linkedinUrl || `https://www.linkedin.com/search/results/people/?keywords=${encodeURIComponent(biz.businessName + " owner")}`;
+    window.open(url, "_blank");
+  };
 
   const stats = useMemo(() => ({
-    total: businesses.length,
-    small: businesses.filter((b: any) => b.businessSize === "small").length,
-    medium: businesses.filter((b: any) => b.businessSize === "medium").length,
-    large: businesses.filter((b: any) => b.businessSize === "large").length,
-    imported: businesses.filter((b: any) => b.isImported).length,
+    highPotential: businesses.filter(b => solarScore(b) >= 70).length,
+    large: businesses.filter(b => b.businessSize === "large").length,
+    medium: businesses.filter(b => b.businessSize === "medium").length,
+    small: businesses.filter(b => b.businessSize === "small").length,
+    imported: businesses.filter(b => b.isImported).length,
   }), [businesses]);
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-foreground flex items-center gap-3">
-          <div className="p-2 rounded-xl bg-gradient-to-br from-orange-500/20 to-amber-500/20">
-            <Search className="w-6 h-6 text-orange-400" />
-          </div>
-          Business Scraper
-        </h1>
-        <p className="text-muted-foreground mt-1">Find businesses from Google Maps and import them as leads</p>
+        <h1 className="text-2xl font-bold text-foreground">Business Lead Finder</h1>
+        <p className="text-muted-foreground text-sm mt-1">Find high-potential solar customers from Google Maps. AI-scored and ready to outreach.</p>
       </div>
 
-      {/* Search Section */}
-      <Card className="border-border/50 bg-card/80 backdrop-blur">
-        <CardHeader>
-          <CardTitle className="text-lg">Search Businesses</CardTitle>
-          <CardDescription>Select business type and location to find potential solar customers</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {/* Business Type Grid */}
-          <div>
-            <Label className="text-sm font-medium mb-3 block">Business Type</Label>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2">
-              {BUSINESS_TYPES.map((type) => {
-                const Icon = type.icon;
-                const isSelected = businessType === type.value;
-                return (
-                  <button
-                    key={type.value}
-                    onClick={() => setBusinessType(type.value)}
-                    className={`flex flex-col items-center gap-1.5 p-3 rounded-xl border transition-all text-xs font-medium ${
-                      isSelected
-                        ? "border-orange-500 bg-orange-500/10 text-orange-400 shadow-lg shadow-orange-500/10"
-                        : "border-border/50 bg-background/50 text-muted-foreground hover:border-orange-500/30 hover:text-foreground"
-                    }`}
-                  >
-                    <Icon className="w-5 h-5" />
-                    <span className="text-center leading-tight">{type.label}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Location & State */}
+      <Card className="border-border/30 bg-card/60">
+        <CardContent className="pt-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="md:col-span-1">
-              <Label className="text-sm font-medium">City / Area</Label>
-              <Input
-                placeholder="e.g., Mumbai, Pune, Jaipur"
-                value={location}
-                onChange={(e) => setLocation(e.target.value)}
-                className="mt-1.5 bg-background/50"
-              />
-            </div>
             <div>
-              <Label className="text-sm font-medium">State</Label>
-              <Select value={state} onValueChange={setState}>
-                <SelectTrigger className="mt-1.5 bg-background/50">
-                  <SelectValue placeholder="Select state" />
-                </SelectTrigger>
+              <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Business Type</label>
+              <Select value={businessType} onValueChange={setBusinessType}>
+                <SelectTrigger><SelectValue placeholder="Select type..." /></SelectTrigger>
                 <SelectContent>
-                  {INDIAN_STATES.map((s) => (
-                    <SelectItem key={s} value={s}>{s}</SelectItem>
+                  {BUSINESS_TYPES.map(t => (
+                    <SelectItem key={t.value} value={t.value}>
+                      <div className="flex items-center gap-2"><t.icon className="w-4 h-4" />{t.label}</div>
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
-            <div className="flex items-end">
-              <Button
-                onClick={handleSearch}
-                disabled={searchMutation.isPending}
-                className="w-full bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-semibold"
-              >
-                {searchMutation.isPending ? (
-                  <><Loader2 className="w-4 h-4 animate-spin mr-2" /> Scraping...</>
-                ) : (
-                  <><Search className="w-4 h-4 mr-2" /> Search Businesses</>
-                )}
-              </Button>
+            <div>
+              <label className="text-xs font-medium text-muted-foreground mb-1.5 block">City / Area</label>
+              <Input value={location} onChange={e => setLocation(e.target.value)} placeholder="e.g. Hyderabad" />
             </div>
+            <div>
+              <label className="text-xs font-medium text-muted-foreground mb-1.5 block">State</label>
+              <Select value={state} onValueChange={setState}>
+                <SelectTrigger><SelectValue placeholder="All states" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">All States</SelectItem>
+                  {INDIAN_STATES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="flex gap-3 mt-4">
+            <Button onClick={() => searchMutation.mutate({ businessType, location, state })}
+              disabled={searchMutation.isPending || !businessType || !location}
+              className="bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white">
+              {searchMutation.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Search className="w-4 h-4 mr-2" />}
+              Search Businesses
+            </Button>
+            <Select value={sizeFilter} onValueChange={setSizeFilter}>
+              <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Sizes</SelectItem>
+                <SelectItem value="large">Large</SelectItem>
+                <SelectItem value="medium">Medium</SelectItem>
+                <SelectItem value="small">Small</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </CardContent>
       </Card>
 
-      {/* Stats Bar */}
       {businesses.length > 0 && (
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
           {[
-            { label: "Total Found", value: stats.total, color: "text-blue-400" },
-            { label: "Small", value: stats.small, color: "text-green-400" },
+            { label: "High Potential", value: stats.highPotential, color: "text-green-400" },
+            { label: "Large", value: stats.large, color: "text-orange-400" },
             { label: "Medium", value: stats.medium, color: "text-yellow-400" },
-            { label: "Large", value: stats.large, color: "text-red-400" },
-            { label: "Imported", value: stats.imported, color: "text-orange-400" },
-          ].map((stat) => (
-            <Card key={stat.label} className="border-border/30 bg-card/60">
+            { label: "Small", value: stats.small, color: "text-gray-400" },
+            { label: "Imported", value: stats.imported, color: "text-blue-400" },
+          ].map(s => (
+            <Card key={s.label} className="border-border/30 bg-card/60">
               <CardContent className="p-3 text-center">
-                <p className={`text-2xl font-bold ${stat.color}`}>{stat.value}</p>
-                <p className="text-xs text-muted-foreground">{stat.label}</p>
+                <p className={`text-2xl font-bold ${s.color}`}>{s.value}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">{s.label}</p>
               </CardContent>
             </Card>
           ))}
         </div>
       )}
 
-      {/* Filter Bar */}
       {businesses.length > 0 && (
-        <div className="flex items-center gap-3 flex-wrap">
-          <Button variant="outline" size="sm" onClick={() => setShowFilters(!showFilters)} className="gap-1.5">
-            <Filter className="w-3.5 h-3.5" />
-            Filters
-            {showFilters ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+        <div className="flex flex-wrap gap-2 items-center">
+          <Button variant="outline" size="sm" onClick={toggleSelectAll} className="border-border/50 text-sm">
+            {selectedIds.size === sortedBusinesses.filter(b => !b.isImported).length
+              ? <><CheckSquare className="w-4 h-4 mr-1.5" />Deselect All</>
+              : <><Square className="w-4 h-4 mr-1.5" />Select All</>}
           </Button>
-          {showFilters && (
-            <>
-              {["all", "small", "medium", "large"].map((size) => (
-                <Button
-                  key={size}
-                  variant={sizeFilter === size ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setSizeFilter(size)}
-                  className={sizeFilter === size ? "bg-orange-500 hover:bg-orange-600" : ""}
-                >
-                  {size === "all" ? "All Sizes" : size.charAt(0).toUpperCase() + size.slice(1)}
-                </Button>
-              ))}
-            </>
+          {selectedIds.size > 0 && (
+            <Button size="sm" onClick={() => bulkImportMutation.mutate({ businessIds: Array.from(selectedIds) })}
+              disabled={bulkImportMutation.isPending}
+              className="bg-gradient-to-r from-orange-500 to-amber-500 text-white text-sm">
+              {bulkImportMutation.isPending ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : <UserPlus className="w-4 h-4 mr-1.5" />}
+              Import {selectedIds.size} Selected
+            </Button>
           )}
-          <span className="text-sm text-muted-foreground ml-auto">
-            Showing {filteredBusinesses.length} of {businesses.length}
-          </span>
+          <Button variant="outline" size="sm" onClick={exportCSV} className="border-border/50 text-sm">
+            <Download className="w-4 h-4 mr-1.5" />Export CSV
+          </Button>
+          <span className="text-xs text-muted-foreground ml-auto">{businesses.length} found · sorted by solar potential</span>
         </div>
       )}
 
-      {/* Results Grid */}
-      {filteredBusinesses.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {filteredBusinesses.map((biz: any) => (
-            <Card
-              key={biz.id}
-              className={`border-border/30 bg-card/80 backdrop-blur hover:border-orange-500/30 transition-all ${
-                biz.isImported ? "opacity-60" : ""
-              }`}
-            >
-              <CardContent className="p-4 space-y-3">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0 flex-1">
-                    <h3 className="font-semibold text-foreground truncate">{biz.businessName}</h3>
-                    <p className="text-xs text-muted-foreground truncate">{biz.businessType}</p>
+      {resultsQuery.isLoading ? (
+        <div className="flex items-center justify-center py-12"><Loader2 className="w-8 h-8 animate-spin text-orange-400" /></div>
+      ) : sortedBusinesses.length > 0 ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {sortedBusinesses.map((biz: any) => {
+            const score = solarScore(biz);
+            const statusInfo = CONTACT_STATUS_OPTIONS.find(s => s.value === (biz.contactStatus || "not_contacted")) || CONTACT_STATUS_OPTIONS[0];
+            const isSelected = selectedIds.has(biz.id);
+            return (
+              <Card key={biz.id} className={`border-border/30 bg-card/60 transition-all duration-200 ${isSelected ? "ring-2 ring-orange-500/50" : ""}`}>
+                <CardContent className="p-4 space-y-3">
+                  <div className="flex items-start gap-3">
+                    {!biz.isImported && (
+                      <button onClick={() => toggleSelect(biz.id)} className="mt-0.5 shrink-0 text-muted-foreground hover:text-orange-400 transition-colors">
+                        {isSelected ? <CheckSquare className="w-4 h-4 text-orange-400" /> : <Square className="w-4 h-4" />}
+                      </button>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-semibold text-foreground text-sm leading-tight truncate">{biz.businessName}</h3>
+                      <div className="flex flex-wrap gap-1.5 mt-1.5">
+                        <Badge variant="outline" className="text-xs text-orange-400 border-orange-500/30 bg-orange-500/10">
+                          {(biz.businessSize?.charAt(0).toUpperCase() + biz.businessSize?.slice(1)) || "Unknown"}
+                        </Badge>
+                        <SolarScoreBadge score={score} />
+                        <Badge variant="outline" className={`text-xs ${statusInfo.color}`}>{statusInfo.label}</Badge>
+                      </div>
+                    </div>
                   </div>
-                  <Badge
-                    variant="outline"
-                    className={`shrink-0 text-xs ${
-                      biz.businessSize === "large"
-                        ? "border-red-500/30 text-red-400 bg-red-500/10"
-                        : biz.businessSize === "medium"
-                        ? "border-yellow-500/30 text-yellow-400 bg-yellow-500/10"
-                        : "border-green-500/30 text-green-400 bg-green-500/10"
-                    }`}
-                  >
-                    {biz.businessSize}
-                  </Badge>
-                </div>
 
-                <div className="space-y-1.5 text-sm">
-                  {biz.address && (
-                    <div className="flex items-start gap-2 text-muted-foreground">
-                      <MapPin className="w-3.5 h-3.5 mt-0.5 shrink-0" />
-                      <span className="line-clamp-2 text-xs">{biz.address}</span>
-                    </div>
-                  )}
-                  {biz.phone && (
-                    <div className="flex items-center gap-2 text-muted-foreground">
-                      <Phone className="w-3.5 h-3.5 shrink-0" />
-                      <span className="text-xs">{biz.phone}</span>
-                    </div>
-                  )}
-                  {biz.website && (
-                    <div className="flex items-center gap-2 text-muted-foreground">
-                      <Globe className="w-3.5 h-3.5 shrink-0" />
-                      <a href={biz.website} target="_blank" rel="noopener noreferrer"
-                        className="text-xs text-orange-400 hover:underline truncate">
-                        {biz.website.replace(/^https?:\/\//, "").slice(0, 30)}
-                        <ExternalLink className="w-3 h-3 inline ml-1" />
-                      </a>
-                    </div>
-                  )}
-                </div>
-
-                {biz.rating && (
-                  <div className="flex items-center gap-1.5">
-                    <Star className="w-3.5 h-3.5 text-yellow-400 fill-yellow-400" />
-                    <span className="text-sm font-medium">{biz.rating}</span>
-                    <span className="text-xs text-muted-foreground">({biz.reviewCount} reviews)</span>
+                  <div className="space-y-1.5">
+                    {biz.address && <div className="flex items-start gap-2 text-muted-foreground"><MapPin className="w-3.5 h-3.5 mt-0.5 shrink-0" /><span className="line-clamp-1 text-xs">{biz.address}</span></div>}
+                    {biz.phone && <div className="flex items-center gap-2"><Phone className="w-3.5 h-3.5 shrink-0 text-muted-foreground" /><span className="text-xs font-medium text-foreground">{biz.phone}</span></div>}
+                    {biz.website && (
+                      <div className="flex items-center gap-2 text-muted-foreground">
+                        <Globe className="w-3.5 h-3.5 shrink-0" />
+                        <a href={biz.website} target="_blank" rel="noopener noreferrer" className="text-xs text-orange-400 hover:underline truncate">
+                          {biz.website.replace(/^https?:\/\//, "").slice(0, 30)}<ExternalLink className="w-3 h-3 inline ml-1" />
+                        </a>
+                      </div>
+                    )}
+                    {biz.rating && (
+                      <div className="flex items-center gap-1.5">
+                        <Star className="w-3.5 h-3.5 text-yellow-400 fill-yellow-400" />
+                        <span className="text-sm font-medium">{biz.rating}</span>
+                        <span className="text-xs text-muted-foreground">({biz.reviewCount} reviews)</span>
+                      </div>
+                    )}
                   </div>
-                )}
 
-                <div className="flex gap-2 pt-1">
-                  {biz.isImported ? (
-                    <Badge variant="outline" className="text-green-400 border-green-500/30 bg-green-500/10">
-                      Imported as Lead
-                    </Badge>
-                  ) : (
-                    <Button
-                      size="sm"
-                      onClick={() => importMutation.mutate({ businessId: biz.id })}
-                      disabled={importMutation.isPending}
-                      className="bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white text-xs"
-                    >
-                      <UserPlus className="w-3.5 h-3.5 mr-1" />
-                      Import as Lead
+                  {biz.aiPitch && expandedPitch === biz.id && (
+                    <div className="p-3 rounded-lg bg-background/50 border border-border/30">
+                      <p className="text-xs text-foreground leading-relaxed">{biz.aiPitch}</p>
+                      <div className="flex gap-2 mt-2">
+                        <Button size="sm" variant="outline" className="text-xs h-7 border-border/50"
+                          onClick={() => { navigator.clipboard.writeText(biz.aiPitch); toast.success("Copied!"); }}>Copy</Button>
+                        <Button size="sm" className="text-xs h-7 bg-emerald-600 hover:bg-emerald-700 text-white border-0"
+                          onClick={() => openWhatsApp(biz, biz.aiPitch)}>
+                          <MessageCircle className="w-3 h-3 mr-1" />Send on WhatsApp
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground shrink-0">Status:</span>
+                    <Select value={biz.contactStatus || "not_contacted"}
+                      onValueChange={(val) => updateStatusMutation.mutate({ businessId: biz.id, contactStatus: val as any })}>
+                      <SelectTrigger className="h-7 text-xs flex-1 border-border/30"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {CONTACT_STATUS_OPTIONS.map(o => <SelectItem key={o.value} value={o.value} className="text-xs">{o.label}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="flex flex-wrap gap-2 pt-1">
+                    {biz.isImported ? (
+                      <Badge variant="outline" className="text-green-400 border-green-500/30 bg-green-500/10">✓ Imported</Badge>
+                    ) : (
+                      <Button size="sm" onClick={() => importMutation.mutate({ businessId: biz.id })}
+                        disabled={importMutation.isPending}
+                        className="bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white text-xs h-7">
+                        <UserPlus className="w-3.5 h-3.5 mr-1" />Import Lead
+                      </Button>
+                    )}
+                    <Button size="sm" variant="outline" className="text-xs h-7 border-border/50" onClick={() => openWhatsApp(biz)}>
+                      <MessageCircle className="w-3.5 h-3.5 mr-1 text-green-400" />WhatsApp
                     </Button>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+                    <Button size="sm" variant="outline" className="text-xs h-7 border-border/50" onClick={() => openLinkedIn(biz)}>
+                      <Linkedin className="w-3.5 h-3.5 mr-1 text-blue-400" />LinkedIn
+                    </Button>
+                    <Button size="sm" variant="outline" className="text-xs h-7 border-border/50"
+                      disabled={generatingPitch === biz.id}
+                      onClick={() => {
+                        if (biz.aiPitch) { setExpandedPitch(expandedPitch === biz.id ? null : biz.id); return; }
+                        setGeneratingPitch(biz.id);
+                        generatePitchMutation.mutate({ businessId: biz.id });
+                      }}>
+                      {generatingPitch === biz.id ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : <Sparkles className="w-3.5 h-3.5 mr-1 text-purple-400" />}
+                      {biz.aiPitch ? (expandedPitch === biz.id ? "Hide Pitch" : "Show Pitch") : "AI Pitch"}
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
       ) : businesses.length === 0 && !resultsQuery.isLoading ? (
         <Card className="border-border/30 bg-card/60">
@@ -315,50 +372,10 @@ export default function BusinessScraper() {
               <Building2 className="w-8 h-8 text-orange-400" />
             </div>
             <h3 className="text-lg font-semibold text-foreground mb-2">No Businesses Found Yet</h3>
-            <p className="text-muted-foreground text-sm max-w-md mx-auto">
-              Select a business type and location above, then click "Search Businesses" to find potential solar customers from Google Maps.
-            </p>
+            <p className="text-muted-foreground text-sm max-w-md mx-auto">Select a business type and city above, then click "Search Businesses".</p>
           </CardContent>
         </Card>
       ) : null}
-
-      {/* Recent Scrape Jobs */}
-      {(jobsQuery.data?.length || 0) > 0 && (
-        <Card className="border-border/30 bg-card/60">
-          <CardHeader>
-            <CardTitle className="text-sm font-medium">Recent Scrape Jobs</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              {(jobsQuery.data || []).slice(0, 5).map((job: any) => (
-                <div key={job.id} className="flex items-center justify-between p-3 rounded-lg bg-background/50 text-sm">
-                  <div>
-                    <span className="text-foreground font-medium">{job.query}</span>
-                    <span className="text-muted-foreground ml-2 text-xs">
-                      {new Date(job.createdAt).toLocaleDateString()}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <span className="text-xs text-muted-foreground">{job.totalFound} found</span>
-                    <Badge
-                      variant="outline"
-                      className={`text-xs ${
-                        job.status === "completed"
-                          ? "text-green-400 border-green-500/30"
-                          : job.status === "failed"
-                          ? "text-red-400 border-red-500/30"
-                          : "text-yellow-400 border-yellow-500/30"
-                      }`}
-                    >
-                      {job.status}
-                    </Badge>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
     </div>
   );
 }

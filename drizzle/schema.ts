@@ -38,6 +38,8 @@ export const agencyConfig = mysqlTable("agencyConfig3", {
   marginPercent: decimal("marginPercent", { precision: 5, scale: 2 }).default("15"),
   botGreeting: text("botGreeting"),
   botTone: varchar("botTone", { length: 50 }).default("friendly"),
+  whatsappNumber: varchar("whatsappNumber", { length: 30 }),
+  linkedinUrl: text("linkedinUrl"),
   isActive: boolean("isActive").default(true),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
@@ -401,9 +403,12 @@ export const scrapedBusinesses = mysqlTable("scrapedBusinesses", {
   rating: decimal("rating", { precision: 3, scale: 1 }),
   reviewCount: int("reviewCount"),
   placeId: varchar("placeId", { length: 200 }),
-  source: varchar("source", { length: 50 }).default("google_maps"),
+    source: varchar("source", { length: 50 }).default("google_maps"),
   isImported: boolean("isImported").default(false),
+  solarScore: int("solarScore").default(5),
+  contactStatus: mysqlEnum("contactStatus", ["not_contacted", "contacted", "interested", "converted"]).default("not_contacted"),
+  linkedinUrl: text("linkedinUrl"),
+  aiPitch: text("aiPitch"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
-
 export type ScrapedBusiness = typeof scrapedBusinesses.$inferSelect;
