@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import {
   Search, Building2, Phone, Mail, MapPin, FileDown,
   Globe, Star, MessageCircle, Sparkles, Loader2,
-  ExternalLink, User, TrendingUp
+  ExternalLink, User, TrendingUp, RefreshCw, Zap
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -60,6 +60,8 @@ export default function ScrapedContacts() {
   const [generatingPitch, setGeneratingPitch] = useState<number | null>(null);
   const [expandedPitch, setExpandedPitch] = useState<number | null>(null);
   const [sendingEmail, setSendingEmail] = useState<number | null>(null);
+  const [extractingEmail, setExtractingEmail] = useState<number | null>(null);
+  const [bulkGenerating, setBulkGenerating] = useState(false);
 
   const { data: businesses = [], isLoading, refetch } = trpc.scraper.allBusinesses.useQuery({
     search: search || undefined,
@@ -79,6 +81,28 @@ export default function ScrapedContacts() {
       refetch();
     },
     onError: (err) => { toast.error(err.message); setGeneratingPitch(null); },
+  });
+
+  const reExtractEmailMutation = trpc.scraper.reExtractEmail.useMutation({
+    onSuccess: (data) => {
+      setExtractingEmail(null);
+      if ((data as any).success) {
+        toast.success(`Email found: ${(data as any).email}`);
+      } else {
+        toast.info((data as any).message || "No email found on website");
+      }
+      refetch();
+    },
+    onError: (err) => { toast.error(err.message); setExtractingEmail(null); },
+  });
+
+  const bulkGeneratePitchesMutation = trpc.scraper.bulkGenerateAIPitches.useMutation({
+    onSuccess: (data) => {
+      setBulkGenerating(false);
+      toast.success(`AI pitches generated for ${(data as any).processed} businesses!`);
+      refetch();
+    },
+    onError: (err) => { toast.error(err.message); setBulkGenerating(false); },
   });
 
   const sendEmailMutation = trpc.scraper.sendOutreachEmail.useMutation({
@@ -140,9 +164,27 @@ export default function ScrapedContacts() {
           <h1 className="text-2xl font-bold text-foreground">Scraped Contacts</h1>
           <p className="text-muted-foreground text-sm mt-1">All businesses found via the Business Scraper — with full details and outreach tools.</p>
         </div>
-        <Button variant="outline" size="sm" onClick={exportCSV} className="border-border/50">
-          <FileDown className="w-4 h-4 mr-1.5" />Export CSV
-        </Button>
+        <div className="flex gap-2 flex-wrap">
+          <Button
+            variant="outline" size="sm"
+            disabled={bulkGenerating || bizList.length === 0}
+            onClick={() => {
+              const agencyId = bizList[0]?.agencyId;
+              if (!agencyId) { toast.error("No contacts to process"); return; }
+              setBulkGenerating(true);
+              bulkGeneratePitchesMutation.mutate({ agencyId });
+            }}
+            className="border-purple-500/40 text-purple-400 hover:bg-purple-500/10"
+          >
+            {bulkGenerating
+              ? <><Loader2 className="w-4 h-4 mr-1.5 animate-spin" />Generating...</>
+              : <><Zap className="w-4 h-4 mr-1.5" />Generate All Pitches</>
+            }
+          </Button>
+          <Button variant="outline" size="sm" onClick={exportCSV} className="border-border/50">
+            <FileDown className="w-4 h-4 mr-1.5" />Export CSV
+          </Button>
+        </div>
       </div>
 
       {/* Filters */}
@@ -327,15 +369,25 @@ export default function ScrapedContacts() {
                       <MessageCircle className="w-3.5 h-3.5 mr-1 text-green-400" />WhatsApp
                     </Button>
 
-                    {/* Email button — only if email available */}
-                    {biz.email && (
+                    {/* Email button — only if email available; otherwise show Get Email if website exists */}
+                    {biz.email ? (
                       <Button size="sm" variant="outline" className="text-xs h-7 border-border/50"
                         disabled={sendingEmail === biz.id}
                         onClick={() => sendOutreachEmail(biz)}>
                         {sendingEmail === biz.id ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : <Mail className="w-3.5 h-3.5 mr-1 text-blue-400" />}
                         Email
                       </Button>
-                    )}
+                    ) : biz.website ? (
+                      <Button size="sm" variant="outline"
+                        className="text-xs h-7 border-orange-500/30 text-orange-400 hover:bg-orange-500/10"
+                        disabled={extractingEmail === biz.id}
+                        onClick={() => { setExtractingEmail(biz.id); reExtractEmailMutation.mutate({ businessId: biz.id }); }}>
+                        {extractingEmail === biz.id
+                          ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />
+                          : <RefreshCw className="w-3.5 h-3.5 mr-1" />}
+                        Get Email
+                      </Button>
+                    ) : null}
 
                     {/* AI Pitch */}
                     <Button size="sm" variant="outline" className="text-xs h-7 border-border/50"

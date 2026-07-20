@@ -1097,13 +1097,73 @@ export const appRouter = router({
           subject: input.subject,
           html: emailHtml,
         });
-        if (result.success) {
+                if (result.success) {
           await db.updateScrapedBusiness(input.businessId, { contactStatus: "contacted" });
         }
         return { success: result.success };
       }),
+    // Re-extract email from website for a single business
+    reExtractEmail: protectedProcedure
+      .input(z.object({ businessId: z.number() }))
+      .mutation(async ({ input }) => {
+        const biz = await db.getScrapedBusinessById(input.businessId);
+        if (!biz) throw new Error("Business not found");
+        if (!biz.website) return { success: false, email: null, message: "No website available" };
+        try {
+          const email = await extractEmailFromWebsite(biz.website, 6000);
+          if (email) {
+            await db.updateScrapedBusiness(input.businessId, { email });
+            return { success: true, email, message: "Email extracted" };
+          }
+          return { success: false, email: null, message: "No email found on website" };
+        } catch {
+          return { success: false, email: null, message: "Failed to fetch website" };
+        }
+      }),
+    // Bulk generate AI pitches for all businesses in the agency
+    bulkGenerateAIPitches: protectedProcedure
+      .input(z.object({ agencyId: z.number() }))
+      .mutation(async ({ input, ctx }) => {
+        if (!ctx.user) throw new Error("Not authenticated");
+        const businesses = await db.searchScrapedBusinesses(input.agencyId);
+        if (!businesses.length) return { success: true, processed: 0 };
+        const solarKeywords = ["solar", "renewable", "photovoltaic", "pv", "wind energy", "green energy", "electrical contractor"];
+        let processed = 0;
+        // Process in batches of 5 to avoid overwhelming the LLM
+        for (const biz of businesses) {
+          try {
+            const isSolarBusiness = solarKeywords.some(kw =>
+              (biz.businessType || "").toLowerCase().includes(kw) ||
+              (biz.businessName || "").toLowerCase().includes(kw)
+            );
+            let systemPrompt: string;
+            let userPrompt: string;
+            if (isSolarBusiness) {
+              systemPrompt = `You are a B2B sales expert writing a WhatsApp outreach message to a solar company. Write a short, persuasive message (max 4 sentences) pitching Sales Squad — an AI-powered lead generation platform for solar companies. Key points: (1) Sales Squad's AI chatbot captures homeowners interested in solar 24/7, (2) every lead comes pre-qualified with name, phone, email, monthly electricity bill, and location, (3) the solar company just receives ready-to-close leads — no marketing spend needed, (4) sign up free as a partner. Do NOT mention solar panels or subsidies. Be conversational and direct.`;
+              const partnerUrl = process.env.VITE_APP_ID ? ('https://' + process.env.VITE_APP_ID + '.manus.space/for-partners') : 'https://salessquad.in/for-partners';
+              userPrompt = `Solar company: ${biz.businessName}, Location: ${biz.city}, ${biz.state}. Partner signup link: ${partnerUrl}`;
+            } else {
+              systemPrompt = `You are a solar sales expert writing a WhatsApp message to a business owner. Write a short, punchy message (max 3 sentences) pitching solar energy to reduce their electricity bills. Be specific to their business type. Mention PM Surya Ghar subsidy and ROI. No emojis. Professional tone.`;
+              userPrompt = `Business: ${biz.businessName}, Type: ${biz.businessType}, Size: ${biz.businessSize}, Location: ${biz.city}, ${biz.state}. Monthly electricity bill estimate: ${biz.businessSize === 'large' ? '₹80,000-1,20,000' : biz.businessSize === 'medium' ? '₹20,000-50,000' : '₹5,000-15,000'}/month.`;
+            }
+            const response = await invokeLLM({
+              messages: [
+                { role: "system", content: systemPrompt },
+                { role: "user", content: userPrompt },
+              ] as any,
+            });
+            const pitch = response.choices[0]?.message?.content as string || "";
+            if (pitch) {
+              await db.updateScrapedBusiness(biz.id, { aiPitch: pitch });
+              processed++;
+            }
+          } catch {
+            // Skip failed pitches silently
+          }
+        }
+        return { success: true, processed };
+      }),
   }),
-
   // ===== BILL PHOTO READING =====
   billReader: router({
     readBillImage: publicProcedure
