@@ -274,7 +274,7 @@ function LocationModal({ onConfirm, onClose }: { onConfirm: (address: string) =>
 
   useEffect(() => {
     if (!navigator.geolocation) { setStep("manual"); return; }
-    const tid = setTimeout(() => setStep("manual"), 8000);
+    const tid = setTimeout(() => setStep("manual"), 5000);
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         clearTimeout(tid);
@@ -292,7 +292,7 @@ function LocationModal({ onConfirm, onClose }: { onConfirm: (address: string) =>
         }
       },
       () => { clearTimeout(tid); setStep("manual"); },
-      { timeout: 7000, enableHighAccuracy: true }
+      { timeout: 4500, enableHighAccuracy: false }
     );
   }, []);
 
@@ -311,7 +311,8 @@ function LocationModal({ onConfirm, onClose }: { onConfirm: (address: string) =>
             <div className="flex flex-col items-center gap-3 py-4">
               <Loader2 className="w-8 h-8 text-emerald-400 animate-spin" />
               <p className="text-gray-400 text-sm">Detecting your location...</p>
-              <button onClick={() => setStep("manual")} className="text-xs text-gray-500 underline">Enter manually instead</button>
+              <p className="text-gray-500 text-xs">Please allow location access when prompted</p>
+              <button onClick={() => setStep("manual")} className="mt-1 px-4 py-2 rounded-lg bg-white/10 text-gray-300 text-sm hover:bg-white/20 transition-colors">Type address instead →</button>
             </div>
           )}
           {step === "detected" && (
