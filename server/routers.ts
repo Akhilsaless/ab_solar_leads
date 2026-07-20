@@ -664,9 +664,20 @@ export const appRouter = router({
         if (!ctx.user) return [];
         const agency = await db.getAgencyByUserId(ctx.user.id);
         if (agency) {
-          return await db.getLeadsByAgency(agency.id);
+          // Only chatbot leads (exclude scraper imports)
+          const all = await db.getLeadsByAgency(agency.id);
+          return (all as any[]).filter((l: any) => l.source !== 'scraper');
         }
-        return await db.getLeads(input || {});
+        return await db.getLeads({ ...(input || {}) });
+      }),
+    scrapedContacts: protectedProcedure
+      .input(z.object({
+        status: z.string().optional(),
+        search: z.string().optional(),
+      }).optional())
+      .query(async ({ input, ctx }) => {
+        if (!ctx.user) return [];
+        return await db.getLeads({ ...(input || {}), source: 'scraper' });
       }),
 
     getById: protectedProcedure

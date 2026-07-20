@@ -317,12 +317,15 @@ export async function getLeadsByAgency(agencyId: number) {
   return (result as any)[0] || [];
 }
 
-export async function getLeads(filters?: { status?: string; search?: string; }) {
+export async function getLeads(filters?: { status?: string; search?: string; source?: string; }) {
   const db = await getDb();
   if (!db) return [];
   const conditions = [];
   if (filters?.status && filters.status !== 'all') {
     conditions.push(eq(leads.status, filters.status as any));
+  }
+  if (filters?.source) {
+    conditions.push(eq(leads.source, filters.source));
   }
   if (filters?.search) {
     conditions.push(or(

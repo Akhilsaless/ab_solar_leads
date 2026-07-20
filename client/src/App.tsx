@@ -22,6 +22,7 @@ import PartnerOutreach from "@/pages/PartnerOutreach";
 import PartnerSignup from "@/pages/PartnerSignup";
 import ForPartners from "@/pages/ForPartners";
 import PartnerDashboard from "@/pages/PartnerDashboard";
+import ScrapedContacts from "@/pages/ScrapedContacts";
 import DashboardLayout from "@/components/DashboardLayout";
 import { Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
@@ -39,6 +40,7 @@ function AuthenticatedRoutes() {
         <Route path="/products" component={Products} />
         <Route path="/analytics" component={Analytics} />
         <Route path="/scraper" component={BusinessScraper} />
+        <Route path="/scraped-contacts" component={ScrapedContacts} />
         <Route path="/subsidies" component={Subsidies} />
         <Route path="/pricing" component={Pricing} />
         <Route path="/settings" component={Settings} />
