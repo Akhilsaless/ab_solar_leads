@@ -1046,10 +1046,28 @@ export const appRouter = router({
       .mutation(async ({ input }) => {
         const biz = await db.getScrapedBusinessById(input.businessId);
         if (!biz) throw new Error("Business not found");
+        // Detect if this is a solar/renewable energy company — pitch Sales Squad to them
+        const solarKeywords = ["solar", "renewable", "photovoltaic", "pv", "wind energy", "green energy", "electrical contractor"];
+        const isSolarBusiness = solarKeywords.some(kw =>
+          (biz.businessType || "").toLowerCase().includes(kw) ||
+          (biz.businessName || "").toLowerCase().includes(kw)
+        );
+        let systemPrompt: string;
+        let userPrompt: string;
+        if (isSolarBusiness) {
+          // Pitch Sales Squad's lead generation platform to solar companies
+          systemPrompt = `You are a B2B sales expert writing a WhatsApp outreach message to a solar company. Write a short, persuasive message (max 4 sentences) pitching Sales Squad — an AI-powered lead generation platform for solar companies. Key points to include: (1) Sales Squad's AI chatbot captures homeowners and businesses interested in solar 24/7, (2) every lead comes pre-qualified with name, phone, email, monthly electricity bill, and location, (3) the solar company just receives ready-to-close leads — no marketing spend needed, (4) sign up free as a partner. Do NOT mention solar panels, subsidies, or electricity savings. Be conversational and direct.`;
+          const partnerSignupUrl = process.env.VITE_APP_ID ? ('https://' + process.env.VITE_APP_ID + '.manus.space/for-partners') : 'https://salessquad.in/for-partners';
+          userPrompt = `Solar company: ${biz.businessName}, Location: ${biz.city}, ${biz.state}. Partner signup link: ${partnerSignupUrl}`;
+        } else {
+          // Pitch solar energy savings to non-solar businesses
+          systemPrompt = `You are a solar sales expert writing a WhatsApp message to a business owner. Write a short, punchy message (max 3 sentences) pitching solar energy to reduce their electricity bills. Be specific to their business type. Mention PM Surya Ghar subsidy and ROI. No emojis. Professional tone.`;
+          userPrompt = `Business: ${biz.businessName}, Type: ${biz.businessType}, Size: ${biz.businessSize}, Location: ${biz.city}, ${biz.state}. Monthly electricity bill estimate: ${biz.businessSize === 'large' ? '₹80,000-1,20,000' : biz.businessSize === 'medium' ? '₹20,000-50,000' : '₹5,000-15,000'}/month.`;
+        }
         const response = await invokeLLM({
           messages: [
-            { role: "system", content: "You are a solar sales expert. Write a short, punchy WhatsApp message (max 3 sentences) pitching solar energy to a business owner. Be specific to their business type. Mention PM Surya Ghar subsidy and ROI. No emojis. Professional tone." },
-            { role: "user", content: `Business: ${biz.businessName}, Type: ${biz.businessType}, Size: ${biz.businessSize}, Location: ${biz.city}, ${biz.state}. Monthly electricity bill estimate for a ${biz.businessSize} ${biz.businessType}: ${biz.businessSize === 'large' ? '₹80,000-1,20,000' : biz.businessSize === 'medium' ? '₹20,000-50,000' : '₹5,000-15,000'}/month.` },
+            { role: "system", content: systemPrompt },
+            { role: "user", content: userPrompt },
           ] as any,
         });
         const pitch = response.choices[0]?.message?.content as string || "";
