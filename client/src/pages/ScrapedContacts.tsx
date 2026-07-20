@@ -3,211 +3,360 @@ import { trpc } from "@/lib/trpc";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Building2, Phone, Mail, MapPin, FileDown } from "lucide-react";
+import {
+  Search, Building2, Phone, Mail, MapPin, FileDown,
+  Globe, Star, MessageCircle, Sparkles, Loader2,
+  ExternalLink, User, TrendingUp
+} from "lucide-react";
 import { toast } from "sonner";
 
-const STATUS_OPTIONS = [
+const CONTACT_STATUS_OPTIONS = [
   { value: "all", label: "All Statuses" },
-  { value: "new", label: "New" },
+  { value: "not_contacted", label: "Not Contacted" },
   { value: "contacted", label: "Contacted" },
-  { value: "qualified", label: "Qualified" },
+  { value: "interested", label: "Interested" },
   { value: "converted", label: "Converted" },
-  { value: "lost", label: "Lost" },
 ];
 
 const statusColor: Record<string, string> = {
-  new: "bg-blue-500/20 text-blue-400",
-  contacted: "bg-yellow-500/20 text-yellow-400",
-  qualified: "bg-purple-500/20 text-purple-400",
-  converted: "bg-green-500/20 text-green-400",
-  lost: "bg-red-500/20 text-red-400",
+  not_contacted: "text-gray-400 border-gray-500/30 bg-gray-500/10",
+  contacted: "text-blue-400 border-blue-500/30 bg-blue-500/10",
+  interested: "text-yellow-400 border-yellow-500/30 bg-yellow-500/10",
+  converted: "text-green-400 border-green-500/30 bg-green-500/10",
 };
+
+function solarScore(biz: any): number {
+  let score = 0;
+  if (biz.businessSize === "large") score += 40;
+  else if (biz.businessSize === "medium") score += 25;
+  else score += 10;
+  const highTypes = ["factor", "textile", "cold storage", "warehouse", "hospital", "hotel"];
+  if (highTypes.some(t => (biz.businessType || "").toLowerCase().includes(t))) score += 30;
+  else score += 15;
+  if (biz.rating && Number(biz.rating) >= 4) score += 15;
+  else if (biz.rating && Number(biz.rating) >= 3) score += 8;
+  if (biz.phone) score += 10;
+  if (biz.website) score += 5;
+  return Math.min(score, 100);
+}
+
+function ScoreBadge({ score }: { score: number }) {
+  const color = score >= 70 ? "text-green-400 border-green-500/30 bg-green-500/10"
+    : score >= 45 ? "text-yellow-400 border-yellow-500/30 bg-yellow-500/10"
+    : "text-gray-400 border-gray-500/30 bg-gray-500/10";
+  return (
+    <Badge variant="outline" className={`text-xs ${color} flex items-center gap-1`}>
+      <TrendingUp className="w-3 h-3" />
+      {score >= 70 ? "High" : score >= 45 ? "Medium" : "Low"} ({score})
+    </Badge>
+  );
+}
 
 export default function ScrapedContacts() {
   const [search, setSearch] = useState("");
-  const [status, setStatus] = useState("all");
+  const [contactStatus, setContactStatus] = useState("all");
+  const [generatingPitch, setGeneratingPitch] = useState<number | null>(null);
+  const [expandedPitch, setExpandedPitch] = useState<number | null>(null);
+  const [sendingEmail, setSendingEmail] = useState<number | null>(null);
 
-  const { data: contacts = [], isLoading, refetch } = trpc.leads.scrapedContacts.useQuery({
-    status: status === "all" ? undefined : status,
+  const { data: businesses = [], isLoading, refetch } = trpc.scraper.allBusinesses.useQuery({
     search: search || undefined,
+    contactStatus: contactStatus !== "all" ? contactStatus : undefined,
   });
 
-  const updateMutation = trpc.leads.update.useMutation({
-    onSuccess: () => { toast.success("Status updated"); refetch(); },
-    onError: () => toast.error("Failed to update"),
+  const updateStatusMutation = trpc.scraper.updateContactStatus.useMutation({
+    onSuccess: () => refetch(),
+    onError: (err) => toast.error(err.message),
   });
 
-  const exportCSV = () => {
-    if (!contacts.length) { toast.error("No contacts to export"); return; }
-    const headers = ["Name", "Phone", "Email", "City", "State", "Status", "Notes", "Date"];
-    const rows = (contacts as any[]).map((c: any) => [
-      `${c.firstName || ""} ${c.lastName || ""}`.trim(),
-      c.phone || "",
-      c.email || "",
-      c.city || "",
-      c.state || "",
-      c.status || "",
-      (c.notes || "").replace(/,/g, ";"),
-      c.createdAt ? new Date(c.createdAt).toLocaleDateString() : "",
-    ]);
-    const csv = [headers, ...rows].map(r => r.join(",")).join("\n");
-    const blob = new Blob([csv], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `scraped-contacts-${new Date().toISOString().split("T")[0]}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-    toast.success("CSV downloaded");
+  const generatePitchMutation = trpc.scraper.generateAIPitch.useMutation({
+    onSuccess: (_data, vars) => {
+      toast.success("AI pitch ready!");
+      setGeneratingPitch(null);
+      setExpandedPitch(vars.businessId);
+      refetch();
+    },
+    onError: (err) => { toast.error(err.message); setGeneratingPitch(null); },
+  });
+
+  const sendEmailMutation = trpc.scraper.sendOutreachEmail.useMutation({
+    onSuccess: (_data, vars) => {
+      toast.success("Email sent!");
+      setSendingEmail(null);
+      refetch();
+    },
+    onError: (err) => { toast.error(err.message); setSendingEmail(null); },
+  });
+
+  const openWhatsApp = (biz: any, pitch?: string) => {
+    const msg = pitch || `Hi, I'm from Sales Squad. We help ${biz.businessType || "businesses"} like ${biz.businessName} cut electricity bills by up to 80% with solar. Govt subsidy up to Rs 78,000 available. Can we discuss?`;
+    const phone = (biz.phone || "").replace(/[^0-9]/g, "");
+    if (phone) {
+      window.open(`https://wa.me/${phone.startsWith("91") ? phone : "91" + phone}?text=${encodeURIComponent(msg)}`, "_blank");
+    } else {
+      navigator.clipboard.writeText(msg);
+      toast.success("No phone — pitch copied to clipboard!");
+    }
   };
 
+  const sendOutreachEmail = (biz: any) => {
+    if (!biz.email) { toast.error("No email address for this business"); return; }
+    const pitch = biz.aiPitch || `Hi,\n\nI'm from Sales Squad. We help ${biz.businessType || "businesses"} like ${biz.businessName} cut electricity bills by up to 80% with solar.\n\nThe Government of India's PM Surya Ghar scheme offers subsidies up to ₹78,000. For a ${biz.businessSize || "medium"} business like yours, the payback period is typically 3-5 years.\n\nWould you like a free solar assessment?\n\nBest regards,\nSales Squad Team`;
+    setSendingEmail(biz.id);
+    sendEmailMutation.mutate({
+      businessId: biz.id,
+      toEmail: biz.email,
+      subject: `Solar Energy Savings for ${biz.businessName} — Sales Squad`,
+      body: pitch,
+    });
+  };
+
+  const exportCSV = () => {
+    if (!(businesses as any[]).length) { toast.error("No contacts to export"); return; }
+    const headers = ["Business Name", "Type", "Size", "Owner", "Phone", "Email", "Website", "City", "State", "Rating", "Reviews", "Solar Score", "Status"];
+    const rows = (businesses as any[]).map((b: any) => [
+      b.businessName, b.businessType || "", b.businessSize || "", b.ownerName || "",
+      b.phone || "", b.email || "", b.website || "",
+      b.city || "", b.state || "", b.rating || "", b.reviewCount || "",
+      solarScore(b), b.contactStatus || "not_contacted",
+    ]);
+    const csv = [headers, ...rows].map(r => r.map((v: any) => `"${String(v).replace(/"/g, '""')}"`).join(",")).join("\n");
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
+    a.download = `scraped-contacts-${new Date().toISOString().split("T")[0]}.csv`;
+    a.click();
+    toast.success("CSV exported!");
+  };
+
+  const bizList = businesses as any[];
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-6">
-      <div className="max-w-7xl mx-auto">
-
-        {/* Header */}
-        <div className="flex items-start justify-between mb-8">
-          <div>
-            <h1 className="text-4xl font-bold text-white mb-2">Scraped Contacts</h1>
-            <p className="text-gray-400">Businesses imported from the Business Scraper</p>
-          </div>
-          <Button
-            onClick={exportCSV}
-            variant="outline"
-            className="border-slate-600 text-gray-300 hover:bg-slate-700"
-          >
-            <FileDown className="w-4 h-4 mr-2" /> Export CSV
-          </Button>
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">Scraped Contacts</h1>
+          <p className="text-muted-foreground text-sm mt-1">All businesses found via the Business Scraper — with full details and outreach tools.</p>
         </div>
+        <Button variant="outline" size="sm" onClick={exportCSV} className="border-border/50">
+          <FileDown className="w-4 h-4 mr-1.5" />Export CSV
+        </Button>
+      </div>
 
-        {/* Filters */}
-        <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-4 mb-6 flex flex-col sm:flex-row gap-3">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-            <Input
-              placeholder="Search by name, phone, email..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-9 bg-slate-700 border-slate-600 text-white placeholder:text-gray-500"
-            />
-          </div>
-          <Select value={status} onValueChange={setStatus}>
-            <SelectTrigger className="bg-slate-700 border-slate-600 text-white w-full sm:w-48">
-              <SelectValue placeholder="Filter by status" />
-            </SelectTrigger>
-            <SelectContent className="bg-slate-700 border-slate-600">
-              {STATUS_OPTIONS.map(opt => (
-                <SelectItem key={opt.value} value={opt.value} className="text-white">{opt.label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        {/* Stats */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
-          {[
-            { label: "Total", value: (contacts as any[]).length, color: "text-white" },
-            { label: "New", value: (contacts as any[]).filter((c: any) => c.status === "new").length, color: "text-blue-400" },
-            { label: "Contacted", value: (contacts as any[]).filter((c: any) => c.status === "contacted").length, color: "text-yellow-400" },
-            { label: "Converted", value: (contacts as any[]).filter((c: any) => c.status === "converted").length, color: "text-green-400" },
-          ].map(stat => (
-            <div key={stat.label} className="bg-slate-800/50 border border-slate-700 rounded-lg p-4 text-center">
-              <div className={`text-2xl font-bold ${stat.color}`}>{stat.value}</div>
-              <div className="text-gray-400 text-sm mt-1">{stat.label}</div>
+      {/* Filters */}
+      <Card className="border-border/30 bg-card/60">
+        <CardContent className="pt-4 pb-4">
+          <div className="flex flex-col sm:flex-row gap-3">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                placeholder="Search by name, phone, email, city..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pl-9"
+              />
             </div>
+            <Select value={contactStatus} onValueChange={setContactStatus}>
+              <SelectTrigger className="w-full sm:w-48">
+                <SelectValue placeholder="All Statuses" />
+              </SelectTrigger>
+              <SelectContent>
+                {CONTACT_STATUS_OPTIONS.map(opt => (
+                  <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Stats */}
+      {bizList.length > 0 && (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {[
+            { label: "Total", value: bizList.length, color: "text-foreground" },
+            { label: "Not Contacted", value: bizList.filter(b => !b.contactStatus || b.contactStatus === "not_contacted").length, color: "text-gray-400" },
+            { label: "Contacted", value: bizList.filter(b => b.contactStatus === "contacted").length, color: "text-blue-400" },
+            { label: "Converted", value: bizList.filter(b => b.contactStatus === "converted").length, color: "text-green-400" },
+          ].map(s => (
+            <Card key={s.label} className="border-border/30 bg-card/60">
+              <CardContent className="p-3 text-center">
+                <p className={`text-2xl font-bold ${s.color}`}>{s.value}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">{s.label}</p>
+              </CardContent>
+            </Card>
           ))}
         </div>
+      )}
 
-        {/* Table */}
-        {isLoading ? (
-          <div className="text-center py-20 text-gray-400">Loading contacts...</div>
-        ) : (contacts as any[]).length === 0 ? (
-          <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-16 text-center">
-            <Building2 className="w-12 h-12 text-gray-500 mx-auto mb-4" />
-            <p className="text-gray-400 font-medium">No scraped contacts yet</p>
-            <p className="text-gray-500 text-sm mt-2">Go to Business Scraper, search for businesses, and click "Import" to add them here</p>
-          </div>
-        ) : (
-          <div className="bg-slate-800/50 border border-slate-700 rounded-lg overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-slate-700/50 border-b border-slate-600">
-                  <tr>
-                    <th className="px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase">Business / Name</th>
-                    <th className="px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase">Phone</th>
-                    <th className="px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase">Email</th>
-                    <th className="px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase">Location</th>
-                    <th className="px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase">Status</th>
-                    <th className="px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase">Date</th>
-                    <th className="px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-700">
-                  {(contacts as any[]).map((contact: any) => (
-                    <tr key={contact.id} className="hover:bg-slate-700/20 transition">
-                      <td className="px-5 py-4">
-                        <div className="text-sm text-white font-medium">
-                          {contact.firstName} {contact.lastName}
-                        </div>
-                        {contact.notes && (
-                          <div className="text-xs text-gray-500 mt-0.5 max-w-xs truncate">{contact.notes}</div>
-                        )}
-                      </td>
-                      <td className="px-5 py-4">
-                        {contact.phone ? (
-                          <a href={`tel:${contact.phone}`} className="flex items-center gap-1 text-sm text-gray-300 hover:text-orange-400">
-                            <Phone className="w-3 h-3" /> {contact.phone}
-                          </a>
-                        ) : <span className="text-gray-600 text-sm italic">No phone</span>}
-                      </td>
-                      <td className="px-5 py-4">
-                        {contact.email ? (
-                          <a href={`mailto:${contact.email}`} className="flex items-center gap-1 text-sm text-gray-300 hover:text-orange-400">
-                            <Mail className="w-3 h-3" /> {contact.email}
-                          </a>
-                        ) : <span className="text-gray-600 text-sm italic">No email</span>}
-                      </td>
-                      <td className="px-5 py-4">
-                        {(contact.city || contact.state) ? (
-                          <span className="flex items-center gap-1 text-sm text-gray-400">
-                            <MapPin className="w-3 h-3" /> {[contact.city, contact.state].filter(Boolean).join(", ")}
-                          </span>
-                        ) : <span className="text-gray-600 text-sm italic">—</span>}
-                      </td>
-                      <td className="px-5 py-4">
-                        <Badge className={`text-xs ${statusColor[contact.status] || "bg-gray-500/20 text-gray-400"}`}>
-                          {contact.status || "new"}
+      {/* Business Cards */}
+      {isLoading ? (
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="w-8 h-8 animate-spin text-orange-400" />
+        </div>
+      ) : bizList.length === 0 ? (
+        <Card className="border-border/30 bg-card/60">
+          <CardContent className="p-12 text-center">
+            <Building2 className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+            <h3 className="text-lg font-semibold text-foreground mb-2">No Scraped Contacts Yet</h3>
+            <p className="text-muted-foreground text-sm max-w-md mx-auto">
+              Go to Business Scraper, search for businesses, and they will appear here automatically.
+            </p>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {bizList.map((biz: any) => {
+            const score = solarScore(biz);
+            const statusInfo = CONTACT_STATUS_OPTIONS.find(s => s.value === (biz.contactStatus || "not_contacted")) || CONTACT_STATUS_OPTIONS[1];
+            return (
+              <Card key={biz.id} className="border-border/30 bg-card/60">
+                <CardContent className="p-4 space-y-3">
+                  {/* Business name + badges */}
+                  <div>
+                    <h3 className="font-semibold text-foreground text-sm leading-tight">{biz.businessName}</h3>
+                    <div className="flex flex-wrap gap-1.5 mt-1.5">
+                      {biz.businessType && (
+                        <Badge variant="outline" className="text-xs text-orange-400 border-orange-500/30 bg-orange-500/10 capitalize">
+                          {biz.businessType}
                         </Badge>
-                      </td>
-                      <td className="px-5 py-4 text-sm text-gray-500">
-                        {contact.createdAt ? new Date(contact.createdAt).toLocaleDateString() : "—"}
-                      </td>
-                      <td className="px-5 py-4">
-                        <Select
-                          value={contact.status || "new"}
-                          onValueChange={(val) => updateMutation.mutate({ id: contact.id, status: val })}
-                        >
-                          <SelectTrigger className="bg-slate-700 border-slate-600 text-white text-xs h-8 w-32">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent className="bg-slate-700 border-slate-600">
-                            <SelectItem value="new" className="text-white text-xs">New</SelectItem>
-                            <SelectItem value="contacted" className="text-white text-xs">Contacted</SelectItem>
-                            <SelectItem value="qualified" className="text-white text-xs">Qualified</SelectItem>
-                            <SelectItem value="converted" className="text-white text-xs">Converted</SelectItem>
-                            <SelectItem value="lost" className="text-white text-xs">Lost</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-      </div>
+                      )}
+                      {biz.businessSize && (
+                        <Badge variant="outline" className="text-xs text-muted-foreground border-border/50 capitalize">
+                          {biz.businessSize}
+                        </Badge>
+                      )}
+                      <ScoreBadge score={score} />
+                      <Badge variant="outline" className={`text-xs ${statusColor[biz.contactStatus || "not_contacted"]}`}>
+                        {statusInfo.label}
+                      </Badge>
+                    </div>
+                  </div>
+
+                  {/* Details */}
+                  <div className="space-y-1.5">
+                    {biz.ownerName && (
+                      <div className="flex items-center gap-2">
+                        <User className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
+                        <span className="text-xs text-foreground font-medium">{biz.ownerName}</span>
+                      </div>
+                    )}
+                    {biz.address && (
+                      <div className="flex items-start gap-2 text-muted-foreground">
+                        <MapPin className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                        <span className="text-xs line-clamp-1">{biz.address}</span>
+                      </div>
+                    )}
+                    {biz.phone && (
+                      <div className="flex items-center gap-2">
+                        <Phone className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
+                        <a href={`tel:${biz.phone}`} className="text-xs font-medium text-foreground hover:text-orange-400">{biz.phone}</a>
+                      </div>
+                    )}
+                    {biz.email && (
+                      <div className="flex items-center gap-2">
+                        <Mail className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
+                        <a href={`mailto:${biz.email}`} className="text-xs text-orange-400 hover:underline truncate">{biz.email}</a>
+                      </div>
+                    )}
+                    {biz.website && (
+                      <div className="flex items-center gap-2 text-muted-foreground">
+                        <Globe className="w-3.5 h-3.5 shrink-0" />
+                        <a href={biz.website} target="_blank" rel="noopener noreferrer" className="text-xs text-orange-400 hover:underline truncate">
+                          {biz.website.replace(/^https?:\/\//, "").slice(0, 35)}<ExternalLink className="w-3 h-3 inline ml-1" />
+                        </a>
+                      </div>
+                    )}
+                    {biz.rating && (
+                      <div className="flex items-center gap-1.5">
+                        <Star className="w-3.5 h-3.5 text-yellow-400 fill-yellow-400" />
+                        <span className="text-sm font-medium text-foreground">{biz.rating}</span>
+                        {biz.reviewCount > 0 && <span className="text-xs text-muted-foreground">({biz.reviewCount} reviews)</span>}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* AI Pitch expanded */}
+                  {biz.aiPitch && expandedPitch === biz.id && (
+                    <div className="p-3 rounded-lg bg-background/50 border border-border/30">
+                      <p className="text-xs text-foreground leading-relaxed">{biz.aiPitch}</p>
+                      <div className="flex gap-2 mt-2 flex-wrap">
+                        <Button size="sm" variant="outline" className="text-xs h-7 border-border/50"
+                          onClick={() => { navigator.clipboard.writeText(biz.aiPitch); toast.success("Copied!"); }}>
+                          Copy
+                        </Button>
+                        <Button size="sm" className="text-xs h-7 bg-emerald-600 hover:bg-emerald-700 text-white border-0"
+                          onClick={() => openWhatsApp(biz, biz.aiPitch)}>
+                          <MessageCircle className="w-3 h-3 mr-1" />Send on WhatsApp
+                        </Button>
+                        {biz.email && (
+                          <Button size="sm" className="text-xs h-7 bg-blue-600 hover:bg-blue-700 text-white border-0"
+                            disabled={sendingEmail === biz.id}
+                            onClick={() => sendOutreachEmail(biz)}>
+                            {sendingEmail === biz.id ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Mail className="w-3 h-3 mr-1" />}
+                            Send Email
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Action buttons */}
+                  <div className="flex flex-wrap gap-2 pt-1">
+                    {/* Status dropdown */}
+                    <Select
+                      value={biz.contactStatus || "not_contacted"}
+                      onValueChange={(val) => updateStatusMutation.mutate({ businessId: biz.id, contactStatus: val as any })}
+                    >
+                      <SelectTrigger className="h-7 text-xs w-36 border-border/50">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="not_contacted" className="text-xs">Not Contacted</SelectItem>
+                        <SelectItem value="contacted" className="text-xs">Contacted</SelectItem>
+                        <SelectItem value="interested" className="text-xs">Interested</SelectItem>
+                        <SelectItem value="converted" className="text-xs">Converted</SelectItem>
+                      </SelectContent>
+                    </Select>
+
+                    {/* WhatsApp */}
+                    <Button size="sm" variant="outline" className="text-xs h-7 border-border/50"
+                      onClick={() => openWhatsApp(biz)}>
+                      <MessageCircle className="w-3.5 h-3.5 mr-1 text-green-400" />WhatsApp
+                    </Button>
+
+                    {/* Email button — only if email available */}
+                    {biz.email && (
+                      <Button size="sm" variant="outline" className="text-xs h-7 border-border/50"
+                        disabled={sendingEmail === biz.id}
+                        onClick={() => sendOutreachEmail(biz)}>
+                        {sendingEmail === biz.id ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : <Mail className="w-3.5 h-3.5 mr-1 text-blue-400" />}
+                        Email
+                      </Button>
+                    )}
+
+                    {/* AI Pitch */}
+                    <Button size="sm" variant="outline" className="text-xs h-7 border-border/50"
+                      disabled={generatingPitch === biz.id}
+                      onClick={() => {
+                        if (biz.aiPitch) { setExpandedPitch(expandedPitch === biz.id ? null : biz.id); return; }
+                        setGeneratingPitch(biz.id);
+                        generatePitchMutation.mutate({ businessId: biz.id });
+                      }}>
+                      {generatingPitch === biz.id
+                        ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />
+                        : <Sparkles className="w-3.5 h-3.5 mr-1 text-purple-400" />}
+                      {biz.aiPitch ? (expandedPitch === biz.id ? "Hide Pitch" : "Show Pitch") : "AI Pitch"}
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

@@ -444,6 +444,26 @@ export async function getScrapedBusinessesByAgency(agencyId: number, filters?: {
   return db.select().from(scrapedBusinesses).where(and(...conditions)).orderBy(desc(scrapedBusinesses.createdAt)).limit(500);
 }
 
+export async function searchScrapedBusinesses(agencyId: number, filters?: { search?: string; contactStatus?: string; }) {
+  const db = await getDb();
+  if (!db) return [];
+  const conditions = [eq(scrapedBusinesses.agencyId, agencyId)];
+  if (filters?.contactStatus && filters.contactStatus !== 'all') {
+    conditions.push(eq(scrapedBusinesses.contactStatus, filters.contactStatus as any));
+  }
+  if (filters?.search) {
+    const s = `%${filters.search}%`;
+    conditions.push(or(
+      like(scrapedBusinesses.businessName, s),
+      like(scrapedBusinesses.phone, s),
+      like(scrapedBusinesses.email, s),
+      like(scrapedBusinesses.city, s),
+      like(scrapedBusinesses.ownerName, s),
+    ) as any);
+  }
+  return db.select().from(scrapedBusinesses).where(and(...conditions)).orderBy(desc(scrapedBusinesses.createdAt)).limit(500);
+}
+
 export async function getScrapedBusinessById(id: number) {
   const db = await getDb();
   if (!db) return null;

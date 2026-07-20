@@ -266,3 +266,19 @@
 - [x] Add Email outreach button in BusinessScraper.tsx (opens mailto: with pre-filled subject + body)
 - [x] ReferrerScraper.tsx already had email display and Email button — no changes needed
 - [x] 0 TypeScript errors, 153 tests passing
+
+## Scraped Contacts Page Overhaul (Jul 20 2026)
+- [x] Rewrote ScrapedContacts.tsx to pull directly from scrapedBusinesses table (not leads table)
+- [x] Added searchScrapedBusinesses() helper in db.ts with search + contactStatus filter
+- [x] Added scraper.allBusinesses tRPC procedure for the ScrapedContacts page
+- [x] Added scraper.sendOutreachEmail tRPC procedure — sends branded HTML email via SMTP, marks business as contacted
+- [x] Rich business cards: business name, type, size, owner name, address, phone, email (mailto link), website, rating/reviews, solar score badge
+- [x] WhatsApp outreach button (opens wa.me with pre-filled pitch)
+- [x] Email outreach button (sends via SMTP if email available, auto-marks as contacted)
+- [x] AI Pitch button (generates pitch, then shows WhatsApp + Email send buttons inline)
+- [x] Contact status dropdown per card (Not Contacted → Contacted → Interested → Converted)
+- [x] Search bar filters by name, phone, email, city, owner
+- [x] Status filter dropdown
+- [x] Stats row: Total, Not Contacted, Contacted, Converted
+- [x] Export CSV includes all fields
+- [x] 0 TypeScript errors, 153 tests passing

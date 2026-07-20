@@ -965,6 +965,18 @@ export const appRouter = router({
         return await db.getScrapedBusinessesByAgency(agency.id, input || {});
       }),
 
+    allBusinesses: protectedProcedure
+      .input(z.object({
+        search: z.string().optional(),
+        contactStatus: z.string().optional(),
+      }).optional())
+      .query(async ({ input, ctx }) => {
+        if (!ctx.user) return [];
+        const agency = await db.getAgencyByUserId(ctx.user.id);
+        if (!agency) return [];
+        return await db.searchScrapedBusinesses(agency.id, input || {});
+      }),
+
     importAsLead: protectedProcedure
       .input(z.object({ businessId: z.number() }))
       .mutation(async ({ input, ctx }) => {
@@ -1043,6 +1055,34 @@ export const appRouter = router({
         const pitch = response.choices[0]?.message?.content as string || "";
         await db.updateScrapedBusiness(input.businessId, { aiPitch: pitch });
         return { success: true, pitch };
+      }),
+
+    sendOutreachEmail: protectedProcedure
+      .input(z.object({
+        businessId: z.number(),
+        toEmail: z.string().email(),
+        subject: z.string(),
+        body: z.string(),
+      }))
+      .mutation(async ({ input }) => {
+        const biz = await db.getScrapedBusinessById(input.businessId);
+        if (!biz) throw new Error("Business not found");
+        const emailHtml = `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; background: #f9f9f9; border-radius: 8px;">
+            <h2 style="color: #f97316;">Sales Squad — Solar Energy for ${biz.businessName}</h2>
+            <div style="white-space: pre-line; color: #333; font-size: 15px; line-height: 1.6;">${input.body}</div>
+            <hr style="margin: 24px 0; border-color: #ddd;" />
+            <p style="color: #888; font-size: 12px;">Sales Squad | AI-Powered Solar Lead Generation</p>
+          </div>`;
+        const result = await sendEmail({
+          to: input.toEmail,
+          subject: input.subject,
+          html: emailHtml,
+        });
+        if (result.success) {
+          await db.updateScrapedBusiness(input.businessId, { contactStatus: "contacted" });
+        }
+        return { success: result.success };
       }),
   }),
 
