@@ -111,78 +111,102 @@ export default function ReferrerDashboard() {
     window.open(`https://wa.me/?text=${msg}`, "_blank");
   };
   const shareInstagramWithGraphic = () => {
-    // Generate a solar savings graphic as a canvas image and copy caption
+    // Generate solar graphic on canvas, upload as blob URL, then open Instagram Stories deep link
     const canvas = document.createElement("canvas");
     canvas.width = 1080;
-    canvas.height = 1080;
+    canvas.height = 1920; // Stories are 9:16
     const ctx = canvas.getContext("2d")!;
     // Background gradient
-    const grad = ctx.createLinearGradient(0, 0, 1080, 1080);
+    const grad = ctx.createLinearGradient(0, 0, 1080, 1920);
     grad.addColorStop(0, "#0a0a0a");
     grad.addColorStop(1, "#0d2b1a");
     ctx.fillStyle = grad;
-    ctx.fillRect(0, 0, 1080, 1080);
+    ctx.fillRect(0, 0, 1080, 1920);
     // Sun circle
-    const sunGrad = ctx.createRadialGradient(540, 320, 0, 540, 320, 200);
+    const sunGrad = ctx.createRadialGradient(540, 500, 0, 540, 500, 280);
     sunGrad.addColorStop(0, "#fbbf24");
     sunGrad.addColorStop(0.5, "#f97316");
     sunGrad.addColorStop(1, "rgba(249,115,22,0)");
     ctx.fillStyle = sunGrad;
     ctx.beginPath();
-    ctx.arc(540, 320, 200, 0, Math.PI * 2);
+    ctx.arc(540, 500, 280, 0, Math.PI * 2);
     ctx.fill();
     // Sun rays
-    ctx.strokeStyle = "rgba(251,191,36,0.3)";
-    ctx.lineWidth = 3;
-    for (let i = 0; i < 12; i++) {
-      const angle = (i / 12) * Math.PI * 2;
+    ctx.strokeStyle = "rgba(251,191,36,0.25)";
+    ctx.lineWidth = 4;
+    for (let i = 0; i < 16; i++) {
+      const angle = (i / 16) * Math.PI * 2;
       ctx.beginPath();
-      ctx.moveTo(540 + Math.cos(angle) * 210, 320 + Math.sin(angle) * 210);
-      ctx.lineTo(540 + Math.cos(angle) * 280, 320 + Math.sin(angle) * 280);
+      ctx.moveTo(540 + Math.cos(angle) * 300, 500 + Math.sin(angle) * 300);
+      ctx.lineTo(540 + Math.cos(angle) * 400, 500 + Math.sin(angle) * 400);
       ctx.stroke();
     }
     // Main headline
     ctx.fillStyle = "#ffffff";
-    ctx.font = "bold 72px Arial";
+    ctx.font = "bold 90px Arial";
     ctx.textAlign = "center";
-    ctx.fillText("☀️ Switch to Solar", 540, 600);
-    ctx.font = "bold 52px Arial";
+    ctx.fillText("Switch to Solar", 540, 950);
+    ctx.font = "bold 64px Arial";
     ctx.fillStyle = "#10b981";
-    ctx.fillText("Save ₹2,000-5,000/month", 540, 680);
+    ctx.fillText("Save ₹2,000-5,000/month", 540, 1050);
     // Sub text
-    ctx.font = "36px Arial";
+    ctx.font = "44px Arial";
     ctx.fillStyle = "#9ca3af";
-    ctx.fillText("Free estimate in 2 minutes", 540, 750);
-    ctx.fillText("Works for homes & businesses", 540, 800);
-    // CTA box
-    ctx.fillStyle = "rgba(16,185,129,0.2)";
+    ctx.fillText("Free estimate in 2 minutes", 540, 1150);
+    ctx.fillText("Works for homes & businesses", 540, 1220);
+    // Referral link box
+    ctx.fillStyle = "rgba(16,185,129,0.15)";
     ctx.strokeStyle = "#10b981";
-    ctx.lineWidth = 3;
-    const boxX = 140, boxY = 840, boxW = 800, boxH = 100;
+    ctx.lineWidth = 4;
     ctx.beginPath();
-    ctx.roundRect(boxX, boxY, boxW, boxH, 16);
+    ctx.roundRect(80, 1320, 920, 130, 20);
     ctx.fill();
     ctx.stroke();
     ctx.fillStyle = "#10b981";
-    ctx.font = "bold 32px Arial";
-    ctx.fillText("👉 Chat with our AI advisor now", 540, 900);
+    ctx.font = "bold 38px Arial";
+    ctx.fillText("👉 Chat with our AI advisor", 540, 1395);
+    // Brand
     ctx.fillStyle = "#6b7280";
-    ctx.font = "24px Arial";
-    ctx.fillText("Sales Squad • AI-Powered Solar Leads", 540, 980);
-    // Download the image
+    ctx.font = "30px Arial";
+    ctx.fillText("Sales Squad • AI-Powered Solar Leads", 540, 1550);
+    // Link text at bottom
+    ctx.fillStyle = "rgba(255,255,255,0.5)";
+    ctx.font = "26px Arial";
+    const shortLink = referralLink.replace(/^https?:\/\//, "");
+    ctx.fillText(shortLink, 540, 1650);
+
     canvas.toBlob((blob) => {
       if (!blob) return;
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = "solar-share.png";
-      a.click();
-      URL.revokeObjectURL(url);
+      const blobUrl = URL.createObjectURL(blob);
+
+      // Try Instagram Stories deep link (works on mobile with Instagram installed)
+      // instagram-stories://share?backgroundImage=<url>&contentURL=<referralLink>
+      const igDeepLink = `instagram-stories://share?backgroundImage=${encodeURIComponent(blobUrl)}&contentURL=${encodeURIComponent(referralLink)}&backgroundTopColor=%230a0a0a&backgroundBottomColor=%230d2b1a`;
+
+      // On mobile: try the deep link first
+      const isMobile = /Android|iPhone|iPad/i.test(navigator.userAgent);
+      if (isMobile) {
+        // Attempt deep link — if Instagram is installed it opens Stories
+        window.location.href = igDeepLink;
+        // Fallback after 1.5s: download image + show instructions
+        setTimeout(() => {
+          const a = document.createElement("a");
+          a.href = blobUrl;
+          a.download = "solar-story.png";
+          a.click();
+          URL.revokeObjectURL(blobUrl);
+          alert("Instagram not detected. Image downloaded — open Instagram, tap + Story, and select the downloaded image.");
+        }, 1500);
+      } else {
+        // Desktop: download image and show instructions
+        const a = document.createElement("a");
+        a.href = blobUrl;
+        a.download = "solar-story.png";
+        a.click();
+        URL.revokeObjectURL(blobUrl);
+        alert("Image downloaded! Open Instagram on your phone, tap + Story, and select this image to post.");
+      }
     }, "image/png");
-    // Copy caption
-    const caption = `🌞 Switch to Solar & Save ₹2,000-5,000/month!\n\nGet a FREE solar estimate in 2 minutes:\n👉 ${referralLink}\n\nWorks for homes AND businesses! ☀️ #Solar #SolarEnergy #GreenEnergy #SaveElectricity #PMSuryaGhar`;
-    navigator.clipboard.writeText(caption);
-    alert("Image downloaded & caption copied! Post on Instagram.");
   };
 
   if (!uniqueCode) return null;
