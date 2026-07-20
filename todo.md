@@ -257,3 +257,12 @@
 - [x] Stage-aware quick replies on frontend (not LLM-generated)
 - [x] Add state question after bill, before estimate
 - [x] Add brief solar explanation (1-2 lines) woven into hook message
+
+## Website Email Extraction (Jul 20 2026)
+- [x] Create server/emailExtractor.ts — visits business website, checks /contact and /about pages, extracts emails via mailto: links and regex
+- [x] Integrate extractEmailFromWebsite into scraper.search in routers.ts — auto-extracts email after Google Maps detail fetch if website is available
+- [x] Add email field to biz object before bulk insert (scrapedBusinesses table already had email column)
+- [x] Display extracted email in BusinessScraper.tsx business cards (Mail icon + mailto link)
+- [x] Add Email outreach button in BusinessScraper.tsx (opens mailto: with pre-filled subject + body)
+- [x] ReferrerScraper.tsx already had email display and Email button — no changes needed
+- [x] 0 TypeScript errors, 153 tests passing

@@ -11,7 +11,7 @@ import {
   UserPlus, Loader2, Factory, Hotel, School, Hospital,
   ShoppingBag, Warehouse, Utensils, Dumbbell, Building,
   ExternalLink, Download, MessageCircle, CheckSquare,
-  Square, Sparkles, Linkedin, TrendingUp, Sun
+  Square, Sparkles, Linkedin, TrendingUp, Sun, Mail
 } from "lucide-react";
 
 const BUSINESS_TYPES = [
@@ -292,6 +292,7 @@ export default function BusinessScraper() {
                   <div className="space-y-1.5">
                     {biz.address && <div className="flex items-start gap-2 text-muted-foreground"><MapPin className="w-3.5 h-3.5 mt-0.5 shrink-0" /><span className="line-clamp-1 text-xs">{biz.address}</span></div>}
                     {biz.phone && <div className="flex items-center gap-2"><Phone className="w-3.5 h-3.5 shrink-0 text-muted-foreground" /><span className="text-xs font-medium text-foreground">{biz.phone}</span></div>}
+                    {biz.email && <div className="flex items-center gap-2"><Mail className="w-3.5 h-3.5 shrink-0 text-muted-foreground" /><a href={`mailto:${biz.email}`} className="text-xs text-orange-400 hover:underline truncate">{biz.email}</a></div>}
                     {biz.website && (
                       <div className="flex items-center gap-2 text-muted-foreground">
                         <Globe className="w-3.5 h-3.5 shrink-0" />
@@ -350,6 +351,13 @@ export default function BusinessScraper() {
                     <Button size="sm" variant="outline" className="text-xs h-7 border-border/50" onClick={() => openLinkedIn(biz)}>
                       <Linkedin className="w-3.5 h-3.5 mr-1 text-blue-400" />LinkedIn
                     </Button>
+                    {biz.email && (
+                      <Button size="sm" variant="outline" className="text-xs h-7 border-border/50" asChild>
+                        <a href={`mailto:${biz.email}?subject=Solar%20Energy%20for%20${encodeURIComponent(biz.businessName)}&body=${encodeURIComponent(`Hi,\n\nI'm from Sales Squad. We help ${biz.businessType} like ${biz.businessName} cut electricity bills by up to 80% with solar. Govt subsidy up to Rs 78,000 available.\n\nWould love to discuss how we can help you save on energy costs.\n\nBest regards,\nSales Squad Team`)}`} target="_blank" rel="noopener noreferrer">
+                          <Mail className="w-3.5 h-3.5 mr-1 text-blue-400" />Email
+                        </a>
+                      </Button>
+                    )}
                     <Button size="sm" variant="outline" className="text-xs h-7 border-border/50"
                       disabled={generatingPitch === biz.id}
                       onClick={() => {

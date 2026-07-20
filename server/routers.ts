@@ -13,6 +13,7 @@ import * as db from "./db";
 import { referrerRouter } from "./referrer";
 import { partnerRouter } from "./partner";
 import { sendEmail } from "./_core/emailService";
+import { extractEmailFromWebsite } from "./emailExtractor";
 
 export const appRouter = router({
   system: systemRouter,
@@ -871,6 +872,16 @@ export const appRouter = router({
               const d = details.result as any;
               const businessSize = classifyBusinessSize(d.user_ratings_total || 0, d.types || []);
 
+              // Extract email from website if available
+              let extractedEmail: string | null = null;
+              if (d.website) {
+                try {
+                  extractedEmail = await extractEmailFromWebsite(d.website, 4000);
+                } catch {
+                  // Email extraction failure is non-fatal
+                }
+              }
+
               const biz = {
                 agencyId: agency.id,
                 scrapeJobId: jobId,
@@ -878,6 +889,7 @@ export const appRouter = router({
                 businessType: input.businessType,
                 businessSize,
                 phone: d.formatted_phone_number || d.international_phone_number || null,
+                email: extractedEmail || null,
                 website: d.website || null,
                 address: d.formatted_address || place.formatted_address,
                 city: extractCity(d.formatted_address || place.formatted_address),
