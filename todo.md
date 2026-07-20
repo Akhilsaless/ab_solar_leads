@@ -241,3 +241,11 @@
 - [x] Add LinkedIn URL field to Settings page
 - [x] Resend OTP button with 60s cooldown on signup page
 - [x] Fix referral link to use dynamic agency slug from DB
+
+## Bot Personality Rewrite (Jul 20 2026)
+- [ ] Rewrite system prompt with Option A+C pitch (shock the bill + free money hook)
+- [ ] Remove "ji" from all objection handling examples
+- [ ] Remove repeated "Why Solar Now" section from estimate format
+- [ ] Add persistent location quick reply from bill stage onwards
+- [ ] Fix auto-continue timer: cancel if customer sends message first
+- [ ] Keep animated estimate card and agent handoff exactly as-is

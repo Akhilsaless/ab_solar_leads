@@ -465,6 +465,11 @@ export default function ChatBot() {
   const handleSend = useCallback((text?: string) => {
     const trimmed = (text || input).trim();
     if (!trimmed || isLoading) return;
+    // Cancel any pending auto-continue so customer reply takes priority
+    if (autoSequenceRef.current) {
+      clearTimeout(autoSequenceRef.current);
+      autoSequenceRef.current = null;
+    }
     setMessages(prev => {
       const updated = [...prev];
       for (let i = updated.length - 1; i >= 0; i--) {
@@ -642,7 +647,7 @@ export default function ChatBot() {
 
         {/* Input Area */}
         <div className="border-t border-white/10 bg-gray-950/80 backdrop-blur-xl p-4">
-          {messages.length > 2 && (
+          {messages.length > 0 && (
             <div className="mb-3 flex gap-2">
               <Button onClick={downloadPDF} className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white border-0 h-10 text-sm">
                 <Download className="w-4 h-4 mr-2" />Download Estimate
