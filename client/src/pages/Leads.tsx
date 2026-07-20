@@ -183,14 +183,17 @@ export default function Leads() {
                       ) : <span className="text-xs text-muted-foreground">Direct</span>}
                     </td>
                     <td className="px-4 py-3 hidden lg:table-cell">
-                      <Select value={lead.assignedPartnerId?.toString() || ""} onValueChange={(val) => {
-                        assignLead.mutate({ leadId: lead.id, partnerId: val ? parseInt(val) : null });
-                      }}>
+                      <Select
+                        value={lead.assignedPartnerId ? String(lead.assignedPartnerId) : "unassigned"}
+                        onValueChange={(val) => {
+                          assignLead.mutate({ leadId: lead.id, partnerId: val !== "unassigned" ? parseInt(val) : null });
+                        }}
+                      >
                         <SelectTrigger className="w-[140px] text-xs" onClick={(e: any) => e.stopPropagation()}>
-                          <SelectValue placeholder="Unassigned" />
+                          <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="">Unassigned</SelectItem>
+                          <SelectItem value="unassigned">Unassigned</SelectItem>
                           {partners.map((p: any) => (
                             <SelectItem key={p.id} value={p.id.toString()}>{p.companyName}</SelectItem>
                           ))}
