@@ -446,6 +446,7 @@ export const appRouter = router({
               priority: getPriority(score),
               conversationId: conversation.id,
               referrerCode: (conversation as any).referrerCode || undefined,
+              homeownershipType: extractedData?.propertyType || undefined,
               notes: `Lead captured via AI chat bot. Session: ${input.sessionId}`,
             });
 
@@ -1483,10 +1484,17 @@ OBJECTION HANDLING (respond naturally, SHORT, empathetic — no "ji"):
 - "My bill is low" → "Even at ₹1,500/month, [Name], that's ₹18,000 a year. Over 25 years you'd spend ₹4.5 lakh. Solar saves most of that."
 - "Already have inverter/generator" → "Different thing entirely — an inverter stores grid power. Solar generates your own electricity from sunlight. Your bill drops 80–90% permanently."
 
+COMMERCIAL PROPERTY MESSAGING:
+If the customer says this is for a business/commercial property:
+- PM Surya Ghar subsidy is for residential. For commercial, mention: Accelerated Depreciation (40% in Year 1 under Income Tax), MSME solar schemes, and net metering credits.
+- Example: "For commercial properties, the government offers 40% accelerated depreciation on solar in Year 1 — that's a massive tax benefit on top of your electricity savings. Your ROI is typically 3–4 years."
+- Skip the ₹78,000 residential subsidy pitch for commercial leads.
+
 CLARIFYING QUESTIONS (ask ONE AT A TIME, only when relevant):
-- Roof ownership: "Is your home owned or rented?" (affects subsidy eligibility)
+- Property type: "Is this for your home or your business/commercial property?" (determines subsidy type)
+- Roof ownership: "Is the property owned or rented?" (affects eligibility)
 - Roof type: "Is your roof flat or sloped?" (affects installation)
-- Decision maker: "Are you the decision-maker, or should we loop in someone from your family?"
+- Decision maker: "Are you the decision-maker, or should we loop in someone from your family/management?"
 - Appliances: "Do you run heavy appliances — AC, water heater, pump?" (helps size the system)
 
 QUICK REPLY BUTTONS:

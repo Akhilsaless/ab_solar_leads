@@ -19,10 +19,16 @@ const STATUS_OPTIONS = [
   { value: "converted", label: "Converted" },
   { value: "lost", label: "Lost" },
 ];
+const PROPERTY_OPTIONS = [
+  { value: "all", label: "All Types" },
+  { value: "residential", label: "🏠 Residential" },
+  { value: "commercial", label: "🏢 Commercial" },
+];
 
 export default function Leads() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [propertyFilter, setPropertyFilter] = useState("all");
   const [, setLocation] = useLocation();
 
   const leads = trpc.leads.list.useQuery({
@@ -50,7 +56,8 @@ export default function Leads() {
   const partnersQuery = trpc.partner.getPartners.useQuery();
   const partners = (partnersQuery.data as any[]) || [];
 
-  const allLeads = leads.data || [];
+  const allLeadsRaw = leads.data || [];
+  const allLeads = propertyFilter === "all" ? allLeadsRaw : allLeadsRaw.filter((l: any) => (l.homeownershipType || "").toLowerCase() === propertyFilter);
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -81,6 +88,16 @@ export default function Leads() {
           </SelectTrigger>
           <SelectContent>
             {STATUS_OPTIONS.map(opt => (
+              <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select value={propertyFilter} onValueChange={setPropertyFilter}>
+          <SelectTrigger className="w-[160px] bg-card">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {PROPERTY_OPTIONS.map(opt => (
               <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
             ))}
           </SelectContent>
@@ -157,7 +174,18 @@ export default function Leads() {
                       ) : <span className="text-xs text-muted-foreground">&mdash;</span>}
                     </td>
                     <td className="px-4 py-3">
-                      <span className={`status-badge status-${lead.status}`}>{lead.status}</span>
+                      <div className="flex flex-col gap-1">
+                        <span className={`status-badge status-${lead.status}`}>{lead.status}</span>
+                        {lead.homeownershipType && (
+                          <span className={`inline-flex items-center text-xs px-2 py-0.5 rounded-full font-medium w-fit ${
+                            lead.homeownershipType === 'commercial'
+                              ? 'bg-blue-500/10 text-blue-500'
+                              : 'bg-green-500/10 text-green-600 dark:text-green-400'
+                          }`}>
+                            {lead.homeownershipType === 'commercial' ? '🏢 Commercial' : '🏠 Residential'}
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-4 py-3 hidden sm:table-cell">
                       <span className={`text-xs font-semibold priority-${lead.priority}`}>

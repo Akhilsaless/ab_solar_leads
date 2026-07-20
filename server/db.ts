@@ -293,6 +293,7 @@ export async function createLeadFromConversation(data: {
   monthlyEnergyBill?: string; estimatedSavings?: string;
   source?: string; leadScore?: number; priority?: "low" | "medium" | "high" | "urgent";
   conversationId?: number; notes?: string; referrerCode?: string;
+  homeownershipType?: string;
 }) {
   const db = await getDb();
   if (!db) return null;
