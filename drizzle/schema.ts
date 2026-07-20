@@ -220,6 +220,7 @@ export const leads = mysqlTable("leads2", {
   lastContactedAt: timestamp("lastContactedAt"),
   conversationId: int("conversationId"),
   referrerCode: varchar("referrerCode", { length: 100 }),
+  assignedPartnerId: int("assignedPartnerId"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
