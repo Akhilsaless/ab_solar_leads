@@ -92,7 +92,7 @@ export default function ReferrerDashboard() {
   const referralLink = uniqueCode ? `${window.location.origin}/chat/${agencySlug}?ref=${uniqueCode}` : "";
   const copyLink = () => { navigator.clipboard.writeText(referralLink); setCopied(true); setTimeout(() => setCopied(false), 2000); };
   const shareWhatsApp = () => {
-    const msg = encodeURIComponent(`🌞 *Save on your electricity bill with Solar!*\n\nHi! I'm sharing this with you because I think you'll find it useful.\n\nGet a FREE solar estimate in 2 minutes — no forms, just chat with our AI advisor:\n👉 ${referralLink}\n\nSee how much you can save every month! ☀️`);
+    const msg = encodeURIComponent(`🌞 *Save on your electricity bill with Solar!*\n\nHi! I'm sharing this with you because I think you'll find it useful.\n\nGet a FREE solar estimate in 2 minutes — no forms, just chat with our AI advisor:\n👉 ${referralLink}\n\nWorks for homes AND businesses too! 🏠🏢\nSee how much you can save every month! ☀️`);
     window.open(`https://wa.me/?text=${msg}`, "_blank");
   };
 

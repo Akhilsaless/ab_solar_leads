@@ -1470,7 +1470,7 @@ ${conversationContext}
 
 OBJECTION HANDLING (respond naturally, SHORT, empathetic — no "ji"):
 
-⚠️ IMPORTANT: This service is ONLY for independent residential houses with own roofs. NOT for apartments, shared buildings, or rented properties without landlord consent. If customer mentions apartment/shared building: "Our solar solutions work best for independent houses with dedicated roofs. For apartments, you'd need landlord and society approval — want to check with them first?"
+⚠️ IMPORTANT: This service is for BOTH residential houses AND commercial properties (offices, factories, shops, warehouses). The customer must OWN the property or have written LANDLORD PERMISSION for installation. Early in the conversation, ask: "Is this for your home or your business/commercial property?" — this helps tailor the estimate. If customer mentions apartment/shared building without landlord approval: "Solar works best when you own the roof or have landlord permission. Do you have that? Many landlords agree because it increases property value!"
 
 - "Too expensive" → "After the ₹78,000 government subsidy, [Name], the actual out-of-pocket is much lower. You recover it in 3–5 years — after that it's free. Want the exact numbers for your bill?"
 - "Rented house" → "Many landlords agree because it increases property value. We can help you have that conversation. Worth exploring?"
@@ -1517,7 +1517,7 @@ async function extractCustomerData(history: any[], latestMessage: string) {
       messages: [
         {
           role: "system",
-          content: `Extract customer information from this conversation. Return JSON with these fields (null if not found): name, phone, email, city, state (Indian state name), monthlyBill (number in INR), monthlyUnits (number). Only extract clearly stated information, don't guess. For state, use full state name (e.g., "Maharashtra", "Tamil Nadu").`,
+          content: `Extract customer information from this conversation. Return JSON with these fields (null if not found): name, phone, email, city, state (Indian state name), monthlyBill (number in INR), monthlyUnits (number), propertyType ("residential" or "commercial" only if clearly stated, else null). Only extract clearly stated information, don't guess. For state, use full state name (e.g., "Maharashtra", "Tamil Nadu").`,
         },
         {
           role: "user",
@@ -1539,8 +1539,9 @@ async function extractCustomerData(history: any[], latestMessage: string) {
               state: { type: ["string", "null"] },
               monthlyBill: { type: ["number", "null"] },
               monthlyUnits: { type: ["number", "null"] },
+              propertyType: { type: ["string", "null"] },
             },
-            required: ["name", "phone", "email", "city", "state", "monthlyBill", "monthlyUnits"],
+            required: ["name", "phone", "email", "city", "state", "monthlyBill", "monthlyUnits", "propertyType"],
             additionalProperties: false,
           },
         },
