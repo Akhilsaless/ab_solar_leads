@@ -219,6 +219,86 @@ export const partnerRouter = router({
       };
     }),
 
+  // Partner login with email + password
+  partnerLogin: publicProcedure
+    .input(z.object({ email: z.string().email(), password: z.string() }))
+    .mutation(async ({ input }) => {
+      const bcrypt = await import('bcryptjs');
+      const dbConn = await db.getDb();
+      if (!dbConn) throw new Error("Database connection failed");
+      const rows = await dbConn.execute(
+        sql`SELECT id, companyName, email, passwordHash, status FROM solarPartners WHERE email = ${input.email}`
+      ) as any[];
+      if (!rows.length) throw new Error("No partner account found with this email");
+      const partner = rows[0];
+      if (!partner.passwordHash) throw new Error("Password not set. Please contact Sales Squad.");
+      const valid = await bcrypt.compare(input.password, partner.passwordHash);
+      if (!valid) throw new Error("Incorrect password");
+      const { nanoid: nid } = await import('nanoid');
+      const token = nid(32);
+      await dbConn.execute(sql`UPDATE solarPartners SET loginToken = ${token} WHERE id = ${partner.id}`);
+      return { success: true, token, partnerId: partner.id, companyName: partner.companyName };
+    }),
+
+  // Set partner password (called during signup)
+  setPartnerPassword: publicProcedure
+    .input(z.object({ email: z.string().email(), password: z.string() }))
+    .mutation(async ({ input }) => {
+      const bcrypt = await import('bcryptjs');
+      const dbConn = await db.getDb();
+      if (!dbConn) throw new Error("Database connection failed");
+      const hash = await bcrypt.hash(input.password, 10);
+      await dbConn.execute(sql`UPDATE solarPartners SET passwordHash = ${hash} WHERE email = ${input.email}`);
+      return { success: true };
+    }),
+
+  // Get partner's assigned leads (by login token)
+  getMyLeads: publicProcedure
+    .input(z.object({ token: z.string() }))
+    .query(async ({ input }) => {
+      const dbConn = await db.getDb();
+      if (!dbConn) return { partner: null, leads: [] };
+      const partners = await dbConn.execute(
+        sql`SELECT id, companyName, email, phone, serviceAreas, status FROM solarPartners WHERE loginToken = ${input.token}`
+      ) as any[];
+      if (!partners.length) return { partner: null, leads: [] };
+      const partner = partners[0];
+      const leads = await dbConn.execute(
+        sql`SELECT id, firstName, lastName, email, phone, city, state, monthlyEnergyBill, status, createdAt
+            FROM leads WHERE assignedPartnerId = ${partner.id} ORDER BY createdAt DESC`
+      ) as any[];
+      return { partner, leads };
+    }),
+
+  // Referrer sends outreach email to a scraped business
+  referrerSendOutreachEmail: publicProcedure
+    .input(z.object({
+      businessEmail: z.string().email(),
+      businessName: z.string(),
+      referrerName: z.string(),
+      referralLink: z.string(),
+      customMessage: z.string().optional(),
+    }))
+    .mutation(async ({ input }) => {
+      const emailHtml = input.customMessage
+        ? `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px;">${input.customMessage.replace(/\n/g, '<br/>')}</div>`
+        : `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;background:#f9f9f9;padding:24px;border-radius:8px;">
+          <h2 style="color:#f97316;">🌞 Free Solar Savings Estimate for ${input.businessName}</h2>
+          <p>Hi ${input.businessName} Team,</p>
+          <p>My name is ${input.referrerName}. I wanted to share a free tool that calculates exactly how much your business can save on electricity with solar.</p>
+          <p>It takes 2 minutes and there's no commitment:</p>
+          <p style="margin:24px 0;"><a href="${input.referralLink}" style="display:inline-block;background:#f97316;color:white;padding:12px 24px;border-radius:6px;text-decoration:none;font-weight:bold;">Get Free Solar Estimate →</a></p>
+          <p style="color:#666;font-size:13px;">The estimate includes: potential savings, govt subsidy eligibility, and payback period.</p>
+          <p style="color:#999;font-size:12px;">Best,<br/>${input.referrerName}</p>
+        </div>`;
+      await sendEmail({
+        to: input.businessEmail,
+        subject: `Free Solar Savings Estimate for ${input.businessName}`,
+        html: emailHtml,
+      });
+      return { success: true };
+    }),
+
   // Generate AI outreach pitch
   generateOutreachPitch: protectedProcedure
     .input(z.object({

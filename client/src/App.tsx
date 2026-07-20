@@ -21,6 +21,7 @@ import VerifyReferral from "@/pages/VerifyReferral";
 import PartnerOutreach from "@/pages/PartnerOutreach";
 import PartnerSignup from "@/pages/PartnerSignup";
 import ForPartners from "@/pages/ForPartners";
+import PartnerDashboard from "@/pages/PartnerDashboard";
 import DashboardLayout from "@/components/DashboardLayout";
 import { Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
@@ -69,6 +70,7 @@ function Router() {
       <Route path="/partner-outreach" component={PartnerOutreach} />
       <Route path="/partner-signup" component={PartnerSignup} />
       <Route path="/for-partners" component={ForPartners} />
+      <Route path="/partner/dashboard" component={PartnerDashboard} />
 
       {/* Public pricing page */}
       <Route path="/pricing" component={Pricing} />
