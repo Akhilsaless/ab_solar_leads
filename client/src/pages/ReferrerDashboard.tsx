@@ -250,8 +250,8 @@ export default function ReferrerDashboard() {
             <div style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.3)", borderRadius: 12, padding: 14, marginBottom: 16, display: "flex", gap: 12, alignItems: "flex-start" }}>
               <span style={{ fontSize: 18, flexShrink: 0 }}>⚠️</span>
               <div>
-                <p style={{ margin: "0 0 4px", color: "#fca5a5", fontWeight: 600, fontSize: 14 }}>Important: Residential Houses Only</p>
-                <p style={{ margin: 0, color: C.subtle, fontSize: 12 }}>This solar program is for <strong>independent residential houses with own roofs</strong>. Do NOT refer apartment dwellers, shared buildings, or renters without landlord approval. Verify before sharing your link!</p>
+                <p style={{ margin: "0 0 4px", color: "#fca5a5", fontWeight: 600, fontSize: 14 }}>Important: Property Eligibility</p>
+                <p style={{ margin: 0, color: C.subtle, fontSize: 12 }}>This solar program is for <strong>residential houses and commercial properties</strong>. The customer must <strong>own the property</strong> or have <strong>written permission from the landlord</strong> for installation. Do NOT refer renters or shared-building residents without landlord approval. Verify before sharing your link!</p>
               </div>
             </div>
 
