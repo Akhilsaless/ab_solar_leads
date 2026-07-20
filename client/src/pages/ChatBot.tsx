@@ -366,8 +366,6 @@ export default function ChatBot() {
   const [showScrollBtn, setShowScrollBtn] = useState(false);
   const [isClosed, setIsClosed] = useState(false);
   const [showMapPin, setShowMapPin] = useState(false);
-  const [pinnedLocation, setPinnedLocation] = useState<{ lat: number; lng: number; address: string } | null>(null);
-  const [pinMarker, setPinMarker] = useState<google.maps.Marker | null>(null);
   const [pitchCardShown, setPitchCardShown] = useState(false);
   const [estimateShown, setEstimateShown] = useState(false);
   const [handoffShown, setHandoffShown] = useState(false);
@@ -727,25 +725,7 @@ export default function ChatBot() {
                 <Download className="w-4 h-4 mr-2" />Download Estimate
               </Button>
               <BillUploadButton onUpload={handleBillUpload} brandColor={brandColor} disabled={isLoading} />
-              <Button onClick={() => {
-                if (navigator.geolocation) {
-                  setIsLoading(true);
-                  const tid = setTimeout(() => { setIsLoading(false); setShowMapPin(true); }, 5000);
-                  navigator.geolocation.getCurrentPosition(
-                    (pos) => {
-                      clearTimeout(tid);
-                      const { latitude: lat, longitude: lng } = pos.coords;
-                      const geocoder = new google.maps.Geocoder();
-                      geocoder.geocode({ location: { lat, lng } }, (results, status) => {
-                        const address = status === "OK" && results?.[0] ? results[0].formatted_address : `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
-                        setIsLoading(false);
-                        handleSend(`My location: ${address}`);
-                      });
-                    },
-                    () => { clearTimeout(tid); setIsLoading(false); setShowMapPin(true); }
-                  );
-                } else setShowMapPin(true);
-              }}
+              <Button onClick={() => setShowMapPin(true)}
                 className="flex-1 bg-white/10 hover:bg-white/20 text-white border border-white/20 h-10 text-sm">
                 <MapPin className="w-4 h-4 mr-2" />Location
               </Button>
