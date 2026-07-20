@@ -107,12 +107,12 @@ export default function ReferralManagement() {
                 <label className="block text-sm text-gray-300 mb-2">Referrer Signup Link</label>
                 <div className="flex gap-2">
                   <Input
-                    value="absolarleads-xxxqwsn9.manus.space/referrer-signup"
+                    value={`${window.location.origin}/referrer-signup`}
                     readOnly
                     className="bg-white/5 border-white/20 text-white"
                   />
                   <Button
-                    onClick={() => copyToClipboard("absolarleads-xxxqwsn9.manus.space/referrer-signup")}
+                    onClick={() => copyToClipboard(`${window.location.origin}/referrer-signup`)}
                     className="bg-emerald-600 hover:bg-emerald-700"
                   >
                     <Copy className="w-4 h-4" />
@@ -125,12 +125,12 @@ export default function ReferralManagement() {
                 <label className="block text-sm text-gray-300 mb-2">Customer Chatbot Link</label>
                 <div className="flex gap-2">
                   <Input
-                    value="absolarleads-xxxqwsn9.manus.space/chat/ab-solar"
+                    value={`${window.location.origin}/chat/ab-solar`}
                     readOnly
                     className="bg-white/5 border-white/20 text-white"
                   />
                   <Button
-                    onClick={() => copyToClipboard("absolarleads-xxxqwsn9.manus.space/chat/ab-solar")}
+                    onClick={() => copyToClipboard(`${window.location.origin}/chat/ab-solar`)}
                     className="bg-emerald-600 hover:bg-emerald-700"
                   >
                     <Copy className="w-4 h-4" />

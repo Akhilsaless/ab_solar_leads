@@ -142,7 +142,7 @@ export default function BusinessScraper() {
   };
 
   const openWhatsApp = (biz: any, pitch?: string) => {
-    const msg = pitch || `Hi, I'm from AB Solar. We help ${biz.businessType} like ${biz.businessName} cut electricity bills by up to 80% with solar. Govt subsidy up to Rs 78,000 available. Can we discuss?`;
+    const msg = pitch || `Hi, I'm from Sales Squad. We help ${biz.businessType} like ${biz.businessName} cut electricity bills by up to 80% with solar. Govt subsidy up to Rs 78,000 available. Can we discuss?`;
     const phone = biz.phone?.replace(/[^0-9]/g, "");
     if (phone) window.open(`https://wa.me/91${phone}?text=${encodeURIComponent(msg)}`, "_blank");
     else { navigator.clipboard.writeText(msg); toast.success("No phone — pitch copied to clipboard!"); }
