@@ -297,10 +297,10 @@ export default function ReferrerDashboard() {
         <div style={{ background: "linear-gradient(135deg, rgba(16,185,129,0.15), rgba(16,185,129,0.05))", border: `2px solid ${C.green}`, borderRadius: 12, padding: "14px 18px", marginBottom: 16, display: "flex", justifyContent: "space-between", alignItems: "center", boxShadow: `0 0 24px ${C.greenGlow}` }}>
           <div>
             <p style={{ margin: 0, fontWeight: 700, color: C.green, fontSize: 15 }}>🎁 Welcome Bonus Credited!</p>
-            <p style={{ margin: "3px 0 0", fontSize: 12, color: C.subtle }}>₹69 added to your account for joining Sales Squad</p>
+            <p style={{ margin: "3px 0 0", fontSize: 12, color: C.subtle }}>₹50 added to your account for joining Sales Squad</p>
             <p style={{ margin: "3px 0 0", fontSize: 11, color: C.muted }}>Withdrawable after your 1st successful referral</p>
           </div>
-          <span style={{ fontSize: 28, fontWeight: 800, color: C.green }}>+₹69</span>
+          <span style={{ fontSize: 28, fontWeight: 800, color: C.green }}>+₹50</span>
         </div>
 
         {/* Reward Pool — prominent card */}
@@ -422,9 +422,9 @@ export default function ReferrerDashboard() {
               <h3 style={{ margin: "0 0 16px", color: C.green, fontSize: 15 }}>💡 How to Earn</h3>
               {[
                 { icon: "1️⃣", title: "Share your link", desc: "Send to friends, family & neighbors", earn: "" },
-                { icon: "2️⃣", title: "They apply for govt subsidy", desc: "Customer completes site visit & applies for subsidy", earn: "₹750" },
-                { icon: "3️⃣", title: "Solar is installed", desc: "Installation confirmed by Sales Squad", earn: "₹2,000" },
-                { icon: "🎯", title: "Complete daily tasks", desc: "Hit milestones for extra bonuses per referral", earn: "₹31/task, ₹111 bonus" },
+                { icon: "2️⃣", title: "They apply for govt subsidy", desc: "Customer completes site visit & applies for subsidy", earn: "₹500" },
+                { icon: "3️⃣", title: "Solar is installed", desc: "Installation confirmed by Sales Squad", earn: "₹1,500" },
+                { icon: "🎯", title: "Complete daily tasks", desc: "Hit milestones for extra bonuses per referral", earn: "₹100–₹500+" },
               ].map((step, i) => (
                 <div key={i} style={{ display: "flex", gap: 12, alignItems: "flex-start", marginBottom: i < 3 ? 14 : 0 }}>
                   <span style={{ fontSize: 20, flexShrink: 0 }}>{step.icon}</span>
@@ -443,22 +443,22 @@ export default function ReferrerDashboard() {
               {/* ₹50 signup bonus banner */}
               <div style={{ background: "rgba(16,185,129,0.08)", border: `1px solid ${C.borderGreen}`, borderRadius: 8, padding: "10px 14px", marginBottom: 12, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <span style={{ color: C.subtle, fontSize: 13 }}>🎁 Signup Bonus (credited on join)</span>
-                <span style={{ color: C.green, fontWeight: 700, fontSize: 15 }}>+₹69</span>
+                <span style={{ color: C.green, fontWeight: 700, fontSize: 15 }}>+₹50</span>
               </div>
               <div style={{ background: C.bg, borderRadius: 8, padding: 14, border: `1px solid ${C.border}`, marginBottom: 12 }}>
                 <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: C.text, marginBottom: 10 }}>💰 How You Earn:</p>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, fontSize: 12 }}>
-                  <div><span style={{ color: "#10b981", fontWeight: 600 }}>₹31</span> <span style={{ color: C.muted }}>per verified lead</span></div>
-                  <div><span style={{ color: "#f97316", fontWeight: 600 }}>₹750</span> <span style={{ color: C.muted }}>when subsidy applied</span></div>
-                  <div><span style={{ color: "#a78bfa", fontWeight: 600 }}>₹2,000</span> <span style={{ color: C.muted }}>when installed</span></div>
-                  <div><span style={{ color: "#fbbf24", fontWeight: 600 }}>₹31/task, ₹111 bonus</span> <span style={{ color: C.muted }}>daily task bonus</span></div>
+                  <div><span style={{ color: "#10b981", fontWeight: 600 }}>₹20</span> <span style={{ color: C.muted }}>per verified lead</span></div>
+                  <div><span style={{ color: "#f97316", fontWeight: 600 }}>₹500</span> <span style={{ color: C.muted }}>when subsidy applied</span></div>
+                  <div><span style={{ color: "#a78bfa", fontWeight: 600 }}>₹1,500</span> <span style={{ color: C.muted }}>when installed</span></div>
+                  <div><span style={{ color: "#fbbf24", fontWeight: 600 }}>₹100-₹500</span> <span style={{ color: C.muted }}>daily task bonus</span></div>
                 </div>
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
                 {[
-                  { label: "Verified Leads (₹31 each)", value: `₹${((referrals?.filter((r: any) => r.customerVerified)?.length || 0) * 31).toLocaleString()}`, color: "#10b981" },
-                  { label: "Subsidy Bonuses (₹750)", value: `₹${(subsidyReferrals * 750).toLocaleString()}`, color: "#60a5fa" },
-                  { label: "Install Bonuses (₹2,000)", value: `₹${(completedReferrals * 2000).toLocaleString()}`, color: "#a78bfa" },
+                  { label: "Verified Leads (₹20 each)", value: `₹${((referrals?.filter((r: any) => r.customerVerified)?.length || 0) * 20).toLocaleString()}`, color: "#10b981" },
+                  { label: "Subsidy Bonuses (₹500)", value: `₹${(subsidyReferrals * 500).toLocaleString()}`, color: "#60a5fa" },
+                  { label: "Install Bonuses (₹1,500)", value: `₹${(completedReferrals * 1500).toLocaleString()}`, color: "#a78bfa" },
                   { label: "Potential Earn", value: `₹${(subsidyReferrals * 1500).toLocaleString()}`, color: C.green },
                 ].map((item, i) => (
                   <div key={i} style={{ background: C.bg, borderRadius: 8, padding: 12, border: `1px solid ${C.border}` }}>
@@ -480,7 +480,7 @@ export default function ReferrerDashboard() {
                 <div style={{ textAlign: "center", padding: "32px 0" }}>
                   <div style={{ fontSize: 48, marginBottom: 12 }}>🎯</div>
                   <p style={{ color: C.subtle, margin: "0 0 8px", fontWeight: 600 }}>No referrals yet!</p>
-                  <p style={{ color: C.muted, fontSize: 13, margin: "0 0 20px" }}>Share your link to start earning. Every installation earns you ₹2,000!</p>
+                  <p style={{ color: C.muted, fontSize: 13, margin: "0 0 20px" }}>Share your link to start earning. Every installation earns you ₹1,500!</p>
                   <div style={{ display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap" }}>
                     <button onClick={shareWhatsApp} style={{ background: "#16a34a", color: "#fff", border: "none", borderRadius: 8, padding: "10px 16px", cursor: "pointer", fontWeight: 600 }}>📱 WhatsApp</button>
                     <button onClick={shareFacebook} style={{ background: "#1877f2", color: "#fff", border: "none", borderRadius: 8, padding: "10px 16px", cursor: "pointer", fontWeight: 600 }}>📘 Facebook</button>
@@ -502,7 +502,7 @@ export default function ReferrerDashboard() {
                           </div>
                           <div style={{ textAlign: "right" }}>
                             {r.status === "completed" && <span style={{ background: C.greenDim, color: C.green, padding: "3px 10px", borderRadius: 20, fontSize: 11, fontWeight: 600 }}>✅ +₹2,000</span>}
-                            {r.subsidyApplied && r.status !== "completed" && <span style={{ background: C.orangeDim, color: C.orange, padding: "3px 10px", borderRadius: 20, fontSize: 11, fontWeight: 600 }}>📋 +₹750</span>}
+                            {r.subsidyApplied && r.status !== "completed" && <span style={{ background: C.orangeDim, color: C.orange, padding: "3px 10px", borderRadius: 20, fontSize: 11, fontWeight: 600 }}>📋 +₹500</span>}
                           </div>
                         </div>
 
