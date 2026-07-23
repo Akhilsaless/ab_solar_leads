@@ -23,6 +23,7 @@ import PartnerSignup from "@/pages/PartnerSignup";
 import ForPartners from "@/pages/ForPartners";
 import PartnerDashboard from "@/pages/PartnerDashboard";
 import ScrapedContacts from "@/pages/ScrapedContacts";
+import ProductGuide from "@/pages/ProductGuide";
 import DashboardLayout from "@/components/DashboardLayout";
 import { Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
@@ -76,6 +77,9 @@ function Router() {
 
       {/* Public pricing page */}
       <Route path="/pricing" component={Pricing} />
+
+      {/* Product Guide - public */}
+      <Route path="/product-guide" component={ProductGuide} />
 
       {/* Everything else */}
       <Route>

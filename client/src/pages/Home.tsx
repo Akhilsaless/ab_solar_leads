@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   MessageSquare, Users, TrendingUp, Zap, ArrowRight,
-  Copy, ExternalLink, Sun, IndianRupee, Clock, Share2, Gift
+  Copy, ExternalLink, Sun, IndianRupee, Clock, Share2, Gift, BookOpen
 } from "lucide-react";
 import { useState } from "react";
 import { useLocation } from "wouter";
@@ -63,6 +63,33 @@ export default function Home() {
           </Button>
         </div>
       </div>
+
+      {/* Product Guide Share Card */}
+      <Card className="bg-gradient-to-r from-purple-500/10 via-purple-500/5 to-transparent border-purple-500/20">
+        <CardContent className="py-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-purple-500 flex items-center justify-center shrink-0">
+              <BookOpen className="w-5 h-5 text-white" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium">Product Guide</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Share with referrers, partners & investors</p>
+            </div>
+            <div className="flex gap-2">
+              <Button size="sm" variant="ghost" onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/product-guide`); toast.success("Guide link copied!"); }}>
+                <Copy className="w-4 h-4" />
+              </Button>
+              <Button size="sm" variant="outline" className="gap-1.5 text-xs" onClick={() => window.open(`/product-guide`, "_blank")}>
+                <ExternalLink className="w-3.5 h-3.5" />
+                View
+              </Button>
+              <Button size="sm" className="gap-1.5 text-xs bg-green-600 hover:bg-green-700 text-white" onClick={() => { const msg = encodeURIComponent(`🌞 *Sales Squad — AI Solar Platform*\n\nCheck out how you can:\n• Earn ₹1,500 per referral\n• Get free solar estimate\n• Partner with us\n\n👉 ${window.location.origin}/product-guide`); window.open(`https://wa.me/?text=${msg}`, "_blank"); }}>
+                📱 WhatsApp
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Links Banner */}
       <div className="grid md:grid-cols-2 gap-4">
