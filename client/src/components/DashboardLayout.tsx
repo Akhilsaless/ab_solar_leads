@@ -23,7 +23,7 @@ import { getLoginUrl } from "@/const";
 import { useIsMobile } from "@/hooks/useMobile";
 import {
   LayoutDashboard, Users, MessageSquare, Sun, BarChart3,
-  Settings, LogOut, BookOpen, Search, CreditCard, Handshake, UserCheck, Building2
+  Settings, LogOut, BookOpen, Search, CreditCard, Handshake, UserCheck, Building2, Send, MessageCircle, QrCode
 } from "lucide-react";
 import { SalesSquadLogo, SalesSquadIcon } from "./SalesSquadLogo";
 import { CSSProperties, useEffect, useRef, useState } from "react";
@@ -37,6 +37,9 @@ const menuItems = [
   { icon: Users, label: "Leads", path: "/leads" },
   { icon: Search, label: "Business Scraper", path: "/scraper" },
   { icon: Building2, label: "Scraped Contacts", path: "/scraped-contacts" },
+  { icon: Send, label: "Automated Outreach", path: "/automated-outreach" },
+  { icon: MessageCircle, label: "WhatsApp Settings", path: "/whatsapp-settings" },
+  { icon: QrCode, label: "QR Code Generator", path: "/qr-generator" },
   { icon: Handshake, label: "Partner Outreach", path: "/partner-outreach" },
   { icon: UserCheck, label: "Referral Management", path: "/admin/referrals" },
   { icon: Sun, label: "Products", path: "/products" },

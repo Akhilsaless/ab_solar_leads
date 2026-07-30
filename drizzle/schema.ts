@@ -1,4 +1,4 @@
-import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, decimal, boolean, json } from "drizzle-orm/mysql-core";
+import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, decimal, boolean, json, date } from "drizzle-orm/mysql-core";
 
 /**
  * Core user table backing auth flow (agency owners/admins).
@@ -413,3 +413,124 @@ export const scrapedBusinesses = mysqlTable("scrapedBusinesses", {
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 export type ScrapedBusiness = typeof scrapedBusinesses.$inferSelect;
+
+
+/**
+ * Automated Outreach Campaign Configuration
+ * Stores settings for daily automated outreach to Telangana businesses
+ */
+export const automatedOutreachConfig = mysqlTable("automatedOutreachConfig", {
+  id: int("id").autoincrement().primaryKey(),
+  agencyId: int("agencyId").notNull(),
+  state: varchar("state", { length: 100 }).notNull(), // e.g., "Telangana"
+  businessTypes: json("businessTypes"), // Array of business types: ["textile_mills", "cold_storage", "hospitals", etc]
+  minRating: decimal("minRating", { precision: 3, scale: 1 }).default("3.5"),
+  contactsPerDay: int("contactsPerDay").default(30),
+  scheduleTime: varchar("scheduleTime", { length: 10 }).default("10:00"), // HH:MM format
+  messageType: mysqlEnum("messageType", ["generic", "industry_specific"]).default("industry_specific"),
+  isEnabled: boolean("isEnabled").default(true),
+  includeFollowUp: boolean("includeFollowUp").default(true),
+  followUpDays: int("followUpDays").default(3),
+  adminPhoneNumber: varchar("adminPhoneNumber", { length: 30 }), // For WhatsApp alerts
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type AutomatedOutreachConfig = typeof automatedOutreachConfig.$inferSelect;
+export type InsertAutomatedOutreachConfig = typeof automatedOutreachConfig.$inferInsert;
+
+/**
+ * Outreach Campaign Records
+ * Tracks each message sent to a business
+ */
+export const outreachCampaignRecords = mysqlTable("outreachCampaignRecords", {
+  id: int("id").autoincrement().primaryKey(),
+  configId: int("configId").notNull(), // Reference to automatedOutreachConfig
+  businessId: int("businessId").notNull(), // Reference to scrapedBusinesses
+  businessName: varchar("businessName", { length: 300 }).notNull(),
+  businessType: varchar("businessType", { length: 100 }),
+  ownerName: varchar("ownerName", { length: 200 }),
+  phone: varchar("phone", { length: 50 }),
+  email: varchar("email", { length: 320 }),
+  contactMethod: mysqlEnum("contactMethod", ["whatsapp", "email", "both"]).notNull(),
+  messageBody: text("messageBody").notNull(),
+  chatbotLink: text("chatbotLink"), // Personalized link with tracking
+  status: mysqlEnum("status", ["queued", "sent", "delivered", "opened", "replied", "failed"]).default("queued").notNull(),
+  sentAt: timestamp("sentAt"),
+  deliveredAt: timestamp("deliveredAt"),
+  openedAt: timestamp("openedAt"),
+  repliedAt: timestamp("repliedAt"),
+  replyText: text("replyText"),
+  replySource: mysqlEnum("replySource", ["whatsapp", "email", "manual"]),
+  leadScore: int("leadScore").default(0),
+  isFollowUp: boolean("isFollowUp").default(false),
+  followUpScheduledFor: timestamp("followUpScheduledFor"),
+  errorMessage: text("errorMessage"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type OutreachCampaignRecord = typeof outreachCampaignRecords.$inferSelect;
+export type InsertOutreachCampaignRecord = typeof outreachCampaignRecords.$inferInsert;
+
+/**
+ * Lead Scoring Configuration
+ * Defines how leads are scored based on various factors
+ */
+export const leadScoringConfig = mysqlTable("leadScoringConfig", {
+  id: int("id").autoincrement().primaryKey(),
+  agencyId: int("agencyId").notNull(),
+  businessTypeScores: json("businessTypeScores"), // {textile_mills: 40, cold_storage: 35, hospitals: 30, ...}
+  sizeScores: json("sizeScores"), // {large: 30, medium: 15, small: 5}
+  ratingScores: json("ratingScores"), // {4.5: 20, 4.0: 15, 3.5: 10}
+  contactQualityScores: json("contactQualityScores"), // {has_email: 10, has_phone: 10, has_website: 5}
+  engagementScores: json("engagementScores"), // {opened_email: 5, clicked_link: 10, replied: 20}
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type LeadScoringConfig = typeof leadScoringConfig.$inferSelect;
+export type InsertLeadScoringConfig = typeof leadScoringConfig.$inferInsert;
+
+/**
+ * Data Verification Log
+ * Tracks email, phone, and website verification for each business
+ */
+export const dataVerificationLog = mysqlTable("dataVerificationLog", {
+  id: int("id").autoincrement().primaryKey(),
+  businessId: int("businessId").notNull(), // Reference to scrapedBusinesses
+  emailValid: boolean("emailValid").default(false),
+  phoneValid: boolean("phoneValid").default(false),
+  phoneHasWhatsapp: boolean("phoneHasWhatsapp").default(false),
+  websiteActive: boolean("websiteActive").default(false),
+  businessActive: boolean("businessActive").default(false),
+  verificationScore: int("verificationScore").default(0), // 0-100
+  lastVerifiedAt: timestamp("lastVerifiedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type DataVerificationLog = typeof dataVerificationLog.$inferSelect;
+export type InsertDataVerificationLog = typeof dataVerificationLog.$inferInsert;
+
+/**
+ * Outreach Analytics
+ * Daily summary of outreach performance
+ */
+export const outreachAnalytics = mysqlTable("outreachAnalytics", {
+  id: int("id").autoincrement().primaryKey(),
+  configId: int("configId").notNull(), // Reference to automatedOutreachConfig
+  date: date("date").notNull(),
+  totalSent: int("totalSent").default(0),
+  totalDelivered: int("totalDelivered").default(0),
+  totalOpened: int("totalOpened").default(0),
+  totalReplied: int("totalReplied").default(0),
+  totalInterested: int("totalInterested").default(0),
+  responseRate: decimal("responseRate", { precision: 5, scale: 2 }).default("0"),
+  conversionRate: decimal("conversionRate", { precision: 5, scale: 2 }).default("0"),
+  avgLeadScore: decimal("avgLeadScore", { precision: 5, scale: 2 }).default("0"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type OutreachAnalytic = typeof outreachAnalytics.$inferSelect;
+export type InsertOutreachAnalytic = typeof outreachAnalytics.$inferInsert;

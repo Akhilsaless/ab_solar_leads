@@ -24,6 +24,10 @@ import ForPartners from "@/pages/ForPartners";
 import PartnerDashboard from "@/pages/PartnerDashboard";
 import ScrapedContacts from "@/pages/ScrapedContacts";
 import ProductGuide from "@/pages/ProductGuide";
+import { AutomatedOutreach } from "@/pages/AutomatedOutreach";
+import { WhatsAppSettings } from "@/pages/WhatsAppSettings";
+import { HostelReferrerSignup } from "@/pages/HostelReferrerSignup";
+import { QRCodeGenerator } from "@/pages/QRCodeGenerator";
 import DashboardLayout from "@/components/DashboardLayout";
 import { Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
@@ -42,7 +46,10 @@ function AuthenticatedRoutes() {
         <Route path="/analytics" component={Analytics} />
         <Route path="/scraper" component={BusinessScraper} />
         <Route path="/scraped-contacts" component={ScrapedContacts} />
-        <Route path="/subsidies" component={Subsidies} />
+      <Route path="/automated-outreach" component={AutomatedOutreach} />
+      <Route path="/whatsapp-settings" component={WhatsAppSettings} />
+      <Route path="/qr-generator" component={QRCodeGenerator} />
+      <Route path="/subsidies" component={Subsidies} />
         <Route path="/pricing" component={Pricing} />
         <Route path="/settings" component={Settings} />
         <Route component={NotFound} />
@@ -74,6 +81,9 @@ function Router() {
       <Route path="/partner-signup" component={PartnerSignup} />
       <Route path="/for-partners" component={ForPartners} />
       <Route path="/partner/dashboard" component={PartnerDashboard} />
+
+      {/* Hostel referrer signup - public */}
+      <Route path="/hostel-referrer" component={HostelReferrerSignup} />
 
       {/* Public pricing page */}
       <Route path="/pricing" component={Pricing} />
