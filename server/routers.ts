@@ -15,11 +15,13 @@ import { partnerRouter } from "./partner";
 import { sendEmail } from "./_core/emailService";
 import { extractEmailFromWebsite } from "./emailExtractor";
 import { automatedOutreachRouter } from "./automatedOutreach";
+import { partnerManagementRouter } from "./partnerManagement";
 
 export const appRouter = router({
   system: systemRouter,
   referrer: referrerRouter,
   partner: partnerRouter,
+  partnerManagement: partnerManagementRouter,
   automatedOutreach: automatedOutreachRouter,
   auth: router({
     me: publicProcedure.query(opts => opts.ctx.user),

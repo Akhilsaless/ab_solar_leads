@@ -30,6 +30,7 @@ import { HostelReferrerSignup } from "@/pages/HostelReferrerSignup";
 import { QRCodeGenerator } from "@/pages/QRCodeGenerator";
 import { DualLeadPages } from "@/pages/DualLeadPages";
 import { SolarBenefitsVideo } from "@/pages/SolarBenefitsVideo";
+import PartnerSignupsAdmin from "@/pages/PartnerSignupsAdmin";
 import DashboardLayout from "@/components/DashboardLayout";
 import { Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
@@ -53,6 +54,7 @@ function AuthenticatedRoutes() {
       <Route path="/qr-generator" component={QRCodeGenerator} />
       <Route path="/dual-leads" component={DualLeadPages} />
       <Route path="/solar-video" component={SolarBenefitsVideo} />
+      <Route path="/partner-signups" component={PartnerSignupsAdmin} />
       <Route path="/subsidies" component={Subsidies} />
         <Route path="/pricing" component={Pricing} />
         <Route path="/settings" component={Settings} />

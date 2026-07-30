@@ -534,3 +534,28 @@ export const outreachAnalytics = mysqlTable("outreachAnalytics", {
 
 export type OutreachAnalytic = typeof outreachAnalytics.$inferSelect;
 export type InsertOutreachAnalytic = typeof outreachAnalytics.$inferInsert;
+
+
+/**
+ * Partner Signups
+ * Solar companies that sign up to receive leads
+ */
+export const partnerSignups = mysqlTable("partnerSignups", {
+  id: varchar("id", { length: 36 }).primaryKey(),
+  companyName: varchar("companyName", { length: 255 }).notNull(),
+  contactName: varchar("contactName", { length: 255 }).notNull(),
+  email: varchar("email", { length: 320 }).notNull(),
+  phone: varchar("phone", { length: 30 }).notNull(),
+  address: text("address"),
+  city: varchar("city", { length: 100 }),
+  state: varchar("state", { length: 100 }),
+  panNumber: varchar("panNumber", { length: 50 }),
+  gstNumber: varchar("gstNumber", { length: 50 }),
+  partnerSlug: varchar("partnerSlug", { length: 100 }).notNull().unique(),
+  status: mysqlEnum("status", ["new", "contacted", "interested", "converted"]).default("new").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type PartnerSignup = typeof partnerSignups.$inferSelect;
+export type InsertPartnerSignup = typeof partnerSignups.$inferInsert;

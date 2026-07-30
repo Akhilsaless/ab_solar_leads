@@ -42,6 +42,7 @@ const menuItems = [
   { icon: MessageCircle, label: "WhatsApp Settings", path: "/whatsapp-settings" },
   { icon: QrCode, label: "QR Code Generator", path: "/qr-generator" },
   { icon: Handshake, label: "Partner Outreach", path: "/partner-outreach" },
+  { icon: Users, label: "Partner Signups", path: "/partner-signups" },
   { icon: UserCheck, label: "Referral Management", path: "/admin/referrals" },
   { icon: Sun, label: "Products", path: "/products" },
   { icon: BookOpen, label: "Subsidies", path: "/subsidies" },
