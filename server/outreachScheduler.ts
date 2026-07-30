@@ -19,6 +19,9 @@ interface OutreachConfig {
   scheduleTime: string;
   messageType: "generic" | "industry_specific";
   adminPhoneNumber?: string;
+  targetingMode: "blind" | "owner_only"; // NEW: Toggle between targeting modes
+  requireOwnerName: boolean; // NEW: Only send to businesses with identified owner
+  requireOwnerContact: boolean; // NEW: Only send if we have owner's direct contact
 }
 
 interface ScrapedBusiness {
