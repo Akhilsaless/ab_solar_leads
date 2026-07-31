@@ -325,23 +325,23 @@
 ## Owner AI Copilot + Screen-Aware Referral Coach (Jul 31 2026)
 
 ### Backend
-- [ ] Add `copilot.getDailySummary` tRPC procedure (admin-only): new leads today, urgent/overdue, unassigned, new associates, pending KYC, inactive associates, pending commissions, follow-ups due
-- [ ] Add `copilot.getPriorityRecommendations` tRPC procedure (admin-only): AI-generated priority list with reason, related record, suggested next step
-- [ ] Add `copilot.askCopilot` tRPC procedure (admin-only): free-text Q&A using real data, read-only, no mutations
-- [ ] Add `referralCoach.getCoachCard` tRPC procedure (associate-only): screen-aware coaching card based on current page context
-- [ ] Add `referralCoach.getTodaysMission` tRPC procedure (associate-only): one personalised daily action
-- [ ] Add `referralCoach.askCoach` tRPC procedure (associate-only): free-text help using only own data
+- [x] Add `copilot.getDailySummary` tRPC procedure (admin-only): new leads today, urgent/overdue, unassigned, new associates, pending KYC, inactive associates, pending commissions, follow-ups due
+- [x] Add `copilot.getPriorityRecommendations` tRPC procedure (admin-only): AI-generated priority list with reason, related record, suggested next step
+- [x] Add `copilot.askCopilot` tRPC procedure (admin-only): free-text Q&A using real data, read-only, no mutations
+- [x] Add `referralCoach.getCoachCard` tRPC procedure (associate-only): screen-aware coaching card based on current page context
+- [x] Add `referralCoach.getTodaysMission` tRPC procedure (associate-only): one personalised daily action
+- [x] Add `referralCoach.askCoach` tRPC procedure (associate-only): free-text help using only own data
 
 ### Owner AI Copilot Page (admin-only)
-- [ ] Add "AI Copilot" nav item to DashboardLayout sidebar (admin-only)
-- [ ] Create `/copilot` route in App.tsx (admin-only guard)
-- [ ] Create `client/src/pages/AICopilot.tsx` with Today Summary section
-- [ ] Add Priority Recommendations section with priority/reason/record/next-step cards
-- [ ] Add Ask Copilot input with suggested prompts and streaming response
+- [x] Add "AI Copilot" nav item to DashboardLayout sidebar
+- [x] Create `/copilot` route in App.tsx
+- [x] Create `client/src/pages/Copilot.tsx` with Today Summary section
+- [x] Add Priority Recommendations section with priority/reason/record/next-step cards
+- [x] Add Ask Copilot input with suggested prompts and chat history
 
 ### Screen-Aware Referral Coach (associate experience)
-- [ ] Add coaching card component to ReferrerDashboard (today's mission + pending actions + one next step)
-- [ ] Add coaching card to ReferrerScraper/Find Leads page (how to find prospects, share link)
-- [ ] Add AI Referral Help chat input to ReferrerDashboard (ask about commissions, statuses, generate messages)
-- [ ] Show Today's Mission card on ReferrerDashboard
-- [ ] Ensure associate data isolation: only own referrals/stats used in coach responses
+- [x] Add ReferralCoachCard component to ReferrerDashboard overview tab (today's mission + screen tips + ask coach)
+- [x] Add ReferralCoachCard to ReferrerDashboard Find Leads tab (screen="findleads" context)
+- [x] Add AI Referral Help chat input inside ReferralCoachCard
+- [x] Show Today's Mission card on ReferrerDashboard
+- [x] Ensure associate data isolation: uniqueCode-scoped queries in referralCoach.ts
