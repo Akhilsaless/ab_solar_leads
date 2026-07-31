@@ -345,3 +345,9 @@
 - [x] Add AI Referral Help chat input inside ReferralCoachCard
 - [x] Show Today's Mission card on ReferrerDashboard
 - [x] Ensure associate data isolation: uniqueCode-scoped queries in referralCoach.ts
+
+## Associate Dashboard Redesign (Jul 31 2026)
+- [x] Replace Overview tab with Dashboard tab (AI Copilot card + To-Do List + Potential Earnings)
+- [x] Remove tab clutter: keep only Dashboard / Referrals / Find Leads / Withdraw tabs
+- [x] Fix Find Leads AI Coach to explain Business Type, City, Size filters step by step
+- [x] Update askCoach system prompt to include search tool guidance
