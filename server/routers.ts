@@ -11,6 +11,8 @@ import { getStripe } from "./stripe-handler";
 import { PLANS, TRIAL_DAYS } from "./stripe-products";
 import * as db from "./db";
 import { referrerRouter } from "./referrer";
+import { copilotRouter } from "./copilot";
+import { referralCoachRouter } from "./referralCoach";
 import { partnerRouter } from "./partner";
 import { sendEmail } from "./_core/emailService";
 import { extractEmailFromWebsite } from "./emailExtractor";
@@ -26,6 +28,8 @@ export const appRouter = router({
   partner: partnerRouter,
   partnerManagement: partnerManagementRouter,
   automatedOutreach: automatedOutreachRouter,
+  copilot: copilotRouter,
+  referralCoach: referralCoachRouter,
   auth: router({
     me: publicProcedure.query(opts => opts.ctx.user),
     logout: publicProcedure.mutation(({ ctx }) => {

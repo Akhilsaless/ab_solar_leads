@@ -3,6 +3,7 @@ import { trpc } from "@/lib/trpc";
 import { useLocation } from "wouter";
 import { SalesSquadLogo } from "@/components/SalesSquadLogo";
 import ReferrerScraper from "./ReferrerScraper";
+import { ReferralCoachCard } from "@/components/ReferralCoachCard";
 
 // ── Design tokens (Option B: Emerald Green on Pure Black) ──
 const C = {
@@ -359,6 +360,8 @@ export default function ReferrerDashboard() {
         {/* ── OVERVIEW TAB ── */}
         {activeTab === "overview" && (
           <div>
+            {/* AI Coach Card */}
+            <ReferralCoachCard uniqueCode={uniqueCode} screen="dashboard" />
             {/* ⚠️ IMPORTANT: Residential Houses Only */}
             <div style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.3)", borderRadius: 12, padding: 14, marginBottom: 16, display: "flex", gap: 12, alignItems: "flex-start" }}>
               <span style={{ fontSize: 18, flexShrink: 0 }}>⚠️</span>
@@ -691,7 +694,11 @@ export default function ReferrerDashboard() {
 
         {/* ── FIND LEADS TAB ── */}
         {activeTab === "findleads" && (
-          <ReferrerScraper referralLink={referralLink} referrerName={(referrer as any)?.name || "Sales Squad Referrer"} />
+          <div>
+            {/* AI Coach Card for Find Leads screen */}
+            <ReferralCoachCard uniqueCode={uniqueCode} screen="findleads" />
+            <ReferrerScraper referralLink={referralLink} referrerName={(referrer as any)?.name || "Sales Squad Referrer"} />
+          </div>
         )}
 
         {/* Footer */}
