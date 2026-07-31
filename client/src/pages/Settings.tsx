@@ -93,7 +93,7 @@ export default function Settings() {
           </div>
           <div>
             <p className="text-xs text-muted-foreground mb-2 flex items-center gap-1.5"><Linkedin className="w-3.5 h-3.5 text-blue-400" />LinkedIn company page (used in scraper outreach)</p>
-            <Field label="LinkedIn URL (e.g. https://linkedin.com/company/ab-solar)" value={form.linkedinUrl} onChange={(v) => setForm({ ...form, linkedinUrl: v })} />
+            <Field label="LinkedIn URL (e.g. https://linkedin.com/company/sales-squad)" value={form.linkedinUrl} onChange={(v) => setForm({ ...form, linkedinUrl: v })} />
           </div>
         </CardContent>
       </Card>

@@ -88,7 +88,7 @@ export default function ReferrerDashboard() {
 
   // Bot link: direct to chatbot with referrer code as query param
   const agencySlugQuery = trpc.agency.getFirst.useQuery();
-  const agencySlug = agencySlugQuery.data || "ab-solar";
+  const agencySlug = agencySlugQuery.data || "demo";
   const referralLink = uniqueCode ? `${window.location.origin}/chat/${agencySlug}?ref=${uniqueCode}` : "";
   const copyLink = () => { navigator.clipboard.writeText(referralLink); setCopied(true); setTimeout(() => setCopied(false), 2000); };
   const shareWhatsApp = () => {

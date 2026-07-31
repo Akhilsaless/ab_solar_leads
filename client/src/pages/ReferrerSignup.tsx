@@ -24,7 +24,7 @@ export default function ReferrerSignup() {
   const [acceptedTnC, setAcceptedTnC] = useState(false);
   const [resendCooldown, setResendCooldown] = useState(0);
   const agencySlugQuery = trpc.agency.getFirst.useQuery();
-  const agencySlug = agencySlugQuery.data || "ab-solar";
+  const agencySlug = agencySlugQuery.data || "demo";
 
   // Auto-login if session token exists
   useEffect(() => {

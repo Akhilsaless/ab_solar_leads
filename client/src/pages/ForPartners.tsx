@@ -42,7 +42,7 @@ export default function ForPartners() {
             </Button>
             <Button
               variant="outline"
-              onClick={() => setLocation("/chat/ab-solar")}
+              onClick={() => setLocation("/chat/demo")}
               className="border-white/20 text-white hover:bg-white/10 px-8 py-6 text-lg rounded-xl"
             >
               See the Chatbot Live

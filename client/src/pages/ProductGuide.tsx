@@ -67,7 +67,7 @@ export default function ProductGuide() {
   const [, navigate] = useLocation();
   const [copied, setCopied] = useState(false);
   const agencyQuery = trpc.agency.getFirst.useQuery();
-  const agencySlug = agencyQuery.data || "ab-solar";
+  const agencySlug = agencyQuery.data || "demo";
   const chatLink = `${window.location.origin}/chat/${agencySlug}`;
   const referralLink = `${window.location.origin}/referral-landing`;
   const partnerLink = `${window.location.origin}/for-partners`;

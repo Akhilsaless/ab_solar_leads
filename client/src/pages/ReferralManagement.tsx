@@ -135,8 +135,8 @@ export default function ReferralManagement() {
               <div>
                 <label className="block text-sm text-gray-300 mb-2">Customer Chatbot Link</label>
                 <div className="flex gap-2">
-                  <Input value={`${window.location.origin}/chat/ab-solar`} readOnly className="bg-white/5 border-white/20 text-white" />
-                  <Button onClick={() => copyToClipboard(`${window.location.origin}/chat/ab-solar`)} className="bg-emerald-600 hover:bg-emerald-700">
+                  <Input value={`${window.location.origin}/chat/demo`} readOnly className="bg-white/5 border-white/20 text-white" />
+                  <Button onClick={() => copyToClipboard(`${window.location.origin}/chat/demo`)} className="bg-emerald-600 hover:bg-emerald-700">
                     <Copy className="w-4 h-4" />
                   </Button>
                 </div>

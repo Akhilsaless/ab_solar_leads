@@ -100,7 +100,7 @@ export default function ReferralLanding() {
               Start Earning Now <ArrowRight style={{ width: 18, height: 18 }} />
             </button>
             <button
-              onClick={() => navigate(referrerCode ? `/refer/${referrerCode}` : "/chat/ab-solar")}
+              onClick={() => navigate(referrerCode ? `/refer/${referrerCode}` : "/chat/demo")}
               style={{ background: "transparent", color: "#fff", border: "1px solid #333", borderRadius: 10, padding: "14px 28px", fontSize: 16, fontWeight: 600, cursor: "pointer" }}>
               Get Solar Estimate
             </button>
