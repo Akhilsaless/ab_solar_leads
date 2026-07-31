@@ -35,6 +35,7 @@ export function AutomatedOutreach() {
     scheduleTime: "10:00",
     messageType: "industry_specific" as const,
     adminPhoneNumber: "",
+    outreachMode: "blind" as "blind" | "owner_only",
   });
 
   useEffect(() => {
@@ -49,6 +50,7 @@ export function AutomatedOutreach() {
         scheduleTime: config.scheduleTime || "10:00",
         messageType: config.messageType || "industry_specific",
         adminPhoneNumber: config.adminPhoneNumber || "",
+        outreachMode: (config.outreachMode as "blind" | "owner_only") || "blind",
       });
     }
   }, [configQuery.data]);
@@ -79,6 +81,7 @@ export function AutomatedOutreach() {
         contactsPerDay: parseInt(formData.contactsPerDay),
         scheduleTime: formData.scheduleTime,
         adminPhoneNumber: formData.adminPhoneNumber || undefined,
+        outreachMode: formData.outreachMode,
       });
       await configQuery.refetch();
     } catch (error) {
@@ -265,6 +268,36 @@ export function AutomatedOutreach() {
                   onChange={(e) => setFormData({ ...formData, adminPhoneNumber: e.target.value })}
                   className="mt-1"
                 />
+              </div>
+
+              <div>
+                <Label>Outreach Mode</Label>
+                <div className="mt-2 flex gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setFormData({ ...formData, outreachMode: "blind" })}
+                    className={`flex-1 rounded-lg border-2 p-3 text-left transition-all ${
+                      formData.outreachMode === "blind"
+                        ? "border-emerald-500 bg-emerald-500/10 text-emerald-600"
+                        : "border-border bg-background text-muted-foreground hover:border-muted-foreground"
+                    }`}
+                  >
+                    <div className="font-semibold text-sm">🚀 Blind Send</div>
+                    <div className="text-xs mt-0.5">Messages are sent automatically to businesses without owner approval</div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFormData({ ...formData, outreachMode: "owner_only" })}
+                    className={`flex-1 rounded-lg border-2 p-3 text-left transition-all ${
+                      formData.outreachMode === "owner_only"
+                        ? "border-amber-500 bg-amber-500/10 text-amber-600"
+                        : "border-border bg-background text-muted-foreground hover:border-muted-foreground"
+                    }`}
+                  >
+                    <div className="font-semibold text-sm">🔔 Owner Approval</div>
+                    <div className="text-xs mt-0.5">You get notified first; messages only send after your approval</div>
+                  </button>
+                </div>
               </div>
 
               <div className="flex gap-2">

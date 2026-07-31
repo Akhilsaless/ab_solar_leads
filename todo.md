@@ -282,3 +282,42 @@
 - [x] Stats row: Total, Not Contacted, Contacted, Converted
 - [x] Export CSV includes all fields
 - [x] 0 TypeScript errors, 153 tests passing
+
+## Session Improvements (Jul 31 2026)
+
+### Phase 1 — Chatbot Fixes
+- [x] Fix session key: `ab-solar-session-${slug}` → `chat-session-v2-${slug}`
+- [x] Add OTP verification step before lead capture (backend sendOTP + verifyOTP procedures)
+- [x] Add WhatsApp/SMS consent checkbox before sending follow-ups
+- [x] Prevent duplicate leads (check phone before saving in backend)
+- [x] Make email optional in lead capture (already optional in schema)
+- [ ] Add delivery method choice: PDF Estimate / WhatsApp Estimate / Expert Callback / Free Site Visit
+- [ ] Bill upload OR manual entry (not both shown simultaneously)
+- [ ] After OCR: show confirmation step before auto-proceeding
+- [ ] Handle OCR failures gracefully with fallback to manual entry
+- [ ] Mark estimates as "preliminary" — do NOT promise subsidy eligibility
+- [ ] Save unfinished conversations to localStorage (beyond sessionStorage)
+
+### Phase 2 — Complete TODOs
+- [x] Add delete functionality to Leads page (individual + bulk with confirmation)
+- [x] Add delete functionality to ReferralManagement page (individual referrer delete)
+- [x] Add delete functionality to PartnerSignupsAdmin page (individual partner delete)
+- [x] Fix URL rebranding: referrerDb.ts (already using salessquad.manus.space)
+- [x] Fix URL rebranding: partnerManagement.ts (already using salessquad.manus.space)
+- [x] Fix hardcoded ab-solar slug in routers.ts (now uses 'demo' fallback)
+- [x] Fix hardcoded /chat/ab-solar in outreachScheduler.ts (now uses /chat/demo)
+- [x] Add Outreach Mode Selector toggle in AutomatedOutreach Settings tab (blind vs owner-only)
+- [x] Add outreachMode field to automatedOutreachConfig schema
+- [x] Display partner signup page link in PartnerSignupsAdmin page (top of page)
+
+### Phase 3 — UI Polish
+- [x] Skeleton loading states for Leads page (per-cell animated skeletons)
+- [x] Better empty states with icons/illustrations on Leads page
+- [x] Filter chips on Leads page (status chips with counts)
+- [x] Lead Activity Timeline inside Lead detail side-sheet
+- [x] Compact AI Summary inside Lead detail side-sheet
+- [x] Lead Detail Sheet: contact info, solar data, notes, activity timeline, AI summary
+- [ ] Audit Log for important admin actions
+- [ ] Better spacing, typography, cards, tables across all pages
+- [ ] Mobile responsiveness improvements
+- [ ] Accessibility improvements (focus rings, keyboard nav)

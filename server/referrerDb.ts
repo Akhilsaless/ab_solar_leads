@@ -126,7 +126,7 @@ export async function recordReferralSignup(referrerId: number, conversationId: n
       // Use the app origin from env or fallback to the known production domain
       const appOrigin = process.env.APP_ORIGIN || process.env.VITE_APP_ID
         ? `https://${process.env.VITE_APP_ID}.manus.space`
-        : 'https://absolarleads-xxxqwsn9.manus.space';
+        : 'https://salessquad.manus.space';
       const verifyUrl = `${appOrigin}/verify-referral?token=${verificationToken}`;
       sendEmail({
         to: customerData.email,

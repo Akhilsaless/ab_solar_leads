@@ -529,3 +529,37 @@ export async function markFollowUpSent(sessionId: string, field: "followUp24Sent
     await db.update(conversations).set({ followUp72Sent: true } as any).where(eq(conversations.sessionId, sessionId));
   }
 }
+
+// ==================== DELETE HELPERS ====================
+
+export async function deleteLead(id: number) {
+  const db = await getDb();
+  if (!db) return;
+  await db.execute(sql`DELETE FROM leadActivity2 WHERE leadId = ${id}`);
+  await db.delete(leads).where(eq(leads.id, id));
+}
+
+export async function deleteLeadsBulk(ids: number[]) {
+  const db = await getDb();
+  if (!db) return;
+  for (const id of ids) {
+    await db.execute(sql`DELETE FROM leadActivity2 WHERE leadId = ${id}`);
+    await db.delete(leads).where(eq(leads.id, id));
+  }
+}
+
+export async function getLeadByPhone(phone: string) {
+  const db = await getDb();
+  if (!db) return null;
+  const result = await db.select().from(leads).where(eq(leads.phone, phone)).limit(1);
+  return result[0] || null;
+}
+
+export async function deleteReferrer(id: number) {
+  const db = await getDb();
+  if (!db) return;
+  // Delete referrals and withdrawals first (raw SQL for tables not in schema imports)
+  await db.execute(sql`DELETE FROM withdrawals WHERE referrerId = ${id}`);
+  await db.execute(sql`DELETE FROM referrals WHERE referrerId = ${id}`);
+  await db.execute(sql`DELETE FROM referrers WHERE id = ${id}`);
+}

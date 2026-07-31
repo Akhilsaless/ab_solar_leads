@@ -1,4 +1,5 @@
-import { router, publicProcedure } from "./_core/trpc";
+import { router, publicProcedure, protectedProcedure } from "./_core/trpc";
+import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { getDb } from "./db";
 import { sql } from "drizzle-orm";
@@ -519,6 +520,20 @@ export const referrerRouter = router({
         }).catch(console.error);
       }
 
+      return { success: true };
+    }),
+
+  // Admin: Delete a referrer and all their data
+  deleteReferrer: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      if ((ctx.user as any).role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const dbConn = await getDb();
+      if (!dbConn) throw new Error("Database not available");
+      await dbConn.execute(sql`DELETE FROM withdrawals WHERE referrerId = ${input.id}`);
+      await dbConn.execute(sql`DELETE FROM referrals WHERE referrerId = ${input.id}`);
+      await dbConn.execute(sql`DELETE FROM referralTasks WHERE referrerId = ${input.id}`);
+      await dbConn.execute(sql`DELETE FROM referrers WHERE id = ${input.id}`);
       return { success: true };
     }),
 });

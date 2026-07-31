@@ -240,7 +240,7 @@ export async function runAutomatedOutreach(): Promise<void> {
             const message = generateMessage(business, config.messageType);
 
             // Generate chatbot link
-            const chatbotLink = `/chat/ab-solar?ref=OUTREACH_${business.id}_${Date.now()}`;
+            const chatbotLink = `/chat/demo?ref=OUTREACH_${business.id}_${Date.now()}`;
 
             // Determine contact method
             let contactMethod: "whatsapp" | "email" | "both" = "email";

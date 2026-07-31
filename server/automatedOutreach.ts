@@ -111,6 +111,7 @@ export const automatedOutreachRouter = router({
         contactsPerDay: z.number().optional(),
         scheduleTime: z.string().optional(),
         adminPhoneNumber: z.string().optional(),
+        outreachMode: z.enum(["blind", "owner_only"]).optional(),
       }))
       .mutation(async ({ ctx, input }) => {
         if (!ctx.user) throw new Error("Unauthorized");
@@ -138,6 +139,10 @@ export const automatedOutreachRouter = router({
         if (input.adminPhoneNumber !== undefined) {
           updates.push("adminPhoneNumber = ?");
           values.push(input.adminPhoneNumber);
+        }
+        if (input.outreachMode !== undefined) {
+          updates.push("outreachMode = ?");
+          values.push(input.outreachMode);
         }
 
         if (updates.length === 0) return { success: true };

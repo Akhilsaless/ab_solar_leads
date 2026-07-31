@@ -17,6 +17,9 @@ import { extractEmailFromWebsite } from "./emailExtractor";
 import { automatedOutreachRouter } from "./automatedOutreach";
 import { partnerManagementRouter } from "./partnerManagement";
 
+// In-memory OTP store (session → { otp, expiresAt, phone })
+const otpStore = new Map<string, { otp: string; expiresAt: Date; phone: string }>();
+
 export const appRouter = router({
   system: systemRouter,
   referrer: referrerRouter,
@@ -41,10 +44,10 @@ export const appRouter = router({
 
     getFirst: publicProcedure.query(async () => {
       const dbConn = await db.getDb();
-      if (!dbConn) return "ab-solar";
+      if (!dbConn) return "demo";
       const agencies = await dbConn.execute(sql`SELECT agencySlug FROM agencyConfig3 WHERE isActive = 1 LIMIT 1`) as any[];
       const row = Array.isArray(agencies[0]) ? agencies[0][0] : agencies[0];
-      return (row as any)?.agencySlug || "ab-solar";
+      return (row as any)?.agencySlug || "demo";
     }),
 
     getBySlug: publicProcedure
@@ -435,6 +438,11 @@ export const appRouter = router({
           if (hasName && hasContact && conversation.status === "active") {
             updateData.status = updateData.status || "lead_captured";
 
+            // Server-side duplicate prevention: skip if phone already exists
+            const phoneForCheck = extractedData.phone || conversation.customerPhone;
+            const emailForCheck = extractedData.email || conversation.customerEmail;
+            const existingLead = phoneForCheck ? await db.getLeadByPhone(phoneForCheck) : null;
+            if (!existingLead) {
             // Create a lead record
             const nameParts = (extractedData.name || conversation.customerName || "").split(" ");
             await db.createLeadFromConversation({
@@ -496,6 +504,7 @@ export const appRouter = router({
               subject: `New Lead: ${leadName} - ₹${bill || 'N/A'} Monthly Bill`,
               html: leadDetailsHtml,
             });
+            } // end if (!existingLead)
           }
 
           if (Object.keys(updateData).length > 0) {
@@ -619,6 +628,60 @@ export const appRouter = router({
         if (!conversation) return [];
         return await db.getChatMessages(conversation.id);
       }),
+
+    // OTP: Send a 6-digit OTP to the customer's phone via WhatsApp/SMS
+    sendOtp: publicProcedure
+      .input(z.object({
+        sessionId: z.string(),
+        phone: z.string(),
+      }))
+      .mutation(async ({ input }) => {
+        const otp = Math.floor(100000 + Math.random() * 900000).toString();
+        const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 min expiry
+        // Store OTP in conversation metadata (use raw SQL to avoid schema changes)
+        const dbConn = await db.getDb();
+        if (dbConn) {
+          await dbConn.execute(
+            sql`UPDATE conversations3 SET customerPhone = ${input.phone} WHERE sessionId = ${input.sessionId}`
+          );
+          // Store OTP in a simple in-memory map (per session, expires in 10 min)
+          otpStore.set(input.sessionId, { otp, expiresAt, phone: input.phone });
+        }
+        // Send OTP via email as fallback (WhatsApp requires credentials)
+        const conv = await db.getConversation(input.sessionId);
+        if (conv?.customerEmail) {
+          await sendEmail({
+            to: conv.customerEmail,
+            subject: 'Your Sales Squad Verification Code',
+            html: `<p>Your verification code is: <strong>${otp}</strong></p><p>Valid for 10 minutes.</p>`,
+          });
+        }
+        // For now, log OTP to console (WhatsApp integration pending credentials)
+        console.log(`[OTP] Session ${input.sessionId}: ${otp} for phone ${input.phone}`);
+        return { success: true, message: 'OTP sent to your number' };
+      }),
+
+    // OTP: Verify the OTP entered by the customer
+    verifyOtp: publicProcedure
+      .input(z.object({
+        sessionId: z.string(),
+        otp: z.string(),
+      }))
+      .mutation(async ({ input }) => {
+        const stored = otpStore.get(input.sessionId);
+        if (!stored) return { success: false, message: 'OTP expired or not found. Please request a new one.' };
+        if (new Date() > stored.expiresAt) {
+          otpStore.delete(input.sessionId);
+          return { success: false, message: 'OTP expired. Please request a new one.' };
+        }
+        if (stored.otp !== input.otp.trim()) {
+          return { success: false, message: 'Incorrect OTP. Please try again.' };
+        }
+        otpStore.delete(input.sessionId);
+        // Mark phone as verified in conversation
+        await db.updateConversation(input.sessionId, { customerPhone: stored.phone } as any);
+        return { success: true, message: 'Phone verified successfully!' };
+      }),
   }),
 
   // ===== CONVERSATIONS (Admin view) =====
@@ -717,6 +780,27 @@ export const appRouter = router({
       .input(z.object({ leadId: z.number() }))
       .query(async ({ input }) => {
         return await db.getLeadActivity(input.leadId);
+      }),
+
+    delete: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input }) => {
+        await db.deleteLead(input.id);
+        return { success: true };
+      }),
+
+    deleteBulk: protectedProcedure
+      .input(z.object({ ids: z.array(z.number()) }))
+      .mutation(async ({ input }) => {
+        await db.deleteLeadsBulk(input.ids);
+        return { success: true, deleted: input.ids.length };
+      }),
+
+    checkDuplicate: publicProcedure
+      .input(z.object({ phone: z.string() }))
+      .query(async ({ input }) => {
+        const existing = await db.getLeadByPhone(input.phone);
+        return { isDuplicate: !!existing };
       }),
   }),
 

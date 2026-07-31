@@ -1,7 +1,7 @@
 import { router, publicProcedure, protectedProcedure } from "./_core/trpc";
 import { z } from "zod";
 import * as db from "./db";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, sql } from "drizzle-orm";
 import { partnerSignups } from "../drizzle/schema";
 import { TRPCError } from "@trpc/server";
 
@@ -94,7 +94,7 @@ export const partnerManagementRouter = router({
   generatePartnerLink: protectedProcedure
     .input(z.object({ partnerId: z.string() }))
     .query(({ input: inp }: any) => {
-      const origin = process.env.VITE_FRONTEND_URL || "https://absolarleads.manus.space";
+      const origin = process.env.VITE_FRONTEND_URL || "https://salessquad.manus.space";
       const partnerSlug = inp.partnerId.toLowerCase().replace(/\s+/g, "-");
       return {
         link: `${origin}/partner/${partnerSlug}`,
@@ -124,6 +124,19 @@ export const partnerManagementRouter = router({
         email: partner.email,
         phone: partner.phone,
       };
+    }),
+
+  // Delete a partner signup
+  deleteSignup: protectedProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ ctx, input }: any) => {
+      if (ctx.user.role !== "admin") {
+        throw new TRPCError({ code: "FORBIDDEN" });
+      }
+      const dbConn = await db.getDb();
+      if (!dbConn) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+      await dbConn.execute(sql`DELETE FROM partnerSignups WHERE id = ${input.id}`);
+      return { success: true };
     }),
 
   // Create partner signup
@@ -166,7 +179,7 @@ export const partnerManagementRouter = router({
       return {
         success: true,
         partnerId: result[0]?.id || "",
-        partnerLink: `${process.env.VITE_FRONTEND_URL || "https://absolarleads.manus.space"}/partner/${partnerSlug}`,
+        partnerLink: `${process.env.VITE_FRONTEND_URL || "https://salessquad.manus.space"}/partner/${partnerSlug}`,
       };
     }),
 });

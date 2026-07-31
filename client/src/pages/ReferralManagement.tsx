@@ -2,11 +2,13 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Copy, CheckCircle, XCircle, Clock, TrendingUp } from "lucide-react";
+import { Copy, CheckCircle, XCircle, Trash2 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
+import { toast } from "sonner";
 
 export default function ReferralManagement() {
   const [selectedTab, setSelectedTab] = useState<"links" | "referrers" | "referrals" | "withdrawals">("links");
+  const [confirmDeleteReferrerId, setConfirmDeleteReferrerId] = useState<number | null>(null);
 
   // Queries
   const referrers = trpc.referrer.getAllReferrers.useQuery();
@@ -17,21 +19,22 @@ export default function ReferralManagement() {
   const markSubsidy = trpc.referrer.markSubsidyApplied.useMutation({
     onSuccess: () => { referrals.refetch(); },
   });
-
   const confirmInstall = trpc.referrer.confirmInstallation.useMutation({
     onSuccess: () => { referrals.refetch(); },
   });
-
   const approveWithdrawal = trpc.referrer.approveWithdrawal.useMutation({
-    onSuccess: () => {
-      withdrawals.refetch();
-    },
+    onSuccess: () => { withdrawals.refetch(); },
   });
-
   const rejectWithdrawal = trpc.referrer.rejectWithdrawal.useMutation({
+    onSuccess: () => { withdrawals.refetch(); },
+  });
+  const deleteReferrer = trpc.referrer.deleteReferrer.useMutation({
     onSuccess: () => {
-      withdrawals.refetch();
+      referrers.refetch();
+      setConfirmDeleteReferrerId(null);
+      toast.success("Referrer deleted");
     },
+    onError: () => toast.error("Failed to delete referrer"),
   });
 
   const potInfo = trpc.referrer.getPotInfo.useQuery(undefined, { refetchInterval: 15000 });
@@ -40,6 +43,7 @@ export default function ReferralManagement() {
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
+    toast.success("Copied!");
   };
 
   return (
@@ -48,6 +52,22 @@ export default function ReferralManagement() {
         <h1 className="text-3xl font-bold text-white mb-2">Referral Management</h1>
         <p className="text-gray-400">Manage referrers, track referrals, and approve withdrawals</p>
       </div>
+
+      {/* Confirm delete referrer dialog */}
+      {confirmDeleteReferrerId !== null && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+          <div className="bg-card border border-border rounded-xl p-6 max-w-sm w-full mx-4 shadow-xl">
+            <h3 className="text-lg font-semibold mb-2">Delete Referrer?</h3>
+            <p className="text-muted-foreground text-sm mb-4">This will permanently delete the referrer and all their referrals, tasks, and withdrawal history. This cannot be undone.</p>
+            <div className="flex gap-2 justify-end">
+              <Button variant="outline" onClick={() => setConfirmDeleteReferrerId(null)}>Cancel</Button>
+              <Button variant="destructive" onClick={() => deleteReferrer.mutate({ id: confirmDeleteReferrerId! })} disabled={deleteReferrer.isPending}>
+                {deleteReferrer.isPending ? "Deleting..." : "Delete"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="flex gap-2 border-b border-white/10">
@@ -66,7 +86,7 @@ export default function ReferralManagement() {
         ))}
       </div>
 
-      {/* Reward Pool Card — always visible above tabs */}
+      {/* Reward Pool Card */}
       <div style={{ background: "#141414", border: "1px solid rgba(16,185,129,0.3)", borderRadius: 14, padding: "20px 24px", display: "flex", flexWrap: "wrap", gap: 24, alignItems: "center", justifyContent: "space-between" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
           <div style={{ width: 48, height: 48, borderRadius: "50%", background: "rgba(16,185,129,0.12)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22 }}>💰</div>
@@ -101,38 +121,22 @@ export default function ReferralManagement() {
         <div className="space-y-4">
           <Card className="bg-white/10 border-white/20 p-6">
             <h2 className="text-xl font-bold text-white mb-4">Share These Links</h2>
-            
             <div className="space-y-4">
               <div>
                 <label className="block text-sm text-gray-300 mb-2">Referrer Signup Link</label>
                 <div className="flex gap-2">
-                  <Input
-                    value={`${window.location.origin}/referrer-signup`}
-                    readOnly
-                    className="bg-white/5 border-white/20 text-white"
-                  />
-                  <Button
-                    onClick={() => copyToClipboard(`${window.location.origin}/referrer-signup`)}
-                    className="bg-emerald-600 hover:bg-emerald-700"
-                  >
+                  <Input value={`${window.location.origin}/referrer-signup`} readOnly className="bg-white/5 border-white/20 text-white" />
+                  <Button onClick={() => copyToClipboard(`${window.location.origin}/referrer-signup`)} className="bg-emerald-600 hover:bg-emerald-700">
                     <Copy className="w-4 h-4" />
                   </Button>
                 </div>
                 <p className="text-xs text-gray-400 mt-2">Send this to people who want to be referrers</p>
               </div>
-
               <div>
                 <label className="block text-sm text-gray-300 mb-2">Customer Chatbot Link</label>
                 <div className="flex gap-2">
-                  <Input
-                    value={`${window.location.origin}/chat/ab-solar`}
-                    readOnly
-                    className="bg-white/5 border-white/20 text-white"
-                  />
-                  <Button
-                    onClick={() => copyToClipboard(`${window.location.origin}/chat/ab-solar`)}
-                    className="bg-emerald-600 hover:bg-emerald-700"
-                  >
+                  <Input value={`${window.location.origin}/chat/ab-solar`} readOnly className="bg-white/5 border-white/20 text-white" />
+                  <Button onClick={() => copyToClipboard(`${window.location.origin}/chat/ab-solar`)} className="bg-emerald-600 hover:bg-emerald-700">
                     <Copy className="w-4 h-4" />
                   </Button>
                 </div>
@@ -157,16 +161,25 @@ export default function ReferralManagement() {
                     <p className="text-sm text-gray-400">{ref.email}</p>
                     <p className="text-sm text-gray-400">{ref.totalReferrals} referrals • Code: {ref.uniqueCode}</p>
                   </div>
-                  <div className="text-right">
-                    <p className="text-2xl font-bold text-emerald-400">₹{Number(ref.totalEarnings).toLocaleString()}</p>
-                    <div className="flex items-center gap-2 justify-end mt-1">
-                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                        Number(ref.qualityScore ?? 100) >= 80 ? 'bg-green-500/20 text-green-400' :
-                        Number(ref.qualityScore ?? 100) >= 60 ? 'bg-yellow-500/20 text-yellow-400' :
-                        'bg-red-500/20 text-red-400'
-                      }`}>Quality: {ref.qualityScore ?? 100}%</span>
-                      {Number(ref.dailyStreak || 0) > 0 && <span className="text-xs text-orange-400">🔥{ref.dailyStreak}d</span>}
+                  <div className="flex items-start gap-3">
+                    <div className="text-right">
+                      <p className="text-2xl font-bold text-emerald-400">₹{Number(ref.totalEarnings).toLocaleString()}</p>
+                      <div className="flex items-center gap-2 justify-end mt-1">
+                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                          Number(ref.qualityScore ?? 100) >= 80 ? 'bg-green-500/20 text-green-400' :
+                          Number(ref.qualityScore ?? 100) >= 60 ? 'bg-yellow-500/20 text-yellow-400' :
+                          'bg-red-500/20 text-red-400'
+                        }`}>Quality: {ref.qualityScore ?? 100}%</span>
+                        {Number(ref.dailyStreak || 0) > 0 && <span className="text-xs text-orange-400">🔥{ref.dailyStreak}d</span>}
+                      </div>
                     </div>
+                    <button
+                      onClick={() => setConfirmDeleteReferrerId(ref.id)}
+                      className="p-1.5 rounded hover:bg-red-500/20 text-red-400 transition-colors mt-1"
+                      title="Delete referrer"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
                   </div>
                 </div>
               </Card>
@@ -199,11 +212,9 @@ export default function ReferralManagement() {
                     <p className="text-sm text-gray-400">{ref.customerPhone} • {ref.customerEmail}</p>
                     {ref.monthlyBill && <p className="text-sm text-gray-400">Bill: ₹{ref.monthlyBill}/mo • {ref.state}</p>}
                     <div className="flex gap-2 mt-2 flex-wrap">
-                      {ref.signupBonusPaid ? (
+                      {(ref.signupBonusPaid || ref.subsidyApplied) && (
                         <span className="text-xs bg-green-500/20 text-green-400 px-2 py-0.5 rounded-full">₹500 paid</span>
-                      ) : ref.subsidyApplied ? (
-                        <span className="text-xs bg-green-500/20 text-green-400 px-2 py-0.5 rounded-full">₹500 paid</span>
-                      ) : null}
+                      )}
                       {ref.installationBonusPaid && (
                         <span className="text-xs bg-green-500/20 text-green-400 px-2 py-0.5 rounded-full">₹1,500 paid</span>
                       )}
@@ -221,22 +232,12 @@ export default function ReferralManagement() {
                        ref.customerVerified ? "✅ Verified" : "⏳ Pending"}
                     </div>
                     {!ref.subsidyApplied && ref.customerVerified && (
-                      <Button
-                        size="sm"
-                        onClick={() => markSubsidy.mutate({ referralId: ref.id })}
-                        disabled={markSubsidy.isPending}
-                        className="bg-orange-500 hover:bg-orange-600 text-xs h-8"
-                      >
+                      <Button size="sm" onClick={() => markSubsidy.mutate({ referralId: ref.id })} disabled={markSubsidy.isPending} className="bg-orange-500 hover:bg-orange-600 text-xs h-8">
                         Mark Subsidy Applied (+₹500)
                       </Button>
                     )}
                     {ref.subsidyApplied && ref.status !== "completed" && (
-                      <Button
-                        size="sm"
-                        onClick={() => confirmInstall.mutate({ referralId: ref.id })}
-                        disabled={confirmInstall.isPending}
-                        className="bg-green-600 hover:bg-green-700 text-xs h-8"
-                      >
+                      <Button size="sm" onClick={() => confirmInstall.mutate({ referralId: ref.id })} disabled={confirmInstall.isPending} className="bg-green-600 hover:bg-green-700 text-xs h-8">
                         Confirm Installation (+₹1,500)
                       </Button>
                     )}
@@ -266,18 +267,10 @@ export default function ReferralManagement() {
                     <p className="text-lg font-bold text-emerald-400 mt-2">₹{wd.amount}</p>
                   </div>
                   <div className="flex gap-2">
-                    <Button
-                      onClick={() => approveWithdrawal.mutate({ withdrawalId: wd.id })}
-                      disabled={approveWithdrawal.isPending}
-                      className="bg-green-600 hover:bg-green-700"
-                    >
+                    <Button onClick={() => approveWithdrawal.mutate({ withdrawalId: wd.id })} disabled={approveWithdrawal.isPending} className="bg-green-600 hover:bg-green-700">
                       <CheckCircle className="w-4 h-4" />
                     </Button>
-                    <Button
-                      onClick={() => rejectWithdrawal.mutate({ withdrawalId: wd.id })}
-                      disabled={rejectWithdrawal.isPending}
-                      className="bg-red-600 hover:bg-red-700"
-                    >
+                    <Button onClick={() => rejectWithdrawal.mutate({ withdrawalId: wd.id })} disabled={rejectWithdrawal.isPending} className="bg-red-600 hover:bg-red-700">
                       <XCircle className="w-4 h-4" />
                     </Button>
                   </div>

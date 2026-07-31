@@ -352,10 +352,12 @@ export default function ChatBot() {
   const slug = params.slug || "demo";
 
   const [sessionId] = useState(() => {
-    const stored = sessionStorage.getItem(`ab-solar-session-${slug}`);
+    // Use a stable session key per slug — not per-page-load
+    const key = `chat-session-v2-${slug}`;
+    const stored = sessionStorage.getItem(key);
     if (stored) return stored;
     const newId = nanoid(24);
-    sessionStorage.setItem(`ab-solar-session-${slug}`, newId);
+    sessionStorage.setItem(key, newId);
     return newId;
   });
 
@@ -369,6 +371,46 @@ export default function ChatBot() {
   const [pitchCardShown, setPitchCardShown] = useState(false);
   const [estimateShown, setEstimateShown] = useState(false);
   const [handoffShown, setHandoffShown] = useState(false);
+
+  // Consent state
+  const [consentGiven, setConsentGiven] = useState(false);
+  const [showConsentBanner, setShowConsentBanner] = useState(true);
+
+  // OTP verification state
+  const [otpPhone, setOtpPhone] = useState("");
+  const [otpCode, setOtpCode] = useState("");
+  const [otpSent, setOtpSent] = useState(false);
+  const [otpVerified, setOtpVerified] = useState(false);
+  const [otpError, setOtpError] = useState("");
+  const [showOtpModal, setShowOtpModal] = useState(false);
+
+  // Duplicate lead detection
+  const [isDuplicateLead, setIsDuplicateLead] = useState(false);
+
+  // OTP mutations
+  const sendOtp = trpc.chat.sendOtp.useMutation({
+    onSuccess: () => { setOtpSent(true); setOtpError(""); },
+    onError: (e) => setOtpError(e.message || "Failed to send OTP"),
+  });
+  const verifyOtp = trpc.chat.verifyOtp.useMutation({
+    onSuccess: (data) => {
+      if (data.success) {
+        setOtpVerified(true);
+        setShowOtpModal(false);
+        setOtpError("");
+      } else {
+        setOtpError(data.message || "Incorrect OTP");
+      }
+    },
+    onError: (e) => setOtpError(e.message || "Verification failed"),
+  });
+  const checkDuplicate = trpc.leads.checkDuplicate.useQuery(
+    { phone: otpPhone },
+    { enabled: otpVerified && otpPhone.length >= 10 }
+  );
+  useEffect(() => {
+    if (checkDuplicate.data?.isDuplicate) setIsDuplicateLead(true);
+  }, [checkDuplicate.data]);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -602,6 +644,71 @@ export default function ChatBot() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950 flex flex-col">
+
+      {/* OTP Verification Modal */}
+      {showOtpModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+          <div className="bg-gray-900 border border-white/10 rounded-2xl w-full max-w-sm p-6 shadow-2xl">
+            <h3 className="text-white font-bold text-lg mb-1">Verify Your Phone</h3>
+            <p className="text-gray-400 text-sm mb-4">We'll send a 6-digit code to confirm your number.</p>
+            {!otpSent ? (
+              <>
+                <input
+                  type="tel"
+                  placeholder="+91 XXXXX XXXXX"
+                  value={otpPhone}
+                  onChange={e => setOtpPhone(e.target.value)}
+                  className="w-full bg-white/[0.06] border border-white/10 rounded-xl px-4 py-2.5 text-white placeholder:text-gray-500 text-sm mb-3 outline-none focus:border-white/30"
+                />
+                <Button
+                  onClick={() => sendOtp.mutate({ sessionId, phone: otpPhone })}
+                  disabled={otpPhone.length < 10 || sendOtp.isPending}
+                  className="w-full bg-emerald-600 hover:bg-emerald-700 text-white border-0"
+                >
+                  {sendOtp.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                  Send OTP
+                </Button>
+              </>
+            ) : (
+              <>
+                <p className="text-gray-400 text-xs mb-2">Enter the 6-digit code sent to {otpPhone}</p>
+                <input
+                  type="text"
+                  placeholder="Enter OTP"
+                  value={otpCode}
+                  onChange={e => setOtpCode(e.target.value)}
+                  maxLength={6}
+                  className="w-full bg-white/[0.06] border border-white/10 rounded-xl px-4 py-2.5 text-white placeholder:text-gray-500 text-sm mb-3 outline-none focus:border-white/30 tracking-widest text-center text-lg"
+                />
+                <Button
+                  onClick={() => verifyOtp.mutate({ sessionId, otp: otpCode })}
+                  disabled={otpCode.length < 6 || verifyOtp.isPending}
+                  className="w-full bg-emerald-600 hover:bg-emerald-700 text-white border-0 mb-2"
+                >
+                  {verifyOtp.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                  Verify OTP
+                </Button>
+                <button onClick={() => { setOtpSent(false); setOtpCode(""); }} className="w-full text-xs text-gray-500 hover:text-gray-300 py-1">Resend OTP</button>
+              </>
+            )}
+            {otpError && <p className="text-red-400 text-xs mt-2">{otpError}</p>}
+            <button onClick={() => setShowOtpModal(false)} className="absolute top-4 right-4 text-gray-500 hover:text-gray-300"><X className="w-5 h-5" /></button>
+          </div>
+        </div>
+      )}
+
+      {/* Duplicate lead warning */}
+      {isDuplicateLead && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+          <div className="bg-gray-900 border border-amber-500/30 rounded-2xl w-full max-w-sm p-6 shadow-2xl">
+            <div className="text-4xl text-center mb-3">☀️</div>
+            <h3 className="text-white font-bold text-lg text-center mb-2">Welcome Back!</h3>
+            <p className="text-gray-400 text-sm text-center mb-4">It looks like you've already enquired with us. Our team will follow up with you shortly. You can continue chatting for more information.</p>
+            <Button onClick={() => setIsDuplicateLead(false)} className="w-full bg-emerald-600 hover:bg-emerald-700 text-white border-0">Continue Chatting</Button>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <header className="border-b border-white/10 bg-gray-950/80 backdrop-blur-xl sticky top-0 z-50">
         <div className="max-w-3xl mx-auto px-4 h-16 flex items-center gap-3">
@@ -719,6 +826,23 @@ export default function ChatBot() {
 
         {/* Input Area */}
         <div className="border-t border-white/10 bg-gray-950/80 backdrop-blur-xl p-4">
+          {/* Consent banner — shown until user accepts */}
+          {showConsentBanner && !consentGiven && (
+            <div className="mb-3 flex items-start gap-2 bg-white/[0.04] border border-white/10 rounded-xl px-3 py-2.5">
+              <input
+                type="checkbox"
+                id="consent-cb"
+                className="mt-0.5 accent-emerald-500 shrink-0"
+                checked={consentGiven}
+                onChange={e => { setConsentGiven(e.target.checked); if (e.target.checked) setShowConsentBanner(false); }}
+              />
+              <label htmlFor="consent-cb" className="text-xs text-gray-400 cursor-pointer">
+                I agree to be contacted by Sales Squad about solar energy solutions. My data will be used only to provide this service.
+                <button onClick={() => setShowConsentBanner(false)} className="ml-2 text-gray-600 hover:text-gray-400 text-[10px] underline">Dismiss</button>
+              </label>
+            </div>
+          )}
+
           {messages.length > 0 && (
             <div className="mb-3 flex gap-2">
               <Button onClick={downloadPDF} className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white border-0 h-10 text-sm">
@@ -729,6 +853,23 @@ export default function ChatBot() {
                 className="flex-1 bg-white/10 hover:bg-white/20 text-white border border-white/20 h-10 text-sm">
                 <MapPin className="w-4 h-4 mr-2" />Location
               </Button>
+            </div>
+          )}
+
+          {/* OTP verify button — shown after some messages if not yet verified */}
+          {messages.length >= 3 && !otpVerified && (
+            <div className="mb-2">
+              <button
+                onClick={() => setShowOtpModal(true)}
+                className="w-full text-xs text-emerald-400 border border-emerald-500/30 rounded-xl py-2 hover:bg-emerald-500/10 transition-colors"
+              >
+                🔒 Verify your phone number to confirm your enquiry
+              </button>
+            </div>
+          )}
+          {otpVerified && (
+            <div className="mb-2 text-center">
+              <span className="text-xs text-emerald-400">✅ Phone verified</span>
             </div>
           )}
           <div className="flex gap-2 items-end">

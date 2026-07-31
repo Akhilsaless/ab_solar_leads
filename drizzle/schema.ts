@@ -431,11 +431,11 @@ export const automatedOutreachConfig = mysqlTable("automatedOutreachConfig", {
   isEnabled: boolean("isEnabled").default(true),
   includeFollowUp: boolean("includeFollowUp").default(true),
   followUpDays: int("followUpDays").default(3),
-  adminPhoneNumber: varchar("adminPhoneNumber", { length: 30 }), // For WhatsApp alerts
+    adminPhoneNumber: varchar("adminPhoneNumber", { length: 30 }), // For WhatsApp alerts
+  outreachMode: mysqlEnum("outreachMode", ["blind", "owner_only"]).default("blind"), // blind = send directly; owner_only = notify owner first
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
-
 export type AutomatedOutreachConfig = typeof automatedOutreachConfig.$inferSelect;
 export type InsertAutomatedOutreachConfig = typeof automatedOutreachConfig.$inferInsert;
 
