@@ -62,6 +62,7 @@ function AnimatedEstimateCard({ meta, brandColor }: { meta: Record<string, any>;
       <div className="px-4 py-3 flex items-center gap-2" style={{ background: `${brandColor}18` }}>
         <BarChart2 className="w-4 h-4" style={{ color: brandColor }} />
         <span className="text-sm font-semibold text-white">Your Solar Estimate</span>
+        <span className="ml-auto text-[10px] text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-full">Preliminary</span>
       </div>
       <div className="divide-y divide-white/5">
         {rows.map((row, i) => (
@@ -77,6 +78,7 @@ function AnimatedEstimateCard({ meta, brandColor }: { meta: Record<string, any>;
       </div>
       <div className="px-4 py-2.5 bg-white/[0.03]">
         <p className="text-[10px] text-gray-500">After payback: 20+ years of near-free electricity</p>
+        <p className="text-[10px] text-amber-500/70 mt-1">⚠ Preliminary estimate — subject to site inspection. Subsidy eligibility not guaranteed.</p>
       </div>
     </div>
   );
@@ -352,11 +354,12 @@ export default function ChatBot() {
   const slug = params.slug || "demo";
 
   const [sessionId] = useState(() => {
-    // Use a stable session key per slug — not per-page-load
+    // Use a stable session key per slug — persisted in both localStorage and sessionStorage
     const key = `chat-session-v2-${slug}`;
-    const stored = sessionStorage.getItem(key);
+    const stored = localStorage.getItem(key) || sessionStorage.getItem(key);
     if (stored) return stored;
     const newId = nanoid(24);
+    localStorage.setItem(key, newId);
     sessionStorage.setItem(key, newId);
     return newId;
   });
@@ -375,6 +378,14 @@ export default function ChatBot() {
   // Consent state
   const [consentGiven, setConsentGiven] = useState(false);
   const [showConsentBanner, setShowConsentBanner] = useState(true);
+
+  // Delivery method choice (shown after estimate)
+  const [deliveryMethod, setDeliveryMethod] = useState<"pdf" | "whatsapp" | "callback" | "site_visit" | null>(null);
+  const [showDeliveryChoice, setShowDeliveryChoice] = useState(false);
+
+  // OCR confirmation state
+  const [ocrData, setOcrData] = useState<{ amount?: string; units?: string; state?: string; discom?: string } | null>(null);
+  const [showOcrConfirm, setShowOcrConfirm] = useState(false);
 
   // OTP verification state
   const [otpPhone, setOtpPhone] = useState("");
@@ -428,6 +439,7 @@ export default function ChatBot() {
   const referrerCode = referrerCodeFromPath || referrerCodeFromQuery;
 
   const readBill = trpc.billReader.readBillImage.useMutation();
+  const [billUploadMode, setBillUploadMode] = useState<"upload" | "manual" | null>(null);
 
   const handleBillUpload = async (imageUrl: string) => {
     setIsLoading(true);
@@ -436,19 +448,39 @@ export default function ChatBot() {
       const result = await readBill.mutateAsync({ imageUrl });
       if (result.success && result.data) {
         const d = result.data;
-        const parts = [];
-        if (d.amount) parts.push(`My monthly bill is ₹${d.amount}`);
-        if (d.units) parts.push(`${d.units} units`);
-        if (d.state) parts.push(`I am from ${d.state}`);
-        if (d.discom) parts.push(`DISCOM: ${d.discom}`);
-        const msg = parts.length > 0 ? parts.join(", ") + "." : "I uploaded my electricity bill.";
-        sendMsg.mutate({ sessionId, message: msg });
+        if (d.amount || d.units || d.state || d.discom) {
+          // Show OCR confirmation step before auto-proceeding
+          setOcrData(d);
+          setIsLoading(false);
+          setShowOcrConfirm(true);
+          return;
+        }
+        // OCR returned nothing useful — fallback to manual entry prompt
+        setIsLoading(false);
+        setMessages(prev => [...prev, { role: "bot", content: "I couldn't read your bill clearly. Could you type your monthly electricity amount (e.g. ₹2500)?", createdAt: new Date() }]);
       } else {
-        sendMsg.mutate({ sessionId, message: "I uploaded my electricity bill but couldn't read it clearly. Can you help me?" });
+        setIsLoading(false);
+        setMessages(prev => [...prev, { role: "bot", content: "I couldn't read your bill clearly. Could you type your monthly electricity amount (e.g. ₹2500)?", createdAt: new Date() }]);
       }
     } catch {
-      sendMsg.mutate({ sessionId, message: "I tried to upload my electricity bill." });
+      setIsLoading(false);
+      setMessages(prev => [...prev, { role: "bot", content: "Bill upload failed. Please type your monthly electricity amount instead (e.g. ₹2500).", createdAt: new Date() }]);
     }
+  };
+
+  const confirmOcrAndSend = () => {
+    if (!ocrData) return;
+    const d = ocrData;
+    const parts = [];
+    if (d.amount) parts.push(`My monthly bill is ₹${d.amount}`);
+    if (d.units) parts.push(`${d.units} units`);
+    if (d.state) parts.push(`I am from ${d.state}`);
+    if (d.discom) parts.push(`DISCOM: ${d.discom}`);
+    const msg = parts.join(", ") + ".";
+    setShowOcrConfirm(false);
+    setOcrData(null);
+    setIsLoading(true);
+    sendMsg.mutate({ sessionId, message: msg });
   };
 
   const downloadPDF = () => {
@@ -541,6 +573,11 @@ export default function ChatBot() {
       // Show optional agent handoff after estimate is shown
       if (data.stage === "ask_site_visit" && !handoffShown) {
         setHandoffShown(true);
+      }
+
+      // Show delivery method choice after estimate is displayed
+      if (data.stage === "show_estimate" && data.estimate?.estimatedCost && !showDeliveryChoice) {
+        setShowDeliveryChoice(true);
       }
 
       // No auto-continue — Klaus asks one question and waits for the customer to reply
@@ -698,6 +735,43 @@ export default function ChatBot() {
       )}
 
       {/* Duplicate lead warning */}
+      {/* OCR Confirmation Modal */}
+      {showOcrConfirm && ocrData && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+          <div className="bg-gray-900 border border-white/10 rounded-2xl w-full max-w-sm p-6 shadow-2xl">
+            <h3 className="text-white font-bold text-lg mb-1">Confirm Bill Details</h3>
+            <p className="text-gray-400 text-sm mb-4">We read the following from your bill. Please confirm or correct:</p>
+            <div className="space-y-3 mb-5">
+              <div>
+                <label className="text-xs text-gray-500 mb-1 block">Monthly Amount (₹)</label>
+                <input type="text" value={ocrData.amount || ""} onChange={e => setOcrData(d => ({ ...d!, amount: e.target.value }))}
+                  className="w-full bg-white/[0.08] border border-white/10 rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:border-emerald-500/50" />
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 mb-1 block">Units (kWh)</label>
+                <input type="text" value={ocrData.units || ""} onChange={e => setOcrData(d => ({ ...d!, units: e.target.value }))}
+                  className="w-full bg-white/[0.08] border border-white/10 rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:border-emerald-500/50" />
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 mb-1 block">State</label>
+                <input type="text" value={ocrData.state || ""} onChange={e => setOcrData(d => ({ ...d!, state: e.target.value }))}
+                  className="w-full bg-white/[0.08] border border-white/10 rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:border-emerald-500/50" />
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <button onClick={() => { setShowOcrConfirm(false); setOcrData(null); }}
+                className="flex-1 py-2.5 rounded-xl border border-white/10 text-gray-400 text-sm hover:bg-white/5 transition-colors">
+                Cancel
+              </button>
+              <button onClick={confirmOcrAndSend}
+                className="flex-1 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium transition-colors">
+                Confirm & Continue
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {isDuplicateLead && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
           <div className="bg-gray-900 border border-amber-500/30 rounded-2xl w-full max-w-sm p-6 shadow-2xl">
@@ -843,16 +917,69 @@ export default function ChatBot() {
             </div>
           )}
 
+          {/* Delivery method choice — shown after estimate */}
+          {showDeliveryChoice && !deliveryMethod && (
+            <div className="mb-3 bg-white/[0.04] border border-white/10 rounded-xl p-3">
+              <p className="text-xs text-gray-400 mb-2 font-medium">How would you like to receive your estimate?</p>
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  { key: "pdf", icon: "📄", label: "PDF Estimate" },
+                  { key: "whatsapp", icon: "💬", label: "WhatsApp" },
+                  { key: "callback", icon: "📞", label: "Expert Callback" },
+                  { key: "site_visit", icon: "🏠", label: "Free Site Visit" },
+                ].map(opt => (
+                  <button key={opt.key} onClick={() => {
+                    setDeliveryMethod(opt.key as any);
+                    if (opt.key === "pdf") downloadPDF();
+                    else handleSend(`I'd like ${opt.label}`);
+                  }}
+                    className="flex items-center gap-2 px-3 py-2 rounded-xl border border-white/10 text-xs text-gray-300 hover:bg-white/10 hover:border-white/20 transition-colors text-left">
+                    <span>{opt.icon}</span><span>{opt.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           {messages.length > 0 && (
-            <div className="mb-3 flex gap-2">
-              <Button onClick={downloadPDF} className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white border-0 h-10 text-sm">
-                <Download className="w-4 h-4 mr-2" />Download Estimate
-              </Button>
-              <BillUploadButton onUpload={handleBillUpload} brandColor={brandColor} disabled={isLoading} />
-              <Button onClick={() => setShowMapPin(true)}
-                className="flex-1 bg-white/10 hover:bg-white/20 text-white border border-white/20 h-10 text-sm">
-                <MapPin className="w-4 h-4 mr-2" />Location
-              </Button>
+            <div className="mb-3">
+              {/* Bill input toggle: upload vs manual */}
+              {billUploadMode === null && (
+                <div className="flex gap-2 mb-2">
+                  <Button onClick={() => setBillUploadMode("upload")}
+                    variant="outline" className="flex-1 border-white/20 text-white bg-transparent hover:bg-white/10 text-sm h-9">
+                    <Upload className="w-3.5 h-3.5 mr-1.5" />Upload Bill Photo
+                  </Button>
+                  <Button onClick={() => setBillUploadMode("manual")}
+                    variant="outline" className="flex-1 border-white/20 text-white bg-transparent hover:bg-white/10 text-sm h-9">
+                    ✏️ Enter Bill Amount
+                  </Button>
+                  <Button onClick={() => setShowMapPin(true)}
+                    variant="outline" className="border-white/20 text-white bg-transparent hover:bg-white/10 h-9 px-3">
+                    <MapPin className="w-3.5 h-3.5" />
+                  </Button>
+                </div>
+              )}
+              {billUploadMode === "upload" && (
+                <div className="flex gap-2 mb-2">
+                  <BillUploadButton onUpload={handleBillUpload} brandColor={brandColor} disabled={isLoading} />
+                  <Button onClick={() => setBillUploadMode(null)} variant="outline" className="border-white/20 text-white bg-transparent hover:bg-white/10 h-10 px-3 text-xs">✕</Button>
+                </div>
+              )}
+              {billUploadMode === "manual" && (
+                <div className="flex gap-2 mb-2">
+                  <input type="number" placeholder="Enter monthly bill (₹)"
+                    className="flex-1 bg-white/[0.08] border border-white/10 rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:border-emerald-500/50"
+                    onKeyDown={e => { if (e.key === "Enter") { const v = (e.target as HTMLInputElement).value; if (v) { setBillUploadMode(null); handleSend(`My monthly electricity bill is ₹${v}`); } } }}
+                  />
+                  <Button onClick={() => setBillUploadMode(null)} variant="outline" className="border-white/20 text-white bg-transparent hover:bg-white/10 h-10 px-3 text-xs">✕</Button>
+                </div>
+              )}
+              {estimateShown && (
+                <Button onClick={downloadPDF} className="w-full bg-emerald-600 hover:bg-emerald-700 text-white border-0 h-9 text-sm">
+                  <Download className="w-4 h-4 mr-2" />Download Preliminary Estimate (PDF)
+                </Button>
+              )}
             </div>
           )}
 

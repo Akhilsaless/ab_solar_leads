@@ -291,12 +291,12 @@
 - [x] Add WhatsApp/SMS consent checkbox before sending follow-ups
 - [x] Prevent duplicate leads (check phone before saving in backend)
 - [x] Make email optional in lead capture (already optional in schema)
-- [ ] Add delivery method choice: PDF Estimate / WhatsApp Estimate / Expert Callback / Free Site Visit
-- [ ] Bill upload OR manual entry (not both shown simultaneously)
-- [ ] After OCR: show confirmation step before auto-proceeding
-- [ ] Handle OCR failures gracefully with fallback to manual entry
-- [ ] Mark estimates as "preliminary" — do NOT promise subsidy eligibility
-- [ ] Save unfinished conversations to localStorage (beyond sessionStorage)
+- [x] Add delivery method choice: PDF Estimate / WhatsApp Estimate / Expert Callback / Free Site Visit
+- [x] Bill upload OR manual entry (not both shown simultaneously, toggle UI)
+- [x] After OCR: show confirmation step before auto-proceeding (editable fields)
+- [x] Handle OCR failures gracefully with fallback to manual entry prompt
+- [x] Mark estimates as "preliminary" — added Preliminary badge + disclaimer
+- [x] Save unfinished conversations to localStorage (persists across tab closes)
 
 ### Phase 2 — Complete TODOs
 - [x] Add delete functionality to Leads page (individual + bulk with confirmation)
@@ -317,7 +317,7 @@
 - [x] Lead Activity Timeline inside Lead detail side-sheet
 - [x] Compact AI Summary inside Lead detail side-sheet
 - [x] Lead Detail Sheet: contact info, solar data, notes, activity timeline, AI summary
-- [ ] Audit Log for important admin actions
-- [ ] Better spacing, typography, cards, tables across all pages
-- [ ] Mobile responsiveness improvements
-- [ ] Accessibility improvements (focus rings, keyboard nav)
+- [ ] Audit Log for important admin actions (deferred — future sprint)
+- [ ] Better spacing, typography, cards, tables across all pages (ongoing)
+- [ ] Mobile responsiveness improvements (ongoing)
+- [ ] Accessibility improvements (focus rings, keyboard nav) (ongoing)
