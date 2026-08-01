@@ -231,6 +231,46 @@ export default function ProductGuide() {
         </Section>
       </div>
 
+      {/* ── REFERRER VIDEO ── */}
+      <div style={{ padding: "60px 20px", background: C.bg }}>
+        <Section>
+          <div style={{ textAlign: "center", marginBottom: 32 }}>
+            <Badge text="🎬 WATCH THIS FIRST" color={C.green} />
+            <h2 style={{ fontSize: "clamp(22px, 3.5vw, 34px)", fontWeight: 800, margin: "16px 0 10px" }}>See How You Can Earn With Solar</h2>
+            <p style={{ color: C.muted, fontSize: 15, maxWidth: 500, margin: "0 auto" }}>Watch this 80-second video to understand exactly how the referral program works</p>
+          </div>
+          <div style={{ maxWidth: 420, margin: "0 auto" }}>
+            <div style={{ position: "relative", borderRadius: 20, overflow: "hidden", border: `2px solid ${C.borderGreen}`, boxShadow: `0 0 60px rgba(16,185,129,0.2)` }}>
+              <video
+                controls
+                playsInline
+                style={{ width: "100%", display: "block", background: "#000" }}
+                poster="https://d2xsxph8kpxj0f.cloudfront.net/310519663486128902/XXxQwsn9S2FCBrsPdEUbzR/referrer_video_ref1-oK93RbBib54P5o29JkuLER.webp"
+              >
+                <source src="/manus-storage/referrer_recruitment_video_b67c9834.mp4" type="video/mp4" />
+              </video>
+            </div>
+            <div style={{ marginTop: 20, display: "flex", gap: 12, flexWrap: "wrap", justifyContent: "center" }}>
+              <button
+                onClick={() => navigate("/referrer-signup")}
+                style={{ background: C.green, color: "#000", border: "none", borderRadius: 12, padding: "14px 28px", fontWeight: 800, fontSize: 15, cursor: "pointer", boxShadow: `0 0 30px ${C.green}40`, flex: "1 1 180px" }}
+              >
+                💰 Get Your Referrer Code →
+              </button>
+              <button
+                onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/product-guide#referrer-video`); }}
+                style={{ background: C.surface2, color: C.text, border: `1px solid ${C.border}`, borderRadius: 12, padding: "14px 20px", fontWeight: 600, fontSize: 14, cursor: "pointer", flex: "1 1 140px" }}
+              >
+                📋 Copy Video Link
+              </button>
+            </div>
+            <p style={{ textAlign: "center", marginTop: 12, fontSize: 12, color: C.subtle }}>
+              salessquadleads.manus.space/product-guide · ₹50 bonus on signup
+            </p>
+          </div>
+        </Section>
+      </div>
+
       {/* ── FOR REFERRERS ── */}
       <div style={{ padding: "60px 20px" }}>
         <Section>
