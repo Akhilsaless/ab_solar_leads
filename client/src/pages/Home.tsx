@@ -84,7 +84,7 @@ export default function Home() {
                 <ExternalLink className="w-3.5 h-3.5" />
                 View
               </Button>
-              <Button size="sm" className="gap-1.5 text-xs bg-green-600 hover:bg-green-700 text-white" onClick={() => { const msg = encodeURIComponent(`💰 *Earn ₹1,500 per Solar Installation!*\n\nWatch this short video to see how you can earn money just by sharing a link:\n👉 ${window.location.origin}/product-guide\n\n✅ ₹50 bonus on signup\n✅ No selling needed\n✅ Agent Klaus does all the work`); window.open(`https://wa.me/?text=${msg}`, "_blank"); }}>
+              <Button size="sm" className="gap-1.5 text-xs bg-green-600 hover:bg-green-700 text-white" onClick={() => { const msg = encodeURIComponent(`💰 *Earn ₹1,500 per Solar Installation!*\n\nAgent Klaus does all the work. You just share your link and earn.\n\n🎬 Demo Video:\nhttps://files.manuscdn.com/user_upload_by_module/session_file/310519663486128902/gWBIPbyLTxHPIDpo.mp4\n\n🔗 Sign Up & Get Your Code:\n${window.location.origin}/referrer-signup\n\n✅ ₹50 bonus on signup\n✅ No selling needed\n✅ Earn ₹1,500 per installation`); window.open(`https://wa.me/?text=${msg}`, "_blank"); }}>
                 📱 Share
               </Button>
             </div>
