@@ -247,7 +247,7 @@ export default function ProductGuide() {
                 style={{ width: "100%", display: "block", background: "#000" }}
                 poster="https://d2xsxph8kpxj0f.cloudfront.net/310519663486128902/XXxQwsn9S2FCBrsPdEUbzR/referrer_video_ref1-oK93RbBib54P5o29JkuLER.webp"
               >
-                <source src="/manus-storage/referrer_recruitment_video_b67c9834.mp4" type="video/mp4" />
+                <source src="https://files.manuscdn.com/user_upload_by_module/session_file/310519663486128902/QgApiONMsVHJFxVZ.mp4" type="video/mp4" />
               </video>
             </div>
             <div style={{ marginTop: 20, display: "flex", gap: 12, flexWrap: "wrap", justifyContent: "center" }}>
@@ -258,7 +258,7 @@ export default function ProductGuide() {
                 💰 Get Your Referrer Code →
               </button>
               <button
-                onClick={() => { const msg = `💰 *Earn ₹1,500 per Solar Installation!*\n\nAgent Klaus does all the work. You just share your link and earn.\n\n🎬 Demo Video:\nhttps://files.manuscdn.com/user_upload_by_module/session_file/310519663486128902/gWBIPbyLTxHPIDpo.mp4\n\n🔗 Sign Up & Get Your Code:\n${window.location.origin}/referrer-signup\n\n✅ ₹50 bonus on signup\n✅ No selling needed\n✅ Earn ₹1,500 per installation`; navigator.clipboard.writeText(msg); }}
+                onClick={() => { const msg = `💰 *Earn ₹1,500 per Solar Installation!*\n\nAgent Klaus does all the work. You just share your link and earn.\n\n🎬 Demo Video:\nhttps://files.manuscdn.com/user_upload_by_module/session_file/310519663486128902/QgApiONMsVHJFxVZ.mp4\n\n🔗 Sign Up & Get Your Code:\n${window.location.origin}/referrer-signup\n\n✅ ₹50 bonus on signup\n✅ No selling needed\n✅ Earn ₹1,500 per installation`; navigator.clipboard.writeText(msg); }}
                 style={{ background: C.surface2, color: C.text, border: `1px solid ${C.border}`, borderRadius: 12, padding: "14px 20px", fontWeight: 600, fontSize: 14, cursor: "pointer", flex: "1 1 140px" }}
               >
                 📋 Copy Video Link
