@@ -239,8 +239,8 @@ export async function runAutomatedOutreach(): Promise<void> {
             // Generate message
             const message = generateMessage(business, config.messageType);
 
-            // Generate chatbot link
-            const chatbotLink = `/chat/demo?ref=OUTREACH_${business.id}_${Date.now()}`;
+            // Generate chatbot link — must be absolute URL so email clients can open it
+            const chatbotLink = `https://salessquadleads-xxxqwsn9.manus.space/chat/demo?ref=OUTREACH_${business.id}_${Date.now()}`;
 
             // Determine contact method
             let contactMethod: "whatsapp" | "email" | "both" = "email";

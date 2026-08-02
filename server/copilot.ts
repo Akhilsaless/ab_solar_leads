@@ -544,32 +544,16 @@ export const copilotRouter = router({
         content: h.content,
       }));
 
-      const systemPrompt = `You are Agent Klaus — the AI Copilot for Sales Squad, a solar lead generation platform.
-You are speaking to the owner (Klaus). Today is ${new Date().toLocaleDateString("en-IN")}.
-
-You have access to LIVE tools that query and modify the real database. Use them to answer questions accurately.
-
-CAPABILITIES:
-- Query live stats (emails sent, opens, clicks, runs, leads, partners)
-- List businesses contacted today, who opened emails, who clicked chatbot
-- Send personalised solar pitch emails to any business (email + name required)
-- Delete leads by name or ID (always preview first, then confirm)
-- Update outreach config (change city, enable/disable, add to rotation)
-- List hot leads ranked by engagement
-- Get run history
-- Search businesses by name/city/type
-
-PERSONALITY:
-- Be concise, direct, and actionable — like a sharp business assistant
-- When showing lists, format them clearly with bullet points
-- When you take an action (send email, delete, update), confirm what you did
-- If asked to delete something, first show what will be deleted and ask for confirmation
-- Remember previous messages in this conversation — use context
-
-RULES:
-- Always use tools for data questions — never guess or make up numbers
-- For destructive actions (delete), always set confirmed=false first to preview, then confirmed=true only if user confirms
-- If a task requires multiple steps, execute them in sequence`;
+      const systemPrompt = `You are Klaus — AI copilot for Sales Squad. Today: ${new Date().toLocaleDateString("en-IN")}.
+STRICT RULES:
+1. ALWAYS call a tool first — never guess or make up numbers
+2. Reply in 1-3 lines max. No intros, no "I'll help you", no filler
+3. For stats/data: show numbers directly, use bullet points for lists
+4. For sending emails: DO IT immediately, then say "Done — sent to X"
+5. For deletes: ask ONE short confirmation only ("Delete [name]? yes/no"), then execute
+6. NEVER ask clarifying questions unless info is truly missing
+7. If automation is asked: call get_stats to check run counts, then answer directly
+8. Be like a sharp exec assistant — fast, direct, zero fluff`;
 
       // Save user message to memory
       await db.execute(sql`
@@ -585,12 +569,13 @@ RULES:
       const toolCallLog: Array<{ tool: string; args: any; result: string }> = [];
       let finalAnswer = "";
 
-      // Agentic loop — up to 5 tool calls
+      // Agentic loop — up to 5 tool calls (gpt-5-nano for speed)
       for (let i = 0; i < 5; i++) {
         const response = await invokeLLM({
           messages,
           tools: AGENT_TOOLS as any,
           tool_choice: "auto",
+          model: "gpt-5-nano",
         });
 
         const msg = response?.choices?.[0]?.message;
@@ -621,12 +606,13 @@ RULES:
         }
       }
 
-      // If loop ended without final answer — do one more LLM call to summarise tool results into a human-readable response
+      // If loop ended without final answer — do one more LLM call to summarise tool results
       if (!finalAnswer) {
         const summaryResp = await invokeLLM({
+          model: "gpt-5-nano",
           messages: [
             ...messages,
-            { role: "user", content: "Based on the tool results above, give a clear, concise, human-readable answer to my original question. Be specific with real numbers and business names from the data. Never return raw JSON or empty arrays." }
+            { role: "user", content: "Answer in 1-3 lines max using the tool data above. Show real numbers. No filler." }
           ],
         });
         const rawContent = summaryResp?.choices?.[0]?.message?.content;
