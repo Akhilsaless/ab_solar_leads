@@ -8,11 +8,66 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import {
   AlertCircle, CheckCircle, Clock, MessageSquare, TrendingUp,
-  Zap, Building2, Mail, Phone, CheckCircle2, XCircle, Loader2
+  Zap, Building2, Mail, Phone, CheckCircle2, XCircle, Loader2, Eye
 } from "lucide-react";
+
+function RunBusinessesModal({ runId, open, onClose }: { runId: number | null; open: boolean; onClose: () => void }) {
+  const bizQuery = trpc.automatedOutreach.runs.getBusinesses.useQuery(
+    { runId: runId! },
+    { enabled: open && runId !== null }
+  );
+  const businesses = (bizQuery.data as any[]) || [];
+  return (
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Businesses Contacted in This Run</DialogTitle>
+        </DialogHeader>
+        {bizQuery.isLoading ? (
+          <div className="flex items-center justify-center py-8"><Loader2 className="w-6 h-6 animate-spin" /></div>
+        ) : businesses.length === 0 ? (
+          <p className="text-sm text-muted-foreground py-4 text-center">No businesses found for this run.</p>
+        ) : (
+          <div className="space-y-2">
+            {businesses.map((biz: any) => (
+              <div key={biz.id} className="p-3 rounded-lg border border-border bg-card">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="text-sm font-medium truncate">{biz.businessName}</div>
+                    <div className="text-xs text-muted-foreground truncate">{biz.address}</div>
+                    <div className="flex gap-2 mt-1 flex-wrap">
+                      {biz.phone && <span className="text-xs text-blue-400">{biz.phone}</span>}
+                      {biz.email && <span className="text-xs text-green-400">{biz.email}</span>}
+                    </div>
+                  </div>
+                  <div className="shrink-0 text-right">
+                    <Badge variant="outline" className={`text-xs ${
+                      biz.contactStatus === 'contacted' ? 'text-green-400 border-green-500/30' :
+                      biz.contactStatus === 'interested' ? 'text-blue-400 border-blue-500/30' :
+                      'text-muted-foreground'
+                    }`}>
+                      {biz.contactStatus === 'contacted' ? 'Emailed' :
+                       biz.contactStatus === 'interested' ? 'Interested' : 'Scraped'}
+                    </Badge>
+                    {biz.emailSentAt && (
+                      <div className="text-xs text-muted-foreground mt-1">
+                        {new Date(biz.emailSentAt).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 const SLOT_SCHEDULE = [
   { slot: 1, time: "8:00 AM",   label: "Factories & Warehouses" },
@@ -35,6 +90,8 @@ const INDIAN_STATES = [
 export function AutomatedOutreach() {
   const [activeTab, setActiveTab] = useState("smart");
   const [configId, setConfigId] = useState<number | null>(null);
+  const [selectedRunId, setSelectedRunId] = useState<number | null>(null);
+  const [showBizModal, setShowBizModal] = useState(false);
 
   // Smart cron state
   const [smartCity, setSmartCity] = useState("");
@@ -303,33 +360,48 @@ export function AutomatedOutreach() {
                   <p className="text-xs mt-1 opacity-60">Make sure you've set your city &amp; state above</p>
                 </div>
               ) : (
-                <div className="space-y-2 max-h-80 overflow-y-auto">
-                  {runs.map((run: any) => (
-                    <div key={run.id} className="flex items-center justify-between p-3 rounded-lg border border-border bg-card">
-                      <div className="flex items-center gap-3 min-w-0">
-                        {run.status === "completed"
-                          ? <CheckCircle2 className="w-4 h-4 text-green-400 shrink-0" />
-                          : run.status === "failed"
-                          ? <XCircle className="w-4 h-4 text-red-400 shrink-0" />
-                          : <Loader2 className="w-4 h-4 animate-spin text-orange-400 shrink-0" />}
-                        <div className="min-w-0">
-                          <div className="text-sm font-medium truncate">{run.businessType}</div>
-                          <div className="text-xs text-muted-foreground truncate">
-                            {run.targetCity}, {run.targetState} · {new Date(run.startedAt).toLocaleString()}
+                <>
+                  <RunBusinessesModal runId={selectedRunId} open={showBizModal} onClose={() => setShowBizModal(false)} />
+                  <div className="space-y-2 max-h-80 overflow-y-auto">
+                    {runs.map((run: any) => (
+                      <div key={run.id} className="p-3 rounded-lg border border-border bg-card">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3 min-w-0">
+                            {run.status === "completed"
+                              ? <CheckCircle2 className="w-4 h-4 text-green-400 shrink-0" />
+                              : run.status === "failed"
+                              ? <XCircle className="w-4 h-4 text-red-400 shrink-0" />
+                              : <Loader2 className="w-4 h-4 animate-spin text-orange-400 shrink-0" />}
+                            <div className="min-w-0">
+                              <div className="text-sm font-medium truncate">{run.businessType}</div>
+                              <div className="text-xs text-muted-foreground truncate">
+                                {run.targetCity}, {run.targetState} · {new Date(run.startedAt).toLocaleString()}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-3 shrink-0 ml-3">
+                            <div className="text-right">
+                              <div className="text-xs text-muted-foreground">
+                                Scraped: <span className="text-foreground font-medium">{run.scrapedCount || 0}</span>
+                              </div>
+                              <div className="text-xs text-muted-foreground">
+                                Emails: <span className="text-green-400 font-medium">{run.emailSentCount || 0}</span>
+                              </div>
+                            </div>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="text-xs h-7 px-2"
+                              onClick={() => { setSelectedRunId(run.id); setShowBizModal(true); }}
+                            >
+                              <Eye className="w-3 h-3 mr-1" /> View
+                            </Button>
                           </div>
                         </div>
                       </div>
-                      <div className="text-right shrink-0 ml-3">
-                        <div className="text-xs text-muted-foreground">
-                          Scraped: <span className="text-foreground font-medium">{run.scrapedCount}</span>
-                        </div>
-                        <div className="text-xs text-muted-foreground">
-                          Sent: <span className="text-green-400 font-medium">{(run.emailSentCount || 0) + (run.whatsappSentCount || 0)}</span>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                </>
               )}
             </CardContent>
           </Card>

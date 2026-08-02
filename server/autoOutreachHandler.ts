@@ -1,8 +1,7 @@
 /**
  * Auto Outreach Handler
  * Runs 5x daily via Heartbeat cron.
- * Each run: scrapes a specific business type in the configured city/state,
- * filters Solar Score 70+, generates AI-personalized pitch, sends email.
+ * IMPORTANT: Responds immediately (< 5s) then processes in background to avoid Heartbeat timeout.
  *
  * Slot mapping:
  *   1 (8 AM IST)    → Factories & Warehouses
@@ -112,8 +111,8 @@ async function generateAiPitch(biz: any, slot: number, botLink: string): Promise
   } catch { /* fallback below */ }
 
   return {
-    subject: "Cut Your Electricity Bill by 40% with Solar",
-    body: "<p>Dear " + name + ", your " + businessTypeLabel + " in " + city + " is a great candidate for solar. Estimated savings: " + estimatedSavings + "/month. ROI in " + estimatedROI + ".</p><p><a href='" + botLink + "'>Get your free estimate here</a></p>",
+    subject: "Cut Your Electricity Bill by 40% with Solar — " + name,
+    body: "<p>Dear " + name + ",</p><p>Your " + businessTypeLabel + " in " + city + " is a great candidate for solar energy. Based on your business size, you could save <strong>" + estimatedSavings + " per month</strong> with a typical ROI of " + estimatedROI + ".</p><p>The Government of India's PM Surya Ghar scheme offers subsidies up to Rs.78,000 for eligible businesses.</p>",
     whatsapp: "Hi " + name + ", save " + estimatedSavings + "/month with solar. Free estimate: " + botLink,
   };
 }
@@ -200,26 +199,115 @@ async function markContacted(agencyId: number, placeId: string, emailSentAt: num
   } catch { /* ignore */ }
 }
 
-async function upsertScrapedBusiness(biz: any) {
+async function upsertScrapedBusiness(biz: any, runId?: number) {
   const db = await getDb();
   if (!db) return;
   try {
     await db.execute(sql`
       INSERT INTO scrapedBusinesses
-        (agencyId, businessName, businessType, businessSize, phone, email, website, address, city, state, rating, reviewCount, placeId, source, contactStatus)
+        (agencyId, businessName, businessType, businessSize, phone, email, website, address, city, state, rating, reviewCount, placeId, source, contactStatus, outreachRunId)
       VALUES
         (${biz.agencyId}, ${biz.businessName}, ${biz.businessType}, ${biz.businessSize}, ${biz.phone || null},
          ${biz.email || null}, ${biz.website || null}, ${biz.address || null}, ${biz.city || null}, ${biz.state || null},
-         ${biz.rating || null}, ${biz.reviewCount || 0}, ${biz.placeId}, 'google_maps', 'not_contacted')
+         ${biz.rating || null}, ${biz.reviewCount || 0}, ${biz.placeId}, 'google_maps', 'not_contacted', ${runId || null})
       ON DUPLICATE KEY UPDATE
         businessName = VALUES(businessName),
         phone = COALESCE(VALUES(phone), phone),
         email = COALESCE(VALUES(email), email),
         website = COALESCE(VALUES(website), website),
         rating = VALUES(rating),
-        reviewCount = VALUES(reviewCount)
+        reviewCount = VALUES(reviewCount),
+        outreachRunId = COALESCE(outreachRunId, VALUES(outreachRunId))
     `);
   } catch { /* ignore duplicate key */ }
+}
+
+/**
+ * The actual processing work — runs in background after HTTP response is sent.
+ */
+async function processOutreachInBackground(slot: number, city: string, state: string, runId: number) {
+  const slotConfig = SLOT_CONFIG[slot];
+  let scrapedCount = 0, eligibleCount = 0, emailSentCount = 0, whatsappSentCount = 0, errorCount = 0;
+
+  try {
+    const query = slotConfig.businessType + " in " + city + ", " + state + ", India";
+    const searchResult = await makeRequest<PlacesSearchResult>(
+      "/maps/api/place/textsearch/json",
+      { query, region: "in" }
+    );
+
+    const places = searchResult.results || [];
+    scrapedCount = places.length;
+
+    for (const place of places.slice(0, 20)) {
+      try {
+        const alreadyContacted = await wasAlreadyContacted(1, place.place_id);
+        if (alreadyContacted) continue;
+
+        let biz: any = {
+          agencyId: 1,
+          businessName: place.name,
+          businessType: slotConfig.label,
+          businessSize: classifySize(place.user_ratings_total || 0, place.types || []),
+          address: place.formatted_address,
+          city: extractCity(place.formatted_address),
+          state,
+          rating: place.rating?.toString() || null,
+          reviewCount: place.user_ratings_total || 0,
+          placeId: place.place_id,
+          phone: null,
+          email: null,
+          website: null,
+        };
+
+        try {
+          const details = await makeRequest<PlaceDetailsResult>(
+            "/maps/api/place/details/json",
+            { place_id: place.place_id, fields: "name,formatted_phone_number,international_phone_number,website,rating,user_ratings_total,types" }
+          );
+          const d = details.result as any;
+          biz.phone = d.formatted_phone_number || d.international_phone_number || null;
+          biz.website = d.website || null;
+          biz.businessSize = classifySize(d.user_ratings_total || biz.reviewCount, d.types || place.types || []);
+          biz.rating = d.rating?.toString() || biz.rating;
+          biz.reviewCount = d.user_ratings_total || biz.reviewCount;
+        } catch { /* use basic info */ }
+
+        await upsertScrapedBusiness(biz, runId);
+
+        const score = calcSolarScore(biz);
+        if (score < 70) continue;
+        eligibleCount++;
+
+        const { subject, body, whatsapp } = await generateAiPitch(biz, slot, BOT_LINK);
+        const emailSentAt = Date.now();
+
+        if (biz.email) {
+          const emailHtml = buildEmailHtml(subject, body);
+          await sendEmail({ to: biz.email, subject, html: emailHtml });
+          emailSentCount++;
+          await markContacted(1, biz.placeId, emailSentAt);
+        }
+
+        if (biz.phone) {
+          // WhatsApp placeholder — activated when WhatsApp API is connected
+          void whatsapp;
+          whatsappSentCount++;
+        }
+
+      } catch (bizErr) {
+        console.error("[AutoOutreach] Error processing business:", bizErr);
+        errorCount++;
+      }
+    }
+
+    await updateOutreachRun(runId, { scrapedCount, eligibleCount, emailSentCount, whatsappSentCount, errorCount, status: "completed" });
+    console.log("[AutoOutreach] Slot " + slot + " completed: scraped=" + scrapedCount + " eligible=" + eligibleCount + " emails=" + emailSentCount + " whatsapp=" + whatsappSentCount);
+
+  } catch (err) {
+    console.error("[AutoOutreach] Background processing error:", err);
+    await updateOutreachRun(runId, { status: "failed", errorCount: errorCount + 1 });
+  }
 }
 
 export async function autoOutreachHandler(req: Request, res: Response) {
@@ -240,93 +328,21 @@ export async function autoOutreachHandler(req: Request, res: Response) {
     const city = config?.targetCity || "Hyderabad";
     const state = config?.targetState || "Telangana";
 
+    // Create the run record immediately
     const runId = await createOutreachRun(1, slot, slotConfig.label, city, state);
 
-    let scrapedCount = 0, eligibleCount = 0, emailSentCount = 0, whatsappSentCount = 0, errorCount = 0;
+    // ── Respond immediately so Heartbeat doesn't timeout ──────────────────────
+    res.json({ success: true, slot, city, state, businessType: slotConfig.label, runId, status: "processing" });
 
-    try {
-      const query = slotConfig.businessType + " in " + city + ", " + state + ", India";
-      const searchResult = await makeRequest<PlacesSearchResult>(
-        "/maps/api/place/textsearch/json",
-        { query, region: "in" }
-      );
-
-      const places = searchResult.results || [];
-      scrapedCount = places.length;
-
-      for (const place of places.slice(0, 20)) {
-        try {
-          const alreadyContacted = await wasAlreadyContacted(1, place.place_id);
-          if (alreadyContacted) continue;
-
-          let biz: any = {
-            agencyId: 1,
-            businessName: place.name,
-            businessType: slotConfig.label,
-            businessSize: classifySize(place.user_ratings_total || 0, place.types || []),
-            address: place.formatted_address,
-            city: extractCity(place.formatted_address),
-            state,
-            rating: place.rating?.toString() || null,
-            reviewCount: place.user_ratings_total || 0,
-            placeId: place.place_id,
-            phone: null,
-            email: null,
-            website: null,
-          };
-
-          try {
-            const details = await makeRequest<PlaceDetailsResult>(
-              "/maps/api/place/details/json",
-              { place_id: place.place_id, fields: "name,formatted_phone_number,international_phone_number,website,rating,user_ratings_total,types" }
-            );
-            const d = details.result as any;
-            biz.phone = d.formatted_phone_number || d.international_phone_number || null;
-            biz.website = d.website || null;
-            biz.businessSize = classifySize(d.user_ratings_total || biz.reviewCount, d.types || place.types || []);
-            biz.rating = d.rating?.toString() || biz.rating;
-            biz.reviewCount = d.user_ratings_total || biz.reviewCount;
-          } catch { /* use basic info */ }
-
-          await upsertScrapedBusiness(biz);
-
-          const score = calcSolarScore(biz);
-          if (score < 70) continue;
-          eligibleCount++;
-
-          const { subject, body, whatsapp } = await generateAiPitch(biz, slot, BOT_LINK);
-          const emailSentAt = Date.now();
-
-          if (biz.email) {
-            const emailHtml = buildEmailHtml(subject, body);
-            await sendEmail({ to: biz.email, subject, html: emailHtml });
-            emailSentCount++;
-            await markContacted(1, biz.placeId, emailSentAt);
-          }
-
-          if (biz.phone) {
-            // WhatsApp placeholder — activated when WhatsApp API is connected
-            void whatsapp;
-            whatsappSentCount++;
-          }
-
-        } catch (bizErr) {
-          console.error("Error processing business:", bizErr);
-          errorCount++;
-        }
-      }
-
-      await updateOutreachRun(runId, { scrapedCount, eligibleCount, emailSentCount, whatsappSentCount, errorCount, status: "completed" });
-
-      return res.json({ success: true, slot, city, state, businessType: slotConfig.label, scrapedCount, eligibleCount, emailSentCount, whatsappSentCount, errorCount });
-
-    } catch (innerErr) {
-      await updateOutreachRun(runId, { status: "failed", errorCount: 1 });
-      throw innerErr;
-    }
+    // ── Process in background (fire-and-forget) ───────────────────────────────
+    processOutreachInBackground(slot, city, state, runId).catch(err => {
+      console.error("[AutoOutreach] Unhandled background error:", err);
+    });
 
   } catch (err) {
-    console.error("autoOutreachHandler error:", err);
-    return res.status(500).json({ error: "Internal server error" });
+    console.error("[AutoOutreach] Handler error:", err);
+    if (!res.headersSent) {
+      return res.status(500).json({ error: "Internal server error" });
+    }
   }
 }

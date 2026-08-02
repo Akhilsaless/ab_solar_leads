@@ -510,5 +510,22 @@ export const automatedOutreachRouter = router({
       const data = Array.isArray(rows[0]) ? rows[0] : rows;
       return (data as any[])[0] || { totalRuns: 0, totalScraped: 0, totalEligible: 0, totalEmailSent: 0, totalWhatsappSent: 0, totalErrors: 0 };
     }),
+    getBusinesses: protectedProcedure
+      .input(z.object({ runId: z.number() }))
+      .query(async ({ ctx, input }) => {
+        if (!ctx.user) throw new Error("Unauthorized");
+        const agency = await db.getAgencyByUserId(ctx.user.id);
+        if (!agency) throw new Error("Agency not found");
+        const dbConn = await db.getDb();
+        if (!dbConn) throw new Error("DB error");
+        const rows = await dbConn.execute(sql`
+          SELECT id, businessName, businessType, businessSize, phone, email, website, address, city, state,
+                 rating, reviewCount, contactStatus, emailSentAt, placeId
+          FROM scrapedBusinesses
+          WHERE agencyId = ${agency.id} AND outreachRunId = ${input.runId}
+          ORDER BY id DESC LIMIT 50
+        `) as any[];
+        return Array.isArray(rows[0]) ? rows[0] : rows;
+      }),
   }),
 });
