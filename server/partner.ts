@@ -374,4 +374,124 @@ export const partnerRouter = router({
         throw new Error("Failed to assign lead");
       }
     }),
+
+  // Upload pricing sheet or product list for a partner
+  uploadPartnerFile: publicProcedure
+    .input(z.object({
+      token: z.string(),
+      fileUrl: z.string(),
+      fileType: z.enum(["pricingSheet", "productList"]),
+    }))
+    .mutation(async ({ input }) => {
+      const dbConn = await db.getDb();
+      if (!dbConn) throw new Error("Database connection failed");
+      const partner = firstRow(await dbConn.execute(
+        sql`SELECT id FROM solarPartners WHERE loginToken = ${input.token}`
+      ));
+      if (!partner) throw new Error("Invalid session");
+      const column = input.fileType === "pricingSheet" ? "pricingSheetUrl" : "productListUrl";
+      await dbConn.execute(
+        sql`UPDATE solarPartners SET ${sql.raw(column)} = ${input.fileUrl} WHERE id = ${partner.id}`
+      );
+      return { success: true };
+    }),
+
+  // Get partner profile including uploaded files
+  getPartnerProfile: publicProcedure
+    .input(z.object({ token: z.string() }))
+    .query(async ({ input }) => {
+      const dbConn = await db.getDb();
+      if (!dbConn) return null;
+      const partner = firstRow(await dbConn.execute(
+        sql`SELECT id, companyName, email, phone, whatsappNumber, serviceAreas, status, pricingSheetUrl, productListUrl
+            FROM solarPartners WHERE loginToken = ${input.token}`
+      ));
+      return partner || null;
+    }),
+
+  // Update lead status by partner
+  updateLeadStatus: publicProcedure
+    .input(z.object({
+      token: z.string(),
+      leadId: z.number(),
+      status: z.enum(["new", "contacted", "converted", "lost"]),
+    }))
+    .mutation(async ({ input }) => {
+      const dbConn = await db.getDb();
+      if (!dbConn) throw new Error("Database connection failed");
+      const partner = firstRow(await dbConn.execute(
+        sql`SELECT id FROM solarPartners WHERE loginToken = ${input.token}`
+      ));
+      if (!partner) throw new Error("Invalid session");
+      // Verify lead belongs to this partner
+      const lead = firstRow(await dbConn.execute(
+        sql`SELECT id FROM leads2 WHERE id = ${input.leadId} AND assignedPartnerId = ${partner.id}`
+      ));
+      if (!lead) throw new Error("Lead not found or not assigned to you");
+      await dbConn.execute(
+        sql`UPDATE leads2 SET status = ${input.status} WHERE id = ${input.leadId}`
+      );
+      return { success: true };
+    }),
+
+  // Get partner lead stats (by token, for partner dashboard)
+  getMyStats: publicProcedure
+    .input(z.object({ token: z.string() }))
+    .query(async ({ input }) => {
+      const dbConn = await db.getDb();
+      if (!dbConn) return { total: 0, new: 0, contacted: 0, converted: 0, lost: 0 };
+      const partner = firstRow(await dbConn.execute(
+        sql`SELECT id FROM solarPartners WHERE loginToken = ${input.token}`
+      ));
+      if (!partner) return { total: 0, new: 0, contacted: 0, converted: 0, lost: 0 };
+      const stats = rows(await dbConn.execute(
+        sql`SELECT status, COUNT(*) as count FROM leads2 WHERE assignedPartnerId = ${partner.id} GROUP BY status`
+      ));
+      const result = { total: 0, new: 0, contacted: 0, converted: 0, lost: 0 } as Record<string, number>;
+      for (const row of stats) {
+        const s = (row.status || "new") as string;
+        const c = Number(row.count);
+        result.total += c;
+        if (s in result) result[s] += c;
+        else result.new += c;
+      }
+      return result;
+    }),
+
+  // Get partner leads with solar estimate data
+  getMyLeadsDetailed: publicProcedure
+    .input(z.object({ token: z.string() }))
+    .query(async ({ input }) => {
+      const dbConn = await db.getDb();
+      if (!dbConn) return [];
+      const partner = firstRow(await dbConn.execute(
+        sql`SELECT id FROM solarPartners WHERE loginToken = ${input.token}`
+      ));
+      if (!partner) return [];
+      return rows(await dbConn.execute(
+        sql`SELECT l.id, l.firstName, l.lastName, l.email, l.phone, l.city, l.state,
+                   l.monthlyEnergyBill, l.status, l.createdAt,
+                   c.recommendedKw, c.estimatedCost, c.subsidyAmount, c.netCost, c.estimatedSavingsMonthly
+            FROM leads2 l
+            LEFT JOIN conversations3 c ON l.conversationId = c.id
+            WHERE l.assignedPartnerId = ${partner.id}
+            ORDER BY l.createdAt DESC`
+      ));
+    }),
+
+  // Register interest in marketing automation
+  notifyMeMarketing: publicProcedure
+    .input(z.object({ token: z.string() }))
+    .mutation(async ({ input }) => {
+      const dbConn = await db.getDb();
+      if (!dbConn) throw new Error("Database connection failed");
+      const partner = firstRow(await dbConn.execute(
+        sql`SELECT id FROM solarPartners WHERE loginToken = ${input.token}`
+      ));
+      if (!partner) throw new Error("Invalid session");
+      await dbConn.execute(
+        sql`UPDATE solarPartners SET marketingNotifyMe = TRUE WHERE id = ${partner.id}`
+      );
+      return { success: true };
+    }),
 });

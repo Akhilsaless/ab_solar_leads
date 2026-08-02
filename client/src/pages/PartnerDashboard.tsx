@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useRef } from "react";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,16 +7,21 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import {
   Sun, LogIn, LogOut, Phone, Mail, MapPin,
-  Users, TrendingUp, Clock, CheckCircle, Loader2
+  Users, TrendingUp, Clock, CheckCircle, Loader2,
+  Upload, FileText, Package, Megaphone, Bell, ChevronDown,
+  Zap, IndianRupee, Calendar, BarChart2
 } from "lucide-react";
 
 const STORAGE_KEY = "partner_token";
+const FORGE_URL = (import.meta as any).env?.VITE_FRONTEND_FORGE_API_URL || "";
+const FORGE_KEY = (import.meta as any).env?.VITE_FRONTEND_FORGE_API_KEY || "";
+
+type Tab = "leads" | "profile" | "marketing";
 
 function StatusBadge({ status }: { status: string }) {
   const map: Record<string, string> = {
     new: "text-blue-400 border-blue-500/30 bg-blue-500/10",
     contacted: "text-yellow-400 border-yellow-500/30 bg-yellow-500/10",
-    qualified: "text-purple-400 border-purple-500/30 bg-purple-500/10",
     converted: "text-green-400 border-green-500/30 bg-green-500/10",
     lost: "text-red-400 border-red-500/30 bg-red-500/10",
   };
@@ -27,11 +32,34 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
+function StatCard({ label, value, icon: Icon, color }: { label: string; value: number; icon: any; color: string }) {
+  return (
+    <Card className="border-border/30 bg-card/60">
+      <CardContent className="p-4">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-card flex items-center justify-center border border-border/30">
+            <Icon className={`w-5 h-5 ${color}`} />
+          </div>
+          <div>
+            <p className={`text-2xl font-bold ${color}`}>{value}</p>
+            <p className="text-xs text-muted-foreground">{label}</p>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function PartnerDashboard() {
   const [token, setToken] = useState(() => localStorage.getItem(STORAGE_KEY) || "");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoggedIn, setIsLoggedIn] = useState(!!localStorage.getItem(STORAGE_KEY));
+  const [activeTab, setActiveTab] = useState<Tab>("leads");
+  const [updatingLead, setUpdatingLead] = useState<number | null>(null);
+  const [uploadingFile, setUploadingFile] = useState<"pricingSheet" | "productList" | null>(null);
+  const pricingRef = useRef<HTMLInputElement>(null);
+  const productRef = useRef<HTMLInputElement>(null);
 
   const loginMutation = trpc.partner.partnerLogin.useMutation({
     onSuccess: (data) => {
@@ -43,10 +71,44 @@ export default function PartnerDashboard() {
     onError: (err) => toast.error(err.message),
   });
 
-  const dashboardQuery = trpc.partner.getMyLeads.useQuery(
+  const leadsQuery = trpc.partner.getMyLeadsDetailed.useQuery(
     { token },
     { enabled: isLoggedIn && !!token }
   );
+
+  const statsQuery = trpc.partner.getMyStats.useQuery(
+    { token },
+    { enabled: isLoggedIn && !!token }
+  );
+
+  const profileQuery = trpc.partner.getPartnerProfile.useQuery(
+    { token },
+    { enabled: isLoggedIn && !!token }
+  );
+
+  const updateStatusMutation = trpc.partner.updateLeadStatus.useMutation({
+    onSuccess: () => {
+      leadsQuery.refetch();
+      statsQuery.refetch();
+      setUpdatingLead(null);
+      toast.success("Lead status updated");
+    },
+    onError: (err) => { toast.error(err.message); setUpdatingLead(null); },
+  });
+
+  const uploadFileMutation = trpc.partner.uploadPartnerFile.useMutation({
+    onSuccess: () => {
+      profileQuery.refetch();
+      setUploadingFile(null);
+      toast.success("File uploaded successfully!");
+    },
+    onError: (err) => { toast.error(err.message); setUploadingFile(null); },
+  });
+
+  const notifyMeMutation = trpc.partner.notifyMeMarketing.useMutation({
+    onSuccess: () => toast.success("We'll notify you when Marketing Automation is available!"),
+    onError: (err) => toast.error(err.message),
+  });
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -56,25 +118,41 @@ export default function PartnerDashboard() {
 
   const handleLogout = () => {
     localStorage.removeItem(STORAGE_KEY);
-    setToken("");
-    setIsLoggedIn(false);
-    setEmail("");
-    setPassword("");
+    setToken(""); setIsLoggedIn(false); setEmail(""); setPassword("");
   };
 
-  // If token is invalid, reset
-  useEffect(() => {
-    if (dashboardQuery.data?.partner === null && isLoggedIn) {
-      handleLogout();
-      toast.error("Session expired. Please log in again.");
+  const handleFileUpload = async (file: File, fileType: "pricingSheet" | "productList") => {
+    if (!file) return;
+    if (file.size > 10 * 1024 * 1024) { toast.error("File too large. Max 10MB."); return; }
+    setUploadingFile(fileType);
+    try {
+      const key = `partner-files/${token.slice(0, 8)}-${fileType}-${Date.now()}.${file.name.split(".").pop()}`;
+      const uploadUrl = `${FORGE_URL}/v1/storage/upload?path=${encodeURIComponent(key)}`;
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await fetch(uploadUrl, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${FORGE_KEY}` },
+        body: formData,
+      });
+      if (!res.ok) throw new Error("Upload failed");
+      const { url } = await res.json();
+      uploadFileMutation.mutate({ token, fileUrl: url, fileType });
+    } catch (e) {
+      toast.error("Upload failed. Please try again.");
+      setUploadingFile(null);
     }
-  }, [dashboardQuery.data]);
+  };
+
+  const handleStatusChange = (leadId: number, status: string) => {
+    setUpdatingLead(leadId);
+    updateStatusMutation.mutate({ token, leadId, status: status as any });
+  };
 
   if (!isLoggedIn) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <div className="w-full max-w-md">
-          {/* Logo */}
           <div className="text-center mb-8">
             <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-orange-500 to-amber-500 flex items-center justify-center mx-auto mb-4">
               <Sun className="w-8 h-8 text-white" />
@@ -82,7 +160,6 @@ export default function PartnerDashboard() {
             <h1 className="text-2xl font-bold text-foreground">Partner Dashboard</h1>
             <p className="text-muted-foreground text-sm mt-1">Sales Squad — Solar Lead Management</p>
           </div>
-
           <Card className="border-border/30 bg-card/60">
             <CardHeader>
               <CardTitle className="text-lg flex items-center gap-2">
@@ -94,29 +171,13 @@ export default function PartnerDashboard() {
               <form onSubmit={handleLogin} className="space-y-4">
                 <div>
                   <label className="text-sm font-medium text-muted-foreground mb-1.5 block">Email Address</label>
-                  <Input
-                    type="email"
-                    value={email}
-                    onChange={e => setEmail(e.target.value)}
-                    placeholder="your@company.com"
-                    required
-                  />
+                  <Input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="your@company.com" required />
                 </div>
                 <div>
                   <label className="text-sm font-medium text-muted-foreground mb-1.5 block">Password</label>
-                  <Input
-                    type="password"
-                    value={password}
-                    onChange={e => setPassword(e.target.value)}
-                    placeholder="Enter your password"
-                    required
-                  />
+                  <Input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Enter your password" required />
                 </div>
-                <Button
-                  type="submit"
-                  className="w-full bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-semibold"
-                  disabled={loginMutation.isPending}
-                >
+                <Button type="submit" className="w-full bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-semibold" disabled={loginMutation.isPending}>
                   {loginMutation.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <LogIn className="w-4 h-4 mr-2" />}
                   Sign In
                 </Button>
@@ -132,16 +193,16 @@ export default function PartnerDashboard() {
     );
   }
 
-  const partner = dashboardQuery.data?.partner as any;
-  const leads = (dashboardQuery.data?.leads as any[]) || [];
-  const isLoading = dashboardQuery.isLoading;
+  const profile = profileQuery.data as any;
+  const leads = (leadsQuery.data as any[]) || [];
+  const stats = statsQuery.data || { total: 0, new: 0, contacted: 0, converted: 0, lost: 0 };
+  const isLoading = leadsQuery.isLoading;
 
-  const stats = {
-    total: leads.length,
-    new: leads.filter(l => l.status === "new" || !l.status).length,
-    converted: leads.filter(l => l.status === "converted").length,
-    contacted: leads.filter(l => l.status === "contacted").length,
-  };
+  const tabs: { id: Tab; label: string; icon: any }[] = [
+    { id: "leads", label: "My Leads", icon: Users },
+    { id: "profile", label: "Company Profile", icon: FileText },
+    { id: "marketing", label: "Marketing", icon: Megaphone },
+  ];
 
   return (
     <div className="min-h-screen bg-background">
@@ -153,7 +214,7 @@ export default function PartnerDashboard() {
               <Sun className="w-5 h-5 text-white" />
             </div>
             <div>
-              <p className="font-semibold text-foreground text-sm">{partner?.companyName || "Partner"}</p>
+              <p className="font-semibold text-foreground text-sm">{profile?.companyName || "Partner"}</p>
               <p className="text-xs text-muted-foreground">Sales Squad Partner</p>
             </div>
           </div>
@@ -161,130 +222,347 @@ export default function PartnerDashboard() {
             <LogOut className="w-3.5 h-3.5 mr-1.5" />Logout
           </Button>
         </div>
+        {/* Tabs */}
+        <div className="max-w-6xl mx-auto px-4 flex gap-1 pb-0">
+          {tabs.map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+                activeTab === tab.id
+                  ? "border-orange-500 text-orange-400"
+                  : "border-transparent text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <tab.icon className="w-4 h-4" />
+              {tab.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       <div className="max-w-6xl mx-auto px-4 py-6 space-y-6">
-        {/* Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {[
-            { label: "Total Leads", value: stats.total, icon: Users, color: "text-orange-400" },
-            { label: "New Leads", value: stats.new, icon: TrendingUp, color: "text-blue-400" },
-            { label: "Contacted", value: stats.contacted, icon: Clock, color: "text-yellow-400" },
-            { label: "Converted", value: stats.converted, icon: CheckCircle, color: "text-green-400" },
-          ].map(s => (
-            <Card key={s.label} className="border-border/30 bg-card/60">
-              <CardContent className="p-4">
+
+        {/* ── LEADS TAB ── */}
+        {activeTab === "leads" && (
+          <>
+            {/* Stats */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <StatCard label="Total Leads" value={stats.total} icon={Users} color="text-orange-400" />
+              <StatCard label="New" value={stats.new} icon={TrendingUp} color="text-blue-400" />
+              <StatCard label="Contacted" value={stats.contacted} icon={Clock} color="text-yellow-400" />
+              <StatCard label="Converted" value={stats.converted} icon={CheckCircle} color="text-green-400" />
+            </div>
+
+            {/* Leads List */}
+            <Card className="border-border/30 bg-card/60">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Users className="w-5 h-5 text-orange-400" />
+                  Assigned Leads
+                  <Badge variant="outline" className="ml-auto text-orange-400 border-orange-500/30 bg-orange-500/10">
+                    {leads.length} total
+                  </Badge>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {isLoading ? (
+                  <div className="flex items-center justify-center py-12">
+                    <Loader2 className="w-8 h-8 animate-spin text-orange-400" />
+                  </div>
+                ) : leads.length === 0 ? (
+                  <div className="text-center py-12">
+                    <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-orange-500/20 to-amber-500/20 flex items-center justify-center mx-auto mb-4">
+                      <Users className="w-8 h-8 text-orange-400" />
+                    </div>
+                    <h3 className="text-lg font-semibold text-foreground mb-2">No Leads Yet</h3>
+                    <p className="text-muted-foreground text-sm max-w-sm mx-auto">
+                      Sales Squad will assign leads to you as they come in. Check back soon!
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {leads.map((lead: any) => (
+                      <div key={lead.id} className="p-4 rounded-xl bg-background/50 border border-border/30 hover:border-orange-500/20 transition-colors">
+                        <div className="flex items-start gap-4">
+                          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-orange-500/20 to-amber-500/20 flex items-center justify-center shrink-0">
+                            <span className="text-sm font-bold text-orange-400">
+                              {(lead.firstName || "?")[0].toUpperCase()}
+                            </span>
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <h4 className="font-semibold text-foreground text-sm">{lead.firstName} {lead.lastName}</h4>
+                              <StatusBadge status={lead.status || "new"} />
+                            </div>
+                            <div className="flex flex-wrap gap-3 mt-1.5">
+                              {lead.phone && (
+                                <a href={`tel:${lead.phone}`} className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors">
+                                  <Phone className="w-3 h-3" />{lead.phone}
+                                </a>
+                              )}
+                              {lead.email && (
+                                <a href={`mailto:${lead.email}`} className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors">
+                                  <Mail className="w-3 h-3" />{lead.email}
+                                </a>
+                              )}
+                              {(lead.city || lead.state) && (
+                                <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                                  <MapPin className="w-3 h-3" />{[lead.city, lead.state].filter(Boolean).join(", ")}
+                                </span>
+                              )}
+                            </div>
+                            {/* Bill + Solar Estimate */}
+                            <div className="flex flex-wrap gap-3 mt-2">
+                              {lead.monthlyEnergyBill && (
+                                <span className="flex items-center gap-1 text-xs text-orange-400 bg-orange-500/10 border border-orange-500/20 rounded-md px-2 py-0.5">
+                                  <IndianRupee className="w-3 h-3" />Bill: ₹{Number(lead.monthlyEnergyBill).toLocaleString()}/mo
+                                </span>
+                              )}
+                              {lead.recommendedKw && (
+                                <span className="flex items-center gap-1 text-xs text-yellow-400 bg-yellow-500/10 border border-yellow-500/20 rounded-md px-2 py-0.5">
+                                  <Zap className="w-3 h-3" />{Number(lead.recommendedKw).toFixed(1)} kW system
+                                </span>
+                              )}
+                              {lead.netCost && (
+                                <span className="flex items-center gap-1 text-xs text-green-400 bg-green-500/10 border border-green-500/20 rounded-md px-2 py-0.5">
+                                  <IndianRupee className="w-3 h-3" />Net cost: ₹{Number(lead.netCost).toLocaleString()}
+                                </span>
+                              )}
+                              {lead.subsidyAmount && (
+                                <span className="flex items-center gap-1 text-xs text-blue-400 bg-blue-500/10 border border-blue-500/20 rounded-md px-2 py-0.5">
+                                  <BarChart2 className="w-3 h-3" />Subsidy: ₹{Number(lead.subsidyAmount).toLocaleString()}
+                                </span>
+                              )}
+                              {lead.estimatedSavingsMonthly && (
+                                <span className="flex items-center gap-1 text-xs text-purple-400 bg-purple-500/10 border border-purple-500/20 rounded-md px-2 py-0.5">
+                                  <TrendingUp className="w-3 h-3" />Saves ₹{Number(lead.estimatedSavingsMonthly).toLocaleString()}/mo
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex flex-col items-end gap-2 shrink-0">
+                            <p className="text-xs text-muted-foreground">
+                              <Calendar className="w-3 h-3 inline mr-1" />
+                              {new Date(lead.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
+                            </p>
+                            {lead.phone && (
+                              <a
+                                href={`https://wa.me/91${lead.phone.replace(/\D/g, "")}?text=${encodeURIComponent(`Hi ${lead.firstName}, I'm calling from Sales Squad regarding your solar inquiry. Is this a good time to talk?`)}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1 text-xs bg-green-600/20 text-green-400 border border-green-500/30 rounded-md px-2 py-1 hover:bg-green-600/30 transition-colors"
+                              >
+                                WhatsApp
+                              </a>
+                            )}
+                          </div>
+                        </div>
+                        {/* Status Update */}
+                        <div className="mt-3 flex items-center gap-2">
+                          <span className="text-xs text-muted-foreground">Update status:</span>
+                          {(["contacted", "converted", "lost"] as const).map(s => (
+                            <button
+                              key={s}
+                              disabled={updatingLead === lead.id || (lead.status || "new") === s}
+                              onClick={() => handleStatusChange(lead.id, s)}
+                              className={`text-xs px-2.5 py-1 rounded-md border transition-colors disabled:opacity-40 ${
+                                s === "converted" ? "border-green-500/30 text-green-400 hover:bg-green-500/10" :
+                                s === "contacted" ? "border-yellow-500/30 text-yellow-400 hover:bg-yellow-500/10" :
+                                "border-red-500/30 text-red-400 hover:bg-red-500/10"
+                              } ${(lead.status || "new") === s ? "opacity-40 cursor-default" : ""}`}
+                            >
+                              {updatingLead === lead.id ? <Loader2 className="w-3 h-3 animate-spin" /> : s.charAt(0).toUpperCase() + s.slice(1)}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </>
+        )}
+
+        {/* ── PROFILE TAB ── */}
+        {activeTab === "profile" && (
+          <div className="space-y-6">
+            {/* Company Info */}
+            <Card className="border-border/30 bg-card/60">
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <FileText className="w-4 h-4 text-orange-400" />
+                  Company Information
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {profileQuery.isLoading ? (
+                  <div className="flex items-center justify-center py-8"><Loader2 className="w-6 h-6 animate-spin text-orange-400" /></div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {[
+                      { label: "Company Name", value: profile?.companyName },
+                      { label: "Email", value: profile?.email },
+                      { label: "Phone", value: profile?.phone },
+                      { label: "WhatsApp", value: profile?.whatsappNumber },
+                      { label: "Service Areas", value: profile?.serviceAreas },
+                      { label: "Status", value: profile?.status },
+                    ].map(f => f.value ? (
+                      <div key={f.label}>
+                        <p className="text-xs text-muted-foreground mb-0.5">{f.label}</p>
+                        <p className="text-sm text-foreground font-medium">{f.value}</p>
+                      </div>
+                    ) : null)}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Pricing Sheet Upload */}
+            <Card className="border-border/30 bg-card/60">
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <IndianRupee className="w-4 h-4 text-orange-400" />
+                  Pricing Sheet
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Upload your pricing sheet (PDF or image). Our AI will use this to give customers accurate quotes during chat.
+                </p>
+                {profile?.pricingSheetUrl && (
+                  <div className="flex items-center gap-2 mb-4 p-3 rounded-lg bg-green-500/10 border border-green-500/20">
+                    <CheckCircle className="w-4 h-4 text-green-400 shrink-0" />
+                    <span className="text-sm text-green-400">Pricing sheet uploaded</span>
+                    <a href={profile.pricingSheetUrl} target="_blank" rel="noopener noreferrer" className="ml-auto text-xs text-orange-400 hover:underline">View</a>
+                  </div>
+                )}
+                <input
+                  ref={pricingRef}
+                  type="file"
+                  accept=".pdf,.jpg,.jpeg,.png,.webp"
+                  className="hidden"
+                  onChange={e => { const f = e.target.files?.[0]; if (f) handleFileUpload(f, "pricingSheet"); }}
+                />
+                <Button
+                  variant="outline"
+                  className="border-orange-500/30 text-orange-400 hover:bg-orange-500/10"
+                  disabled={uploadingFile === "pricingSheet"}
+                  onClick={() => pricingRef.current?.click()}
+                >
+                  {uploadingFile === "pricingSheet" ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Upload className="w-4 h-4 mr-2" />}
+                  {profile?.pricingSheetUrl ? "Replace Pricing Sheet" : "Upload Pricing Sheet"}
+                </Button>
+                <p className="text-xs text-muted-foreground mt-2">Accepted: PDF, JPG, PNG. Max 10MB.</p>
+              </CardContent>
+            </Card>
+
+            {/* Product List Upload */}
+            <Card className="border-border/30 bg-card/60">
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Package className="w-4 h-4 text-orange-400" />
+                  Product List
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Upload your product catalogue (solar panels, inverters, batteries). Our AI will recommend your specific products to customers.
+                </p>
+                {profile?.productListUrl && (
+                  <div className="flex items-center gap-2 mb-4 p-3 rounded-lg bg-green-500/10 border border-green-500/20">
+                    <CheckCircle className="w-4 h-4 text-green-400 shrink-0" />
+                    <span className="text-sm text-green-400">Product list uploaded</span>
+                    <a href={profile.productListUrl} target="_blank" rel="noopener noreferrer" className="ml-auto text-xs text-orange-400 hover:underline">View</a>
+                  </div>
+                )}
+                <input
+                  ref={productRef}
+                  type="file"
+                  accept=".pdf,.jpg,.jpeg,.png,.webp"
+                  className="hidden"
+                  onChange={e => { const f = e.target.files?.[0]; if (f) handleFileUpload(f, "productList"); }}
+                />
+                <Button
+                  variant="outline"
+                  className="border-orange-500/30 text-orange-400 hover:bg-orange-500/10"
+                  disabled={uploadingFile === "productList"}
+                  onClick={() => productRef.current?.click()}
+                >
+                  {uploadingFile === "productList" ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Upload className="w-4 h-4 mr-2" />}
+                  {profile?.productListUrl ? "Replace Product List" : "Upload Product List"}
+                </Button>
+                <p className="text-xs text-muted-foreground mt-2">Accepted: PDF, JPG, PNG. Max 10MB.</p>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {/* ── MARKETING TAB ── */}
+        {activeTab === "marketing" && (
+          <div className="space-y-6">
+            {/* Coming Soon Card */}
+            <Card className="border-orange-500/20 bg-gradient-to-br from-orange-500/5 to-amber-500/5 relative overflow-hidden">
+              <div className="absolute top-3 right-3">
+                <Badge className="bg-orange-500/20 text-orange-400 border-orange-500/30 text-xs">Coming Soon</Badge>
+              </div>
+              <CardHeader>
+                <CardTitle className="text-xl flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-orange-500 to-amber-500 flex items-center justify-center">
+                    <Megaphone className="w-5 h-5 text-white" />
+                  </div>
+                  Marketing Automation
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-5">
+                <p className="text-muted-foreground text-sm leading-relaxed">
+                  Automatically generate and post solar marketing content on Instagram, Facebook, and YouTube — without lifting a finger. Set your posting schedule and let AI handle the rest.
+                </p>
+
+                {/* Feature Preview */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  {[
+                    { icon: "📱", title: "Instagram & Facebook", desc: "AI-written posts, reels scripts, and ad creatives tailored to your solar business" },
+                    { icon: "▶️", title: "YouTube", desc: "Auto-generate video scripts and thumbnails for solar education content" },
+                    { icon: "📅", title: "Smart Scheduling", desc: "Choose 1–7 posts per day. AI picks the best time to post for maximum reach" },
+                  ].map(f => (
+                    <div key={f.title} className="p-3 rounded-xl bg-background/50 border border-border/30">
+                      <div className="text-2xl mb-2">{f.icon}</div>
+                      <p className="text-sm font-medium text-foreground mb-1">{f.title}</p>
+                      <p className="text-xs text-muted-foreground">{f.desc}</p>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="p-4 rounded-xl bg-orange-500/10 border border-orange-500/20">
+                  <p className="text-sm font-medium text-orange-400 mb-1">Why run ads?</p>
+                  <p className="text-sm text-muted-foreground">
+                    Partners who run social media ads get <strong className="text-foreground">3–5x more leads</strong> than those who don't. Our AI handles everything — content, scheduling, and optimization. You just approve and grow.
+                  </p>
+                </div>
+
                 <div className="flex items-center gap-3">
-                  <div className={`w-10 h-10 rounded-xl bg-card flex items-center justify-center border border-border/30`}>
-                    <s.icon className={`w-5 h-5 ${s.color}`} />
-                  </div>
-                  <div>
-                    <p className={`text-2xl font-bold ${s.color}`}>{s.value}</p>
-                    <p className="text-xs text-muted-foreground">{s.label}</p>
-                  </div>
+                  <Button
+                    className="bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-semibold"
+                    disabled={notifyMeMutation.isPending || notifyMeMutation.isSuccess}
+                    onClick={() => notifyMeMutation.mutate({ token })}
+                  >
+                    {notifyMeMutation.isPending ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : notifyMeMutation.isSuccess ? (
+                      <CheckCircle className="w-4 h-4 mr-2" />
+                    ) : (
+                      <Bell className="w-4 h-4 mr-2" />
+                    )}
+                    {notifyMeMutation.isSuccess ? "You're on the list!" : "Notify Me When Available"}
+                  </Button>
+                  <p className="text-xs text-muted-foreground">We'll email you as soon as it launches.</p>
                 </div>
               </CardContent>
             </Card>
-          ))}
-        </div>
-
-        {/* Service Areas */}
-        {partner?.serviceAreas && (
-          <Card className="border-border/30 bg-card/60">
-            <CardContent className="p-4 flex items-center gap-3">
-              <MapPin className="w-4 h-4 text-orange-400 shrink-0" />
-              <div>
-                <span className="text-sm font-medium text-foreground">Service Areas: </span>
-                <span className="text-sm text-muted-foreground">{partner.serviceAreas}</span>
-              </div>
-            </CardContent>
-          </Card>
+          </div>
         )}
-
-        {/* Leads Table */}
-        <Card className="border-border/30 bg-card/60">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-lg flex items-center gap-2">
-              <Users className="w-5 h-5 text-orange-400" />
-              Assigned Leads
-              <Badge variant="outline" className="ml-auto text-orange-400 border-orange-500/30 bg-orange-500/10">
-                {leads.length} total
-              </Badge>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <div className="flex items-center justify-center py-12">
-                <Loader2 className="w-8 h-8 animate-spin text-orange-400" />
-              </div>
-            ) : leads.length === 0 ? (
-              <div className="text-center py-12">
-                <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-orange-500/20 to-amber-500/20 flex items-center justify-center mx-auto mb-4">
-                  <Users className="w-8 h-8 text-orange-400" />
-                </div>
-                <h3 className="text-lg font-semibold text-foreground mb-2">No Leads Yet</h3>
-                <p className="text-muted-foreground text-sm max-w-sm mx-auto">
-                  Sales Squad will assign leads to you as they come in. Check back soon!
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {leads.map((lead: any) => (
-                  <div key={lead.id} className="flex items-start gap-4 p-4 rounded-xl bg-background/50 border border-border/30 hover:border-orange-500/20 transition-colors">
-                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-orange-500/20 to-amber-500/20 flex items-center justify-center shrink-0">
-                      <span className="text-sm font-bold text-orange-400">
-                        {(lead.firstName || "?")[0].toUpperCase()}
-                      </span>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <h4 className="font-semibold text-foreground text-sm">
-                          {lead.firstName} {lead.lastName}
-                        </h4>
-                        <StatusBadge status={lead.status || "new"} />
-                      </div>
-                      <div className="flex flex-wrap gap-3 mt-1.5">
-                        {lead.phone && (
-                          <a href={`tel:${lead.phone}`} className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors">
-                            <Phone className="w-3 h-3" />{lead.phone}
-                          </a>
-                        )}
-                        {lead.email && (
-                          <a href={`mailto:${lead.email}`} className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors">
-                            <Mail className="w-3 h-3" />{lead.email}
-                          </a>
-                        )}
-                        {(lead.city || lead.state) && (
-                          <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                            <MapPin className="w-3 h-3" />{[lead.city, lead.state].filter(Boolean).join(", ")}
-                          </span>
-                        )}
-                      </div>
-                      {lead.monthlyEnergyBill && (
-                        <p className="text-xs text-orange-400 mt-1">Monthly Bill: ₹{Number(lead.monthlyEnergyBill).toLocaleString()}</p>
-                      )}
-                    </div>
-                    <div className="text-right shrink-0">
-                      <p className="text-xs text-muted-foreground">
-                        {new Date(lead.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
-                      </p>
-                      {lead.phone && (
-                        <a
-                          href={`https://wa.me/91${lead.phone.replace(/\D/g, "")}?text=${encodeURIComponent(`Hi ${lead.firstName}, I'm calling from Sales Squad regarding your solar inquiry. Is this a good time to talk?`)}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1 mt-1.5 text-xs bg-green-600/20 text-green-400 border border-green-500/30 rounded-md px-2 py-1 hover:bg-green-600/30 transition-colors"
-                        >
-                          WhatsApp
-                        </a>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
       </div>
     </div>
   );

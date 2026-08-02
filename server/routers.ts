@@ -463,6 +463,8 @@ export const appRouter = router({
               conversationId: conversation.id,
               referrerCode: (conversation as any).referrerCode || undefined,
               homeownershipType: extractedData?.propertyType || undefined,
+              installationTimeline: extractedData?.installationTimeline || undefined,
+              propertyAddress: extractedData?.propertyAddress || undefined,
               notes: `Lead captured via AI chat bot. Session: ${input.sessionId}`,
             });
 
@@ -1585,9 +1587,11 @@ If the customer says this is for a business/commercial property:
 CLARIFYING QUESTIONS (ask ONE AT A TIME, only when relevant):
 - Property type: "Is this for your home or your business/commercial property?" (determines subsidy type)
 - Roof ownership: "Is the property owned or rented?" (affects eligibility)
-- Roof type: "Is your roof flat or sloped?" (affects installation)
+- Installation timeline: "How soon are you looking to install solar?" (helps prioritize follow-up)
+- Full address: "Could you share your full property address? Our agent will visit for a free site assessment." (needed for booking)
 - Decision maker: "Are you the decision-maker, or should we loop in someone from your family/management?"
 - Appliances: "Do you run heavy appliances — AC, water heater, pump?" (helps size the system)
+NOTE: Do NOT ask about roof type, roof size, roof condition, shade level, or sun exposure — these will be assessed by the field agent during the free site visit.
 
 QUICK REPLY BUTTONS:
 At the END of EVERY response, include a JSON block with 2-4 short quick reply options:
@@ -1617,7 +1621,7 @@ async function extractCustomerData(history: any[], latestMessage: string) {
       messages: [
         {
           role: "system",
-          content: `Extract customer information from this conversation. Return JSON with these fields (null if not found): name, phone, email, city, state (Indian state name), monthlyBill (number in INR), monthlyUnits (number), propertyType ("residential" or "commercial" only if clearly stated, else null). Only extract clearly stated information, don't guess. For state, use full state name (e.g., "Maharashtra", "Tamil Nadu").`,
+          content: `Extract customer information from this conversation. Return JSON with these fields (null if not found): name, phone, email, city, state (Indian state name), monthlyBill (number in INR), monthlyUnits (number), propertyType ("residential" or "commercial" only if clearly stated, else null), installationTimeline (e.g. "immediately", "1-3 months", "3-6 months", "6+ months" — only if clearly stated, else null), propertyAddress (full address if shared, else null). Only extract clearly stated information, don't guess. For state, use full state name (e.g., "Maharashtra", "Tamil Nadu").`,
         },
         {
           role: "user",
@@ -1640,8 +1644,10 @@ async function extractCustomerData(history: any[], latestMessage: string) {
               monthlyBill: { type: ["number", "null"] },
               monthlyUnits: { type: ["number", "null"] },
               propertyType: { type: ["string", "null"] },
+              installationTimeline: { type: ["string", "null"] },
+              propertyAddress: { type: ["string", "null"] },
             },
-            required: ["name", "phone", "email", "city", "state", "monthlyBill", "monthlyUnits", "propertyType"],
+            required: ["name", "phone", "email", "city", "state", "monthlyBill", "monthlyUnits", "propertyType", "installationTimeline", "propertyAddress"],
             additionalProperties: false,
           },
         },
