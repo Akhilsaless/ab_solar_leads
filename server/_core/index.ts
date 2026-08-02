@@ -12,6 +12,7 @@ import { initializeEmailService } from "./emailService";
 import { followUpEmailsHandler } from "../followUpEmailHandler";
 import { adminDigestHandler } from "../adminDigestHandler";
 import { referrerOnboardingHandler } from "../referrerOnboardingHandler";
+import { autoOutreachHandler } from "../autoOutreachHandler";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -51,6 +52,8 @@ async function startServer() {
   app.post("/api/scheduled/adminDigest", adminDigestHandler);
   // Referrer onboarding email sequence (cron-only endpoint)
   app.post("/api/scheduled/referrerOnboarding", referrerOnboardingHandler);
+  // Auto outreach - 5 daily slots
+  app.post("/api/scheduled/autoOutreach", autoOutreachHandler);
 
   // tRPC API
   app.use(

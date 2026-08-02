@@ -7,26 +7,72 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { AlertCircle, CheckCircle, Clock, MessageSquare, TrendingUp } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { toast } from "sonner";
+import {
+  AlertCircle, CheckCircle, Clock, MessageSquare, TrendingUp,
+  Zap, Building2, Mail, Phone, CheckCircle2, XCircle, Loader2
+} from "lucide-react";
+
+const SLOT_SCHEDULE = [
+  { slot: 1, time: "8:00 AM",   label: "Factories & Warehouses" },
+  { slot: 2, time: "10:30 AM",  label: "Hotels & Resorts" },
+  { slot: 3, time: "1:00 PM",   label: "Hospitals & Clinics" },
+  { slot: 4, time: "4:00 PM",   label: "Schools & Colleges" },
+  { slot: 5, time: "7:00 PM",   label: "Offices & Complexes" },
+];
+
+const INDIAN_STATES = [
+  "Andhra Pradesh","Arunachal Pradesh","Assam","Bihar","Chhattisgarh",
+  "Goa","Gujarat","Haryana","Himachal Pradesh","Jharkhand",
+  "Karnataka","Kerala","Madhya Pradesh","Maharashtra","Manipur",
+  "Meghalaya","Mizoram","Nagaland","Odisha","Punjab",
+  "Rajasthan","Sikkim","Tamil Nadu","Telangana","Tripura",
+  "Uttar Pradesh","Uttarakhand","West Bengal","Delhi",
+  "Chandigarh","Puducherry","Jammu and Kashmir","Ladakh",
+];
 
 export function AutomatedOutreach() {
-  const [activeTab, setActiveTab] = useState("overview");
+  const [activeTab, setActiveTab] = useState("smart");
   const [configId, setConfigId] = useState<number | null>(null);
 
-  // Queries
+  // Smart cron state
+  const [smartCity, setSmartCity] = useState("");
+  const [smartState, setSmartState] = useState("");
+  const [smartEnabled, setSmartEnabled] = useState(true);
+
+  // Smart cron queries
+  const smartConfigQuery = trpc.automatedOutreach.smartConfig.get.useQuery();
+  const runsQuery = trpc.automatedOutreach.runs.list.useQuery();
+  const todayStatsQuery = trpc.automatedOutreach.runs.todayStats.useQuery();
+  const updateSmartConfig = trpc.automatedOutreach.smartConfig.update.useMutation({
+    onSuccess: () => {
+      toast.success(`Saved! Auto outreach will target ${smartCity}, ${smartState} from next run.`);
+      smartConfigQuery.refetch();
+      todayStatsQuery.refetch();
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  useEffect(() => {
+    if (smartConfigQuery.data) {
+      setSmartCity(smartConfigQuery.data.targetCity || "Hyderabad");
+      setSmartState(smartConfigQuery.data.targetState || "Telangana");
+      setSmartEnabled(!!smartConfigQuery.data.isEnabled);
+    }
+  }, [smartConfigQuery.data]);
+
+  // Legacy queries
   const configQuery = trpc.automatedOutreach.config.get.useQuery();
   const todayQuery = trpc.automatedOutreach.records.getToday.useQuery();
   const repliesQuery = trpc.automatedOutreach.records.getReplies.useQuery();
   const dailyAnalyticsQuery = trpc.automatedOutreach.analytics.getDaily.useQuery();
-  const weeklyAnalyticsQuery = trpc.automatedOutreach.analytics.getWeekly.useQuery();
 
-  // Mutations
   const createConfigMutation = trpc.automatedOutreach.config.create.useMutation();
   const updateConfigMutation = trpc.automatedOutreach.config.update.useMutation();
   const initializeScoringMutation = trpc.automatedOutreach.scoring.initializeScoring.useMutation();
   const updateStatusMutation = trpc.automatedOutreach.records.updateStatus.useMutation();
 
-  // Form state
   const [formData, setFormData] = useState({
     state: "Telangana",
     businessTypes: ["textile_mills", "cold_storage", "hospitals", "factories"],
@@ -105,28 +151,193 @@ export function AutomatedOutreach() {
   const analytics = dailyAnalyticsQuery.data;
   const todayRecords = todayQuery.data || [];
   const replies = repliesQuery.data || [];
+  const todayStats = todayStatsQuery.data;
+  const runs = (runsQuery.data || []) as any[];
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold">Automated Outreach</h1>
-          <p className="text-gray-500 mt-1">Daily WhatsApp & Email to Telangana businesses</p>
+          <p className="text-muted-foreground mt-1">Smart daily scrape + email/WhatsApp to high-potential businesses</p>
         </div>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="flex flex-wrap h-auto gap-1 w-full">
+          <TabsTrigger value="smart" className="flex items-center gap-1.5">
+            <Zap className="w-3.5 h-3.5" /> Smart Auto (New)
+          </TabsTrigger>
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="settings">Settings</TabsTrigger>
           <TabsTrigger value="today">Today's Outreach</TabsTrigger>
           <TabsTrigger value="replies">Replies</TabsTrigger>
         </TabsList>
 
-        {/* OVERVIEW TAB */}
+        {/* ── SMART AUTO OUTREACH TAB ── */}
+        <TabsContent value="smart" className="space-y-4 mt-4">
+
+          {/* Today Stats */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            {[
+              { label: "Runs Today", value: todayStats?.totalRuns ?? 0, icon: <Zap className="w-4 h-4 text-orange-400" /> },
+              { label: "Scraped", value: todayStats?.totalScraped ?? 0, icon: <Building2 className="w-4 h-4 text-blue-400" /> },
+              { label: "Emails Sent", value: todayStats?.totalEmailSent ?? 0, icon: <Mail className="w-4 h-4 text-green-400" /> },
+              { label: "WhatsApp Ready", value: todayStats?.totalWhatsappSent ?? 0, icon: <Phone className="w-4 h-4 text-emerald-400" /> },
+            ].map(s => (
+              <Card key={s.label} className="bg-card border-border">
+                <CardContent className="pt-4 pb-3">
+                  <div className="flex items-center gap-2 mb-1">{s.icon}<span className="text-xs text-muted-foreground">{s.label}</span></div>
+                  <div className="text-2xl font-bold">{s.value}</div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+
+          {/* City/State Config */}
+          <Card>
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="text-base">Today's Target Location</CardTitle>
+                  <CardDescription>Set which city &amp; state to scrape and outreach today. Change it every morning when you log in.</CardDescription>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <span className="text-xs text-muted-foreground">{smartEnabled ? "Enabled" : "Paused"}</span>
+                  <Switch
+                    checked={smartEnabled}
+                    onCheckedChange={v => {
+                      setSmartEnabled(v);
+                      updateSmartConfig.mutate({ targetCity: smartCity, targetState: smartState, isEnabled: v });
+                    }}
+                  />
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-col sm:flex-row gap-3">
+                <div className="flex-1">
+                  <Label className="text-xs mb-1.5 block">City</Label>
+                  <Input
+                    placeholder="e.g. Hyderabad"
+                    value={smartCity}
+                    onChange={e => setSmartCity(e.target.value)}
+                  />
+                </div>
+                <div className="flex-1">
+                  <Label className="text-xs mb-1.5 block">State</Label>
+                  <Select value={smartState} onValueChange={setSmartState}>
+                    <SelectTrigger><SelectValue placeholder="Select state" /></SelectTrigger>
+                    <SelectContent>
+                      {INDIAN_STATES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex items-end">
+                  <Button
+                    onClick={() => updateSmartConfig.mutate({ targetCity: smartCity, targetState: smartState, isEnabled: smartEnabled })}
+                    disabled={updateSmartConfig.isPending || !smartCity || !smartState}
+                    className="bg-orange-500 hover:bg-orange-600 text-white whitespace-nowrap"
+                  >
+                    {updateSmartConfig.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : "Save Location"}
+                  </Button>
+                </div>
+              </div>
+              {smartConfigQuery.data && (
+                <p className="text-xs text-muted-foreground mt-2">
+                  Currently targeting: <span className="text-foreground font-medium">{smartConfigQuery.data.targetCity}, {smartConfigQuery.data.targetState}</span>
+                </p>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Daily Schedule */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">Daily Schedule — 5 Runs/Day</CardTitle>
+              <CardDescription>Each run scrapes a different business type, filters Solar Score 70+, and sends personalised email + WhatsApp with your bot link</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                {SLOT_SCHEDULE.map(s => (
+                  <div key={s.slot} className="flex items-center justify-between p-3 rounded-lg bg-muted/40 border border-border">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-full bg-orange-500/10 border border-orange-500/30 flex items-center justify-center text-xs font-bold text-orange-400 shrink-0">
+                        {s.slot}
+                      </div>
+                      <div>
+                        <div className="text-sm font-medium">{s.label}</div>
+                        <div className="text-xs text-muted-foreground">{s.time} IST</div>
+                      </div>
+                    </div>
+                    <Badge variant="outline" className="text-xs text-green-400 border-green-500/30 bg-green-500/10 shrink-0">
+                      Active
+                    </Badge>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-3 p-3 rounded-lg bg-blue-500/5 border border-blue-500/20">
+                <p className="text-xs text-blue-400 font-medium">How it works</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Each run: scrapes up to 20 businesses → calculates Solar Score → sends email (if available) + logs WhatsApp message (if phone available) → marks as contacted. Bot link included in every message so businesses can get their estimate instantly.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Run History */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">Run History</CardTitle>
+              <CardDescription>Last 50 auto outreach runs</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {runsQuery.isLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                </div>
+              ) : runs.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <Clock className="w-10 h-10 mx-auto mb-2 opacity-40" />
+                  <p className="text-sm">No runs yet — first run fires at 8:00 AM IST</p>
+                  <p className="text-xs mt-1 opacity-60">Make sure you've set your city &amp; state above</p>
+                </div>
+              ) : (
+                <div className="space-y-2 max-h-80 overflow-y-auto">
+                  {runs.map((run: any) => (
+                    <div key={run.id} className="flex items-center justify-between p-3 rounded-lg border border-border bg-card">
+                      <div className="flex items-center gap-3 min-w-0">
+                        {run.status === "completed"
+                          ? <CheckCircle2 className="w-4 h-4 text-green-400 shrink-0" />
+                          : run.status === "failed"
+                          ? <XCircle className="w-4 h-4 text-red-400 shrink-0" />
+                          : <Loader2 className="w-4 h-4 animate-spin text-orange-400 shrink-0" />}
+                        <div className="min-w-0">
+                          <div className="text-sm font-medium truncate">{run.businessType}</div>
+                          <div className="text-xs text-muted-foreground truncate">
+                            {run.targetCity}, {run.targetState} · {new Date(run.startedAt).toLocaleString()}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="text-right shrink-0 ml-3">
+                        <div className="text-xs text-muted-foreground">
+                          Scraped: <span className="text-foreground font-medium">{run.scrapedCount}</span>
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          Sent: <span className="text-green-400 font-medium">{(run.emailSentCount || 0) + (run.whatsappSentCount || 0)}</span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ── OVERVIEW TAB (legacy) ── */}
         <TabsContent value="overview" className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {/* Today's Stats */}
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium text-gray-600">Today's Sent</CardTitle>
@@ -136,45 +347,31 @@ export function AutomatedOutreach() {
                 <p className="text-xs text-gray-500 mt-1">Scheduled for 10:00 AM</p>
               </CardContent>
             </Card>
-
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium text-gray-600">Delivered</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">{analytics?.totalDelivered || 0}</div>
-                <p className="text-xs text-gray-500 mt-1">
-                  {analytics ? `${((analytics.totalDelivered / analytics.totalSent) * 100).toFixed(0)}% delivery rate` : "N/A"}
-                </p>
               </CardContent>
             </Card>
-
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium text-gray-600">Replies</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold text-green-600">{analytics?.totalReplied || 0}</div>
-                <p className="text-xs text-gray-500 mt-1">
-                  {analytics ? `${analytics.responseRate?.toFixed(1)}% response rate` : "N/A"}
-                </p>
               </CardContent>
             </Card>
-
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium text-gray-600">Interested</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold text-blue-600">{analytics?.totalInterested || 0}</div>
-                <p className="text-xs text-gray-500 mt-1">
-                  {analytics ? `${analytics.conversionRate?.toFixed(1)}% conversion` : "N/A"}
-                </p>
               </CardContent>
             </Card>
           </div>
-
-          {/* Status */}
           <Card>
             <CardHeader>
               <CardTitle>Campaign Status</CardTitle>
@@ -191,30 +388,11 @@ export function AutomatedOutreach() {
                 </div>
                 <Badge className="bg-green-600">ACTIVE</Badge>
               </div>
-
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div>
-                  <p className="text-gray-600">Business Types</p>
-                  <p className="font-medium">Textile, Cold Storage, Hospitals, Factories</p>
-                </div>
-                <div>
-                  <p className="text-gray-600">Minimum Rating</p>
-                  <p className="font-medium">3.5+ stars</p>
-                </div>
-                <div>
-                  <p className="text-gray-600">Message Type</p>
-                  <p className="font-medium">Industry-Specific</p>
-                </div>
-                <div>
-                  <p className="text-gray-600">Location</p>
-                  <p className="font-medium">Telangana Only</p>
-                </div>
-              </div>
             </CardContent>
           </Card>
         </TabsContent>
 
-        {/* SETTINGS TAB */}
+        {/* ── SETTINGS TAB (legacy) ── */}
         <TabsContent value="settings" className="space-y-4">
           <Card>
             <CardHeader>
@@ -229,82 +407,30 @@ export function AutomatedOutreach() {
                 </div>
                 <div>
                   <Label>Minimum Rating</Label>
-                  <Input
-                    type="number"
-                    step="0.1"
-                    value={formData.minRating}
-                    onChange={(e) => setFormData({ ...formData, minRating: e.target.value })}
-                    className="mt-1"
-                  />
+                  <Input type="number" step="0.1" value={formData.minRating}
+                    onChange={(e) => setFormData({ ...formData, minRating: e.target.value })} className="mt-1" />
                 </div>
               </div>
-
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label>Contacts Per Day</Label>
-                  <Input
-                    type="number"
-                    value={formData.contactsPerDay}
-                    onChange={(e) => setFormData({ ...formData, contactsPerDay: e.target.value })}
-                    className="mt-1"
-                  />
+                  <Input type="number" value={formData.contactsPerDay}
+                    onChange={(e) => setFormData({ ...formData, contactsPerDay: e.target.value })} className="mt-1" />
                 </div>
                 <div>
                   <Label>Schedule Time (HH:MM)</Label>
-                  <Input
-                    type="time"
-                    value={formData.scheduleTime}
-                    onChange={(e) => setFormData({ ...formData, scheduleTime: e.target.value })}
-                    className="mt-1"
-                  />
+                  <Input type="time" value={formData.scheduleTime}
+                    onChange={(e) => setFormData({ ...formData, scheduleTime: e.target.value })} className="mt-1" />
                 </div>
               </div>
-
               <div>
                 <Label>Your WhatsApp Number (for alerts)</Label>
-                <Input
-                  placeholder="+91 XXXXX XXXXX"
-                  value={formData.adminPhoneNumber}
-                  onChange={(e) => setFormData({ ...formData, adminPhoneNumber: e.target.value })}
-                  className="mt-1"
-                />
+                <Input placeholder="+91 XXXXX XXXXX" value={formData.adminPhoneNumber}
+                  onChange={(e) => setFormData({ ...formData, adminPhoneNumber: e.target.value })} className="mt-1" />
               </div>
-
-              <div>
-                <Label>Outreach Mode</Label>
-                <div className="mt-2 flex gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setFormData({ ...formData, outreachMode: "blind" })}
-                    className={`flex-1 rounded-lg border-2 p-3 text-left transition-all ${
-                      formData.outreachMode === "blind"
-                        ? "border-emerald-500 bg-emerald-500/10 text-emerald-600"
-                        : "border-border bg-background text-muted-foreground hover:border-muted-foreground"
-                    }`}
-                  >
-                    <div className="font-semibold text-sm">🚀 Blind Send</div>
-                    <div className="text-xs mt-0.5">Messages are sent automatically to businesses without owner approval</div>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setFormData({ ...formData, outreachMode: "owner_only" })}
-                    className={`flex-1 rounded-lg border-2 p-3 text-left transition-all ${
-                      formData.outreachMode === "owner_only"
-                        ? "border-amber-500 bg-amber-500/10 text-amber-600"
-                        : "border-border bg-background text-muted-foreground hover:border-muted-foreground"
-                    }`}
-                  >
-                    <div className="font-semibold text-sm">🔔 Owner Approval</div>
-                    <div className="text-xs mt-0.5">You get notified first; messages only send after your approval</div>
-                  </button>
-                </div>
-              </div>
-
               <div className="flex gap-2">
-                <Button
-                  onClick={configId ? handleUpdateConfig : handleCreateConfig}
-                  disabled={createConfigMutation.isPending || updateConfigMutation.isPending}
-                >
+                <Button onClick={configId ? handleUpdateConfig : handleCreateConfig}
+                  disabled={createConfigMutation.isPending || updateConfigMutation.isPending}>
                   {configId ? "Update Settings" : "Create Campaign"}
                 </Button>
               </div>
@@ -312,7 +438,7 @@ export function AutomatedOutreach() {
           </Card>
         </TabsContent>
 
-        {/* TODAY'S OUTREACH TAB */}
+        {/* ── TODAY'S OUTREACH TAB ── */}
         <TabsContent value="today" className="space-y-4">
           <Card>
             <CardHeader>
@@ -344,7 +470,7 @@ export function AutomatedOutreach() {
           </Card>
         </TabsContent>
 
-        {/* REPLIES TAB */}
+        {/* ── REPLIES TAB ── */}
         <TabsContent value="replies" className="space-y-4">
           <Card>
             <CardHeader>
@@ -370,18 +496,12 @@ export function AutomatedOutreach() {
                       </div>
                       <p className="text-sm bg-gray-50 p-2 rounded">{reply.replyText}</p>
                       <div className="flex gap-2">
-                        <Button
-                          size="sm"
-                          className="bg-green-600 hover:bg-green-700"
-                          onClick={() => handleReplyStatusChange(reply.id, "interested")}
-                        >
+                        <Button size="sm" className="bg-green-600 hover:bg-green-700"
+                          onClick={() => handleReplyStatusChange(reply.id, "interested")}>
                           Interested
                         </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleReplyStatusChange(reply.id, "not_interested")}
-                        >
+                        <Button size="sm" variant="outline"
+                          onClick={() => handleReplyStatusChange(reply.id, "not_interested")}>
                           Not Interested
                         </Button>
                       </div>

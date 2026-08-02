@@ -441,4 +441,74 @@ export const automatedOutreachRouter = router({
         return { verificationScore, emailValid, phoneValid, phoneHasWhatsapp, websiteActive, businessActive };
       }),
   }),
+
+  // ===== SMART CRON OUTREACH CONFIG (city/state selector) =====
+  smartConfig: router({
+    get: protectedProcedure.query(async ({ ctx }) => {
+      if (!ctx.user) throw new Error("Unauthorized");
+      const agency = await db.getAgencyByUserId(ctx.user.id);
+      if (!agency) throw new Error("Agency not found");
+      const dbConn = await db.getDb();
+      if (!dbConn) throw new Error("DB error");
+      const rows = await dbConn.execute(sql`SELECT * FROM outreachConfig WHERE agencyId = ${agency.id} LIMIT 1`) as any[];
+      const data = Array.isArray(rows[0]) ? rows[0] : rows;
+      return (data as any[])[0] || { isEnabled: 1, targetCity: "Hyderabad", targetState: "Telangana" };
+    }),
+    update: protectedProcedure
+      .input(z.object({
+        targetCity: z.string(),
+        targetState: z.string(),
+        isEnabled: z.boolean().optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        if (!ctx.user) throw new Error("Unauthorized");
+        const agency = await db.getAgencyByUserId(ctx.user.id);
+        if (!agency) throw new Error("Agency not found");
+        const dbConn = await db.getDb();
+        if (!dbConn) throw new Error("DB error");
+        const enabled = input.isEnabled !== undefined ? (input.isEnabled ? 1 : 0) : 1;
+        await dbConn.execute(sql`
+          INSERT INTO outreachConfig (agencyId, targetCity, targetState, isEnabled)
+          VALUES (${agency.id}, ${input.targetCity}, ${input.targetState}, ${enabled})
+          ON DUPLICATE KEY UPDATE targetCity = ${input.targetCity}, targetState = ${input.targetState}, isEnabled = ${enabled}
+        `);
+        return { success: true };
+      }),
+  }),
+
+  // ===== SMART CRON RUN HISTORY =====
+  runs: router({
+    list: protectedProcedure.query(async ({ ctx }) => {
+      if (!ctx.user) throw new Error("Unauthorized");
+      const agency = await db.getAgencyByUserId(ctx.user.id);
+      if (!agency) throw new Error("Agency not found");
+      const dbConn = await db.getDb();
+      if (!dbConn) throw new Error("DB error");
+      const rows = await dbConn.execute(sql`
+        SELECT * FROM outreachRuns WHERE agencyId = ${agency.id}
+        ORDER BY startedAt DESC LIMIT 50
+      `) as any[];
+      return Array.isArray(rows[0]) ? rows[0] : rows;
+    }),
+    todayStats: protectedProcedure.query(async ({ ctx }) => {
+      if (!ctx.user) throw new Error("Unauthorized");
+      const agency = await db.getAgencyByUserId(ctx.user.id);
+      if (!agency) throw new Error("Agency not found");
+      const dbConn = await db.getDb();
+      if (!dbConn) throw new Error("DB error");
+      const rows = await dbConn.execute(sql`
+        SELECT
+          COUNT(*) as totalRuns,
+          COALESCE(SUM(scrapedCount),0) as totalScraped,
+          COALESCE(SUM(eligibleCount),0) as totalEligible,
+          COALESCE(SUM(emailSentCount),0) as totalEmailSent,
+          COALESCE(SUM(whatsappSentCount),0) as totalWhatsappSent,
+          COALESCE(SUM(errorCount),0) as totalErrors
+        FROM outreachRuns
+        WHERE agencyId = ${agency.id} AND DATE(startedAt) = CURDATE()
+      `) as any[];
+      const data = Array.isArray(rows[0]) ? rows[0] : rows;
+      return (data as any[])[0] || { totalRuns: 0, totalScraped: 0, totalEligible: 0, totalEmailSent: 0, totalWhatsappSent: 0, totalErrors: 0 };
+    }),
+  }),
 });

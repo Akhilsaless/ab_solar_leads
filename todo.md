@@ -377,3 +377,11 @@
 - [x] DB: add onboardDay1Sent, onboardDay3Sent, onboardDay7Sent columns to referrers table
 - [x] DB: add getAdminDigestStats(), getReferrersForOnboarding(), markOnboardingEmailSent() helpers to db.ts
 - [x] Find Leads: add "Why This Lead Is Good" green card to business cards (score >= 45)
+
+## Smart Auto Outreach Engine
+- [x] outreachConfig and outreachRuns DB tables created
+- [x] autoOutreachHandler.ts - scrapes + filters Solar Score 70+ + sends email/WhatsApp with bot link
+- [x] 5 business-type-specific pitch templates (factories, hotels, hospitals, schools, offices)
+- [x] smartConfig and runs tRPC procedures (city/state selector, run history, today stats)
+- [x] AutomatedOutreach page - Smart Auto tab as default with city/state selector, schedule, run history
+- [x] 5 Heartbeat cron jobs registered (8 AM, 10:30 AM, 1 PM, 4 PM, 7 PM IST)
