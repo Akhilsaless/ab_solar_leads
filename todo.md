@@ -405,3 +405,6 @@
 - [x] Feature 1: Send Now button in Automated Outreach — trigger a run immediately for any slot
 - [x] Feature 2: Hot Leads filter in Scraped Contacts — show only businesses with emailOpenCount > 0
 - [x] Feature 3: City rotation — add Maharashtra (Mumbai/Pune) to rotation cycle alongside Hyderabad/Telangana
+- [ ] Edit Profile button on partner dashboard to update products/pricing/discounts
+- [ ] Chatbot reads partner discounts from DB and mentions them in pitch
+- [ ] Email notification to Agent Klaus on new partner signup

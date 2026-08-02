@@ -363,8 +363,21 @@ export const appRouter = router({
           }
         }
 
+        // Fetch active partner discounts to include in chatbot pitch
+        let partnerDiscounts: string | undefined;
+        try {
+          const dbConn2 = await db.getDb();
+          if (dbConn2) {
+            const partnerRows = (await dbConn2.execute(
+              sql`SELECT discounts FROM solarPartners WHERE status = 'active' AND discounts IS NOT NULL LIMIT 1`
+            )) as any[];
+            const pRow = Array.isArray(partnerRows[0]) ? partnerRows[0][0] : partnerRows[0];
+            if (pRow?.discounts) partnerDiscounts = pRow.discounts;
+          }
+        } catch { /* ignore */ }
+
         // Build the system prompt
-        const systemPrompt = buildSalesAgentPrompt(agency, panels, inverters, subsidyData, conversation, returningContext);
+        const systemPrompt = buildSalesAgentPrompt(agency, panels, inverters, subsidyData, conversation, returningContext, partnerDiscounts);
 
         // Build message history for LLM
         const llmMessages: Array<{ role: string; content: string }> = [
@@ -1448,7 +1461,7 @@ export function calculateSolarEstimate(
 }
 
 // ===== AI SALES AGENT PROMPT BUILDER =====
-function buildSalesAgentPrompt(agency: any, panels: any[], inverters: any[], subsidyData: any, conversation: any, returningContext?: string): string {
+function buildSalesAgentPrompt(agency: any, panels: any[], inverters: any[], subsidyData: any, conversation: any, returningContext?: string, partnerDiscounts?: string): string {
   const panelList = panels.map(p => `- ${p.brand} ${p.model} (${p.wattage}W, ₹${p.pricePerPanel}/panel, ${p.panelType}, ${p.warranty}yr warranty)`).join("\n");
   const inverterList = inverters.map(i => `- ${i.brand} ${i.model} (${i.capacityKw}kW, ₹${i.price}, ${i.inverterType}, ${i.warranty}yr warranty)`).join("\n");
 
@@ -1564,6 +1577,10 @@ ${inverterList || "Standard inverters available"}
 
 Installation Charge: ₹${agency.installationChargePerKw || "8,000"}/kW
 
+${partnerDiscounts ? `PARTNER SPECIAL DISCOUNTS (mention these alongside the government subsidy when pitching):
+${partnerDiscounts}
+When talking about savings, say: "Government subsidy ₹78,000 PLUS ${partnerDiscounts.split(',')[0].trim()} and more special offers running right now."
+` : ""}
 ${subsidyInfo}
 
 ${conversationContext}

@@ -60,6 +60,8 @@ export default function PartnerDashboard() {
   const [uploadingFile, setUploadingFile] = useState<"pricingSheet" | "productList" | null>(null);
   const pricingRef = useRef<HTMLInputElement>(null);
   const productRef = useRef<HTMLInputElement>(null);
+  const [editOpen, setEditOpen] = useState(false);
+  const [editForm, setEditForm] = useState({ products: "", pricing: "", discounts: "", phone: "", whatsappNumber: "" });
 
   const loginMutation = trpc.partner.partnerLogin.useMutation({
     onSuccess: (data) => {
@@ -103,6 +105,15 @@ export default function PartnerDashboard() {
       toast.success("File uploaded successfully!");
     },
     onError: (err) => { toast.error(err.message); setUploadingFile(null); },
+  });
+
+  const updateProfileMutation = trpc.partner.updateProfile.useMutation({
+    onSuccess: () => {
+      profileQuery.refetch();
+      setEditOpen(false);
+      toast.success("Profile updated successfully!");
+    },
+    onError: (err) => toast.error(err.message),
   });
 
   const notifyMeMutation = trpc.partner.notifyMeMarketing.useMutation({
@@ -390,11 +401,28 @@ export default function PartnerDashboard() {
           <div className="space-y-6">
             {/* Company Info */}
             <Card className="border-border/30 bg-card/60">
-              <CardHeader>
+              <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle className="text-base flex items-center gap-2">
                   <FileText className="w-4 h-4 text-orange-400" />
                   Company Information
                 </CardTitle>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="border-orange-500/30 text-orange-400 hover:bg-orange-500/10 text-xs"
+                  onClick={() => {
+                    setEditForm({
+                      products: profile?.products || "",
+                      pricing: profile?.pricing || "",
+                      discounts: profile?.discounts || "",
+                      phone: profile?.phone || "",
+                      whatsappNumber: profile?.whatsappNumber || "",
+                    });
+                    setEditOpen(!editOpen);
+                  }}
+                >
+                  {editOpen ? "Cancel" : "Edit Profile"}
+                </Button>
               </CardHeader>
               <CardContent className="space-y-3">
                 {profileQuery.isLoading ? (
@@ -434,6 +462,39 @@ export default function PartnerDashboard() {
                         <p className="text-sm text-foreground">{profile.discounts}</p>
                       </div>
                     )}
+                  </div>
+                )}
+                {editOpen && (
+                  <div className="mt-4 p-4 rounded-lg border border-orange-500/20 bg-orange-500/5 space-y-3">
+                    <p className="text-xs text-orange-400 font-semibold">Update Profile</p>
+                    <div>
+                      <label className="text-xs text-muted-foreground">Phone</label>
+                      <Input value={editForm.phone} onChange={e => setEditForm(f => ({...f, phone: e.target.value}))} className="mt-1 text-sm" placeholder="Phone number" />
+                    </div>
+                    <div>
+                      <label className="text-xs text-muted-foreground">WhatsApp</label>
+                      <Input value={editForm.whatsappNumber} onChange={e => setEditForm(f => ({...f, whatsappNumber: e.target.value}))} className="mt-1 text-sm" placeholder="WhatsApp number" />
+                    </div>
+                    <div>
+                      <label className="text-xs text-muted-foreground">Products & Services</label>
+                      <textarea value={editForm.products} onChange={e => setEditForm(f => ({...f, products: e.target.value}))} className="mt-1 w-full text-sm bg-background border border-input rounded-md p-2 resize-none" rows={3} placeholder="e.g. 5kW, 10kW rooftop solar systems..." />
+                    </div>
+                    <div>
+                      <label className="text-xs text-muted-foreground">Pricing Details</label>
+                      <textarea value={editForm.pricing} onChange={e => setEditForm(f => ({...f, pricing: e.target.value}))} className="mt-1 w-full text-sm bg-background border border-input rounded-md p-2 resize-none" rows={3} placeholder="e.g. ₹3.8 lakh per kW, 0% EMI..." />
+                    </div>
+                    <div>
+                      <label className="text-xs text-muted-foreground">Current Discounts & Offers</label>
+                      <textarea value={editForm.discounts} onChange={e => setEditForm(f => ({...f, discounts: e.target.value}))} className="mt-1 w-full text-sm bg-background border border-input rounded-md p-2 resize-none" rows={2} placeholder="e.g. 15% off for factories this month..." />
+                    </div>
+                    <Button
+                      className="w-full solar-gradient text-black font-semibold"
+                      disabled={updateProfileMutation.isPending}
+                      onClick={() => updateProfileMutation.mutate({ token, ...editForm })}
+                    >
+                      {updateProfileMutation.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+                      Save Changes
+                    </Button>
                   </div>
                 )}
               </CardContent>

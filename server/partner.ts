@@ -169,6 +169,35 @@ export const partnerRouter = router({
             sql`INSERT INTO solarPartners (companyName, email, phone, whatsappNumber, serviceAreas, products, pricing, discounts, status, signedUpAt)
                 VALUES (${input.companyName}, ${input.email}, ${input.phone}, ${input.whatsappNumber || null}, ${JSON.stringify(input.serviceAreas)}, ${input.products}, ${input.pricing}, ${input.discounts || null}, 'signed_up', NOW())`
           );
+          // Notify Agent Klaus of new partner signup
+          try {
+            await sendEmail({
+              to: "akhil@salessquadtech.com",
+              subject: `🌟 New Partner Signup: ${input.companyName}`,
+              html: `
+                <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;background:#0a0a0a;color:#fff;padding:24px;border-radius:12px;">
+                  <div style="background:#f97316;padding:16px 24px;border-radius:8px;margin-bottom:24px;">
+                    <h2 style="margin:0;color:#fff;">New Partner Signed Up</h2>
+                    <p style="margin:4px 0 0;color:#fff;opacity:0.9;font-size:14px;">Sales Squad Partner Program</p>
+                  </div>
+                  <table style="width:100%;border-collapse:collapse;">
+                    <tr><td style="padding:8px 0;color:#aaa;font-size:13px;">Company</td><td style="padding:8px 0;font-weight:600;">${input.companyName}</td></tr>
+                    <tr><td style="padding:8px 0;color:#aaa;font-size:13px;">Email</td><td style="padding:8px 0;">${input.email}</td></tr>
+                    <tr><td style="padding:8px 0;color:#aaa;font-size:13px;">Phone</td><td style="padding:8px 0;">${input.phone}</td></tr>
+                    <tr><td style="padding:8px 0;color:#aaa;font-size:13px;">WhatsApp</td><td style="padding:8px 0;">${input.whatsappNumber || "—"}</td></tr>
+                    <tr><td style="padding:8px 0;color:#aaa;font-size:13px;">Service Areas</td><td style="padding:8px 0;">${input.serviceAreas.join(", ")}</td></tr>
+                    <tr><td style="padding:8px 0;color:#aaa;font-size:13px;">Products</td><td style="padding:8px 0;">${input.products}</td></tr>
+                    <tr><td style="padding:8px 0;color:#aaa;font-size:13px;">Pricing</td><td style="padding:8px 0;">${input.pricing}</td></tr>
+                    <tr><td style="padding:8px 0;color:#aaa;font-size:13px;">Discounts</td><td style="padding:8px 0;">${input.discounts || "None specified"}</td></tr>
+                  </table>
+                  <p style="margin-top:24px;color:#aaa;font-size:13px;">Log in to your dashboard to review and activate this partner.</p>
+                  <p style="margin-top:16px;color:#f97316;font-size:14px;font-weight:600;">— Agent Klaus</p>
+                </div>
+              `,
+            });
+          } catch (emailErr) {
+            console.error("Failed to send partner signup notification:", emailErr);
+          }
           return { success: true, partnerId: insertId(result), isNew: true };
         }
       } catch (error) {
@@ -413,6 +442,35 @@ export const partnerRouter = router({
             FROM solarPartners WHERE loginToken = ${input.token}`
       ));
       return partner || null;
+    }),
+
+  // Update partner profile (products, pricing, discounts, phone, whatsapp)
+  updateProfile: publicProcedure
+    .input(z.object({
+      token: z.string(),
+      products: z.string().optional(),
+      pricing: z.string().optional(),
+      discounts: z.string().optional(),
+      phone: z.string().optional(),
+      whatsappNumber: z.string().optional(),
+    }))
+    .mutation(async ({ input }) => {
+      const dbConn = await db.getDb();
+      if (!dbConn) throw new Error("Database connection failed");
+      const partner = firstRow(await dbConn.execute(
+        sql`SELECT id FROM solarPartners WHERE loginToken = ${input.token}`
+      ));
+      if (!partner) throw new Error("Invalid session");
+      await dbConn.execute(
+        sql`UPDATE solarPartners
+            SET products = COALESCE(${input.products ?? null}, products),
+                pricing = COALESCE(${input.pricing ?? null}, pricing),
+                discounts = ${input.discounts ?? null},
+                phone = COALESCE(${input.phone ?? null}, phone),
+                whatsappNumber = COALESCE(${input.whatsappNumber ?? null}, whatsappNumber)
+            WHERE id = ${partner.id}`
+      );
+      return { success: true };
     }),
 
   // Update lead status by partner
