@@ -128,6 +128,7 @@ export const conversations = mysqlTable("conversations3", {
   isReturning: boolean("isReturning").default(false),
   followUp24Sent: boolean("followUp24Sent").default(false),
   followUp72Sent: boolean("followUp72Sent").default(false),
+  followUp7dSent: boolean("followUp7dSent").default(false),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });

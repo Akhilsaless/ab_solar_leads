@@ -64,6 +64,24 @@ function solarScore(biz: any): number {
   return Math.min(score, 100);
 }
 
+function getWhyGood(biz: any, score: number): string[] {
+  const reasons: string[] = [];
+  if (biz.businessSize === "large") reasons.push("Large business — likely ₹50,000+ monthly bill");
+  else if (biz.businessSize === "medium") reasons.push("Medium business — likely ₹15,000–₹50,000 monthly bill");
+  const t = (biz.businessType || "").toLowerCase();
+  if (t.includes("hotel") || t.includes("hostel") || t.includes("resort")) reasons.push("Hotels run 24/7 — solar saves massively on AC & lighting");
+  else if (t.includes("factor") || t.includes("manufactur") || t.includes("textile")) reasons.push("Factories have 3-phase power — huge solar savings potential");
+  else if (t.includes("hospital") || t.includes("clinic")) reasons.push("Hospitals need 24/7 power — solar + battery is ideal");
+  else if (t.includes("school") || t.includes("college")) reasons.push("Schools qualify for special education solar subsidies");
+  else if (t.includes("office") || t.includes("it ") || t.includes("tech")) reasons.push("IT offices have high AC load — solar ROI in 3–4 years");
+  else if (t.includes("restaurant") || t.includes("food")) reasons.push("Restaurants run heavy appliances — solar cuts costs significantly");
+  else if (t.includes("cold storage") || t.includes("warehouse")) reasons.push("Cold storage runs 24/7 — solar is extremely cost-effective");
+  if (biz.phone) reasons.push("Phone number available — contact directly via WhatsApp");
+  else if (biz.email) reasons.push("Email available — send a personalised pitch");
+  if (biz.rating && biz.rating >= 4) reasons.push("Well-rated business — stable and likely decision-ready");
+  return reasons.slice(0, 3);
+}
+
 function SolarScoreBadge({ score }: { score: number }) {
   const color = score >= 70 ? "text-green-400 border-green-500/30 bg-green-500/10"
     : score >= 45 ? "text-yellow-400 border-yellow-500/30 bg-yellow-500/10"
@@ -311,6 +329,14 @@ export default function ReferrerScraper({ referralLink, referrerName }: Props) {
                       </div>
                     </div>
                   </div>
+
+                  {/* Why This Lead Is Good */}
+                  {score >= 45 && (() => { const reasons = getWhyGood(biz, score); return reasons.length > 0 ? (
+                    <div className="rounded-md bg-green-500/5 border border-green-500/20 px-3 py-2">
+                      <p className="text-xs font-semibold text-green-400 mb-1">✅ Why this is a good lead</p>
+                      <ul className="space-y-0.5">{reasons.map((r, i) => <li key={i} className="text-xs text-muted-foreground">• {r}</li>)}</ul>
+                    </div>
+                  ) : null; })()}
 
                   <div className="space-y-1.5">
                     {biz.address && <div className="flex items-start gap-2 text-muted-foreground"><MapPin className="w-3.5 h-3.5 mt-0.5 shrink-0" /><span className="line-clamp-1 text-xs">{biz.address}</span></div>}

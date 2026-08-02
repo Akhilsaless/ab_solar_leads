@@ -87,6 +87,43 @@ function build72hEmailHtml(conv: any): string {
 </body></html>`;
 }
 
+function build7dEmailHtml(conv: any): string {
+  const name = conv.customerName || "there";
+  const agencyName = conv.agencyName || "Sales Squad";
+  const brandColor = conv.brandColor || "#F97316";
+  const agencyEmail = conv.agencyEmail || "";
+  const agencyPhone = conv.agencyPhone || "";
+  return `<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>Final note from Agent Klaus</title></head>
+<body style="margin:0;padding:0;background:#f9fafb;font-family:Arial,sans-serif;">
+  <div style="max-width:600px;margin:40px auto;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
+    <div style="background:${brandColor};padding:32px 40px;">
+      <h1 style="margin:0;color:#fff;font-size:24px;">${agencyName}</h1>
+    </div>
+    <div style="padding:40px;">
+      <h2 style="color:#111;">Hi ${name}, one final note from Agent Klaus \u2600\ufe0f</h2>
+      <p style="color:#555;line-height:1.6;">A week ago you explored solar savings with us. We don't want to keep bothering you — this is our last email.</p>
+      <p style="color:#555;line-height:1.6;">If you're still thinking about it, here's what you're missing out on:</p>
+      <ul style="color:#555;line-height:1.8;">
+        <li>Up to 80% reduction in your electricity bill</li>
+        <li>PM Surya Ghar subsidy up to \u20b978,000</li>
+        <li>Solar pays for itself in 4\u20136 years, then it's free energy</li>
+      </ul>
+      <div style="text-align:center;margin:32px 0;">
+        <a href="https://wa.me/${agencyPhone.replace(/[^0-9]/g, '')}"
+           style="background:${brandColor};color:#fff;padding:14px 32px;border-radius:8px;text-decoration:none;font-weight:700;display:inline-block;">
+          Talk to an Expert
+        </a>
+      </div>
+      <p style="color:#888;font-size:13px;">This is our last email to you. No more follow-ups — we respect your decision!</p>
+    </div>
+    <div style="background:#f3f4f6;padding:20px 40px;text-align:center;">
+      <p style="margin:0;color:#9ca3af;font-size:12px;">${agencyName} | ${agencyEmail}</p>
+    </div>
+  </div>
+</body></html>`;
+}
+
 export async function followUpEmailsHandler(req: Request, res: Response) {
   try {
     const user = await sdk.authenticateRequest(req);
@@ -135,7 +172,28 @@ export async function followUpEmailsHandler(req: Request, res: Response) {
       }
     } catch (e) { console.error("[FollowUp] 72h fetch error:", e); }
 
-    return res.json({ ok: true, sent24, sent72, errors, timestamp: new Date().toISOString() });
+    // 7-day follow-ups
+    let sent7d = 0;
+    try {
+      const leads7d = await db.getUnconvertedLeadsForFollowUp(7 * 24, "followUp7dSent");
+      for (const conv of leads7d) {
+        try {
+          if (!conv.customerEmail) { errors++; continue; }
+          const html = build7dEmailHtml(conv);
+          const result = await sendEmail({
+            to: conv.customerEmail as string,
+            subject: `Final note from Agent Klaus — your solar estimate is waiting`,
+            html,
+          });
+          if (result.success) {
+            await db.markFollowUpSent(conv.sessionId, "followUp7dSent");
+            sent7d++;
+          } else { errors++; }
+        } catch (e) { errors++; console.error("[FollowUp] 7d error:", e); }
+      }
+    } catch (e) { console.error("[FollowUp] 7d fetch error:", e); }
+
+    return res.json({ ok: true, sent24, sent72, sent7d, errors, timestamp: new Date().toISOString() });
   } catch (err: any) {
     console.error("[FollowUp] Handler error:", err);
     return res.status(500).json({

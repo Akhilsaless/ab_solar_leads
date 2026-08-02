@@ -10,6 +10,8 @@ import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
 import { initializeEmailService } from "./emailService";
 import { followUpEmailsHandler } from "../followUpEmailHandler";
+import { adminDigestHandler } from "../adminDigestHandler";
+import { referrerOnboardingHandler } from "../referrerOnboardingHandler";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -45,6 +47,10 @@ async function startServer() {
   registerOAuthRoutes(app);
   // Follow-up email scheduler (cron-only endpoint)
   app.post("/api/scheduled/followUpEmails", followUpEmailsHandler);
+  // Admin daily digest (cron-only endpoint)
+  app.post("/api/scheduled/adminDigest", adminDigestHandler);
+  // Referrer onboarding email sequence (cron-only endpoint)
+  app.post("/api/scheduled/referrerOnboarding", referrerOnboardingHandler);
 
   // tRPC API
   app.use(

@@ -1574,6 +1574,7 @@ OBJECTION HANDLING (respond naturally, SHORT, empathetic — no "ji"):
 
 - "Too expensive" → "After the ₹78,000 government subsidy, [Name], the actual out-of-pocket is much lower. You recover it in 3–5 years — after that it's free. Want the exact numbers for your bill?"
 - "Rented house" → "Many landlords agree because it increases property value. We can help you have that conversation. Worth exploring?"
+- If customer CONFIRMS they are renting AND explicitly says landlord will NOT give permission: "Understood — solar does need roof access approval. If your situation changes or you move to an owned property, we'd love to help. Take care!" (end conversation gracefully, do NOT capture as lead)
 - "Not sure it works in my area" → "Solar works across India. Most states get 5–6 peak sun hours daily — more than enough."
 - "Government schemes are fake" → "PM Surya Ghar Yojana is a real central government scheme with ₹75,000 crore budget. We handle all the paperwork — you don't have to deal with any office."
 - "Need to ask family" → "Makes sense. Want me to prepare a detailed estimate you can share with them? Has all the numbers they'll need."
@@ -1672,19 +1673,36 @@ async function extractCustomerData(history: any[], latestMessage: string) {
 // ===== SCORING =====
 function calculateConversationScore(conversation: any, extractedData: any): number {
   let score = 10;
-  if (extractedData?.name || conversation.customerName) score += 15;
-  if (extractedData?.phone || conversation.customerPhone) score += 20;
-  if (extractedData?.email || conversation.customerEmail) score += 10;
-  if (extractedData?.state || conversation.customerState) score += 10;
+  // Contact info
+  if (extractedData?.name || conversation.customerName) score += 12;
+  if (extractedData?.phone || conversation.customerPhone) score += 18;
+  if (extractedData?.email || conversation.customerEmail) score += 8;
+  if (extractedData?.state || conversation.customerState) score += 5;
   if (extractedData?.city || conversation.customerCity) score += 5;
+  // Bill amount — higher bill = higher quality
   if (extractedData?.monthlyBill || conversation.monthlyBill) {
     const bill = extractedData?.monthlyBill || parseFloat(conversation.monthlyBill);
-    if (bill >= 3000) score += 20;
-    else if (bill >= 2000) score += 15;
-    else if (bill >= 1000) score += 10;
-    else score += 5;
+    if (bill >= 10000) score += 20;
+    else if (bill >= 5000) score += 16;
+    else if (bill >= 3000) score += 12;
+    else if (bill >= 1500) score += 8;
+    else score += 4;
   }
-  if ((conversation.messageCount || 0) >= 5) score += 10;
+  // Property ownership — owner is much higher quality
+  const propType = extractedData?.propertyType || "";
+  if (propType === "commercial") score += 10; // commercial = bigger system
+  // Installation timeline — sooner = higher quality
+  const timeline = extractedData?.installationTimeline || "";
+  if (timeline === "immediately") score += 8;
+  else if (timeline === "1-3 months") score += 6;
+  else if (timeline === "3-6 months") score += 3;
+  // Address shared = committed
+  if (extractedData?.propertyAddress || conversation.customerAddress) score += 5;
+  // Engagement — more messages = more interested
+  const msgs = conversation.messageCount || 0;
+  if (msgs >= 10) score += 8;
+  else if (msgs >= 5) score += 5;
+  else if (msgs >= 3) score += 2;
   return Math.min(score, 100);
 }
 

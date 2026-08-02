@@ -364,3 +364,16 @@
 - [x] Chatbot: use partner's uploaded pricing sheet when generating estimates
 - [x] Leads table: save solar estimate fields (kW, cost, subsidy, net cost) when lead is created from conversation
 - [x] Leads table: remove roof condition and sun exposure from lead display in admin
+
+## Email Automation Sequences (Aug 2 2026)
+- [x] Lead follow-up: extend to 7-day final email ("Final note from Agent Klaus")
+- [x] Admin daily digest: build adminDigestHandler.ts with stats (new leads, converted, active referrers, pending payouts)
+- [x] Admin daily digest: register /api/scheduled/adminDigest endpoint in index.ts
+- [x] Referrer onboarding Day 1: "3 tips to get your first lead" email
+- [x] Referrer onboarding Day 3: "Find your first lead — step-by-step guide" email
+- [x] Referrer onboarding Day 7: "Your first week summary + earning potential" email
+- [x] Referrer onboarding: register /api/scheduled/referrerOnboarding endpoint in index.ts
+- [x] DB: add followUp7dSent column to conversations3 table
+- [x] DB: add onboardDay1Sent, onboardDay3Sent, onboardDay7Sent columns to referrers table
+- [x] DB: add getAdminDigestStats(), getReferrersForOnboarding(), markOnboardingEmailSent() helpers to db.ts
+- [x] Find Leads: add "Why This Lead Is Good" green card to business cards (score >= 45)

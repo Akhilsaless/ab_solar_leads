@@ -503,13 +503,15 @@ export async function getScrapeJobsByAgency(userId: number) {
   if (!db) return [];
   return db.select().from(scrapeJobs).where(eq(scrapeJobs.createdBy, userId)).orderBy(desc(scrapeJobs.createdAt)).limit(50);
 }
-export async function getUnconvertedLeadsForFollowUp(hoursAgo: number, followUpField: "followUp24Sent" | "followUp72Sent") {
+export async function getUnconvertedLeadsForFollowUp(hoursAgo: number, followUpField: "followUp24Sent" | "followUp72Sent" | "followUp7dSent") {
   const db = await getDb();
   if (!db) return [];
   const cutoff = new Date(Date.now() - hoursAgo * 60 * 60 * 1000);
   const colExpr = followUpField === "followUp24Sent"
     ? sql`followUp24Sent`
-    : sql`followUp72Sent`;
+    : followUpField === "followUp72Sent"
+    ? sql`followUp72Sent`
+    : sql`followUp7dSent`;
   return db.select().from(conversations)
     .where(
       and(
@@ -521,14 +523,70 @@ export async function getUnconvertedLeadsForFollowUp(hoursAgo: number, followUpF
     ).limit(50);
 }
 
-export async function markFollowUpSent(sessionId: string, field: "followUp24Sent" | "followUp72Sent") {
+export async function markFollowUpSent(sessionId: string, field: "followUp24Sent" | "followUp72Sent" | "followUp7dSent") {
   const db = await getDb();
   if (!db) return;
   if (field === "followUp24Sent") {
     await db.update(conversations).set({ followUp24Sent: true } as any).where(eq(conversations.sessionId, sessionId));
-  } else {
+  } else if (field === "followUp72Sent") {
     await db.update(conversations).set({ followUp72Sent: true } as any).where(eq(conversations.sessionId, sessionId));
+  } else {
+    await db.update(conversations).set({ followUp7dSent: true } as any).where(eq(conversations.sessionId, sessionId));
   }
+}
+
+export async function getAdminDigestStats() {
+  const db = await getDb();
+  if (!db) return null;
+  try {
+    const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const r = (x: any) => Array.isArray(x) && Array.isArray(x[0]) ? x[0][0] : (Array.isArray(x) ? x[0] : x);
+    const [newLeadsRes, totalLeadsRes, convertedRes, activeReferrersRes, pendingPayoutsRes, agencyRes] = await Promise.all([
+      db.execute(sql`SELECT COUNT(*) as cnt FROM leads2 WHERE createdAt >= ${yesterday}`),
+      db.execute(sql`SELECT COUNT(*) as cnt FROM leads2`),
+      db.execute(sql`SELECT COUNT(*) as cnt FROM leads2 WHERE status='converted'`),
+      db.execute(sql`SELECT COUNT(*) as cnt FROM referrers WHERE status='active'`),
+      db.execute(sql`SELECT COALESCE(SUM(amount),0) as total FROM withdrawals WHERE status='pending'`),
+      db.execute(sql`SELECT agencyName, email, phone FROM agencyConfig3 LIMIT 1`),
+    ]);
+    return {
+      newLeads: Number(r(newLeadsRes)?.cnt || 0),
+      totalLeads: Number(r(totalLeadsRes)?.cnt || 0),
+      converted: Number(r(convertedRes)?.cnt || 0),
+      activeReferrers: Number(r(activeReferrersRes)?.cnt || 0),
+      pendingPayouts: Number(r(pendingPayoutsRes)?.total || 0),
+      agency: r(agencyRes) || {},
+    };
+  } catch (e) {
+    console.error("[Digest] Stats error:", e);
+    return null;
+  }
+}
+
+export async function getReferrersForOnboarding(daysAgo: number, emailField: "onboardDay1Sent" | "onboardDay3Sent" | "onboardDay7Sent") {
+  const db = await getDb();
+  if (!db) return [];
+  const cutoffFrom = new Date(Date.now() - (daysAgo + 1) * 24 * 60 * 60 * 1000);
+  const cutoffTo = new Date(Date.now() - daysAgo * 24 * 60 * 60 * 1000);
+  try {
+    const result = await db.execute(
+      sql`SELECT id, name, email, uniqueCode, createdAt FROM referrers
+          WHERE email IS NOT NULL AND status='active'
+          AND createdAt BETWEEN ${cutoffFrom} AND ${cutoffTo}
+          AND ${sql.raw(emailField)} = 0
+          LIMIT 50`
+    );
+    return (Array.isArray(result) && Array.isArray(result[0]) ? result[0] : result) as any[];
+  } catch (e) {
+    console.error("[Onboarding] Fetch error:", e);
+    return [];
+  }
+}
+
+export async function markOnboardingEmailSent(referrerId: number, field: "onboardDay1Sent" | "onboardDay3Sent" | "onboardDay7Sent") {
+  const db = await getDb();
+  if (!db) return;
+  await db.execute(sql`UPDATE referrers SET ${sql.raw(field)} = 1 WHERE id = ${referrerId}`);
 }
 
 // ==================== DELETE HELPERS ====================
