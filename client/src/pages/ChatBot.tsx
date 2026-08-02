@@ -680,7 +680,7 @@ export default function ChatBot() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950 flex flex-col">
+    <div className="fixed inset-0 bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950 flex flex-col">
 
       {/* OTP Verification Modal */}
       {showOtpModal && (
@@ -785,7 +785,7 @@ export default function ChatBot() {
 
       {/* Header */}
       <header className="border-b border-white/10 bg-gray-950/80 backdrop-blur-xl sticky top-0 z-50">
-        <div className="max-w-3xl mx-auto px-4 h-16 flex items-center gap-3">
+        <div className="px-4 h-16 flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl flex items-center justify-center shadow-lg" style={{ background: `linear-gradient(135deg, ${brandColor}, ${brandColor}dd)` }}>
             <Sun className="w-5 h-5 text-white" />
           </div>
@@ -804,8 +804,8 @@ export default function ChatBot() {
       </header>
 
       {/* Messages */}
-      <div className="flex-1 relative max-w-3xl mx-auto w-full">
-        <ScrollArea ref={scrollRef as any} className="h-[calc(100vh-8rem-80px)]" onScrollCapture={handleScroll}>
+      <div className="flex-1 relative w-full">
+        <ScrollArea ref={scrollRef as any} className="h-full" onScrollCapture={handleScroll}>
           <div className="px-4 py-6 space-y-4">
             {messages.map((msg, i) => (
               <div key={i} className={`flex gap-3 animate-slide-up ${msg.role === "customer" ? "flex-row-reverse" : ""}`}>

@@ -1505,13 +1505,13 @@ STEP 1 — GET NAME:
 
 STEP 2 — BRIEF INTRO + BILL (after getting name):
 Give ONE short sentence about what Sales Squad does, then ask the bill:
-"[Name], we help homeowners cut their electricity bill by 80%+ using solar — takes 2 minutes to show your exact numbers. Quick question — what's your electricity bill this month, roughly?"
+"[Name], we help homeowners cut their electricity bill by 80%+ using solar — plus there are extra discounts running right now. Takes 2 minutes to show your exact numbers. Quick question — what's your electricity bill this month, roughly?"
 
 STEP 3 — REACT AND HOOK (after they give the bill):
 React to their specific number, give a brief natural explanation of solar, then drop the free money hook:
-- If bill > ₹3,000: "[Name], ₹[bill] a month — over 10 years that's approx ₹[bill×10×1.08]. Solar panels on your roof generate electricity from sunlight, so your meter runs backward and your bill drops 80%+. And right now the government is giving ₹78,000 back to homeowners who install solar. Which state are you in? I'll check the exact subsidy for your area."
-- If bill ₹1,500–₹3,000: "[Name], that's ₹[bill×12] a year — and bills go up 8–10% every year. Solar cuts that by 80%+ by generating your own electricity from sunlight. The government has a ₹78,000 subsidy scheme running right now. Which state are you in?"
-- If bill < ₹1,500: "[Name], even at that amount, over 25 years you'd spend ₹[bill×25×12 approx]. Solar panels generate free electricity from sunlight — your bill drops permanently. The government subsidy of ₹78,000 makes it almost free upfront. Which state are you in?"
+- If bill > ₹3,000: "[Name], ₹[bill] a month — over 10 years that's approx ₹[bill×10×1.08]. Solar panels on your roof generate electricity from sunlight, so your meter runs backward and your bill drops 80%+. The government gives ₹78,000 back PLUS we have extra discounts running. Which state are you in? I'll check the exact subsidy for your area."
+- If bill ₹1,500–₹3,000: "[Name], that's ₹[bill×12] a year — and bills go up 8–10% every year. Solar cuts that by 80%+ by generating your own electricity from sunlight. Government subsidy ₹78,000 PLUS our extra discounts. Which state are you in?"
+- If bill < ₹1,500: "[Name], even at that amount, over 25 years you'd spend ₹[bill×25×12 approx]. Solar generates free electricity from sunlight — your bill drops permanently. Government subsidy ₹78,000 PLUS extra discounts make it almost free upfront. Which state are you in?"
 
 STEP 4 — SHOW ESTIMATE (after they give their state):
 Present the full estimate using the format below. Use the state-specific subsidy data.

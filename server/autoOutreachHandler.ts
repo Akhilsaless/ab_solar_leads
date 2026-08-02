@@ -111,9 +111,9 @@ async function generateAiPitch(biz: any, slot: number, botLink: string): Promise
   } catch { /* fallback below */ }
 
   return {
-    subject: "Cut Your Electricity Bill by 40% with Solar — " + name,
-    body: "<p>Dear " + name + ",</p><p>Your " + businessTypeLabel + " in " + city + " is a great candidate for solar energy. Based on your business size, you could save <strong>" + estimatedSavings + " per month</strong> with a typical ROI of " + estimatedROI + ".</p><p>The Government of India's PM Surya Ghar scheme offers subsidies up to Rs.78,000 for eligible businesses.</p>",
-    whatsapp: "Hi " + name + ", save " + estimatedSavings + "/month with solar. Free estimate: " + botLink,
+    subject: "Save " + estimatedSavings + "/month with Solar — Free Estimate",
+    body: "<p>Hi " + name + ",</p><p>I'm Agent Klaus from Sales Squad. Your " + businessTypeLabel + " in " + city + " could save <strong>" + estimatedSavings + " monthly</strong> with solar + government subsidies. ROI: " + estimatedROI + ".</p>",
+    whatsapp: "Hi " + name + ", save " + estimatedSavings + "/month with solar. Free 2-min estimate: " + botLink,
   };
 }
 
@@ -139,7 +139,7 @@ function buildEmailHtml(subject: string, body: string, placeId?: string, agencyI
     + "<p style=\"color:#6b7280;font-size:13px;line-height:1.6;\">Our AI agent will calculate your exact savings based on your electricity bill, roof size, and state subsidies in under 2 minutes. No commitment required.</p>"
     + "</div>"
     + "<div style=\"background:#f3f4f6;padding:20px 40px;text-align:center;\">"
-    + "<p style=\"margin:0;color:#9ca3af;font-size:12px;\">Sales Squad | akhil@salessquadtech.com | This is a one-time outreach email.</p>"
+    + "<p style=\"margin:0;color:#9ca3af;font-size:12px;\">— Agent Klaus, Sales Squad | akhil@salessquadtech.com</p>"
     + (pixelUrl ? `<img src="${pixelUrl}" width="1" height="1" style="display:none;" alt="" />` : "")
     + "</div></div></body></html>";
 }

@@ -301,12 +301,11 @@ export function AutomatedOutreach() {
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="flex flex-wrap h-auto gap-1 w-full">
           <TabsTrigger value="smart" className="flex items-center gap-1.5">
-            <Zap className="w-3.5 h-3.5" /> Smart Auto (New)
+            Smart Auto (New)
           </TabsTrigger>
-          <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="settings">Settings</TabsTrigger>
-          <TabsTrigger value="today">Today's Outreach</TabsTrigger>
-          <TabsTrigger value="replies">Replies</TabsTrigger>
+          <TabsTrigger value="today">Leads Contacted</TabsTrigger>
+          <TabsTrigger value="replies">Status</TabsTrigger>
         </TabsList>
 
         {/* ── SMART AUTO OUTREACH TAB ── */}
@@ -606,61 +605,7 @@ export function AutomatedOutreach() {
         </TabsContent>
 
         {/* ── OVERVIEW TAB (legacy) ── */}
-        <TabsContent value="overview" className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-gray-600">Today's Sent</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{analytics?.totalSent || 0}</div>
-                <p className="text-xs text-gray-500 mt-1">Scheduled for 10:00 AM</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-gray-600">Delivered</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{analytics?.totalDelivered || 0}</div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-gray-600">Replies</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-green-600">{analytics?.totalReplied || 0}</div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-gray-600">Interested</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-blue-600">{analytics?.totalInterested || 0}</div>
-              </CardContent>
-            </Card>
-          </div>
-          <Card>
-            <CardHeader>
-              <CardTitle>Campaign Status</CardTitle>
-              <CardDescription>Daily automated outreach to verified businesses</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center justify-between p-4 bg-green-50 border border-green-200 rounded-lg">
-                <div className="flex items-center gap-3">
-                  <CheckCircle className="w-5 h-5 text-green-600" />
-                  <div>
-                    <p className="font-medium">Campaign Active</p>
-                    <p className="text-sm text-gray-600">Sending 30 messages daily at 10:00 AM</p>
-                  </div>
-                </div>
-                <Badge className="bg-green-600">ACTIVE</Badge>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
+
 
         {/* ── SETTINGS TAB (legacy) ── */}
         <TabsContent value="settings" className="space-y-4">
@@ -744,14 +689,14 @@ export function AutomatedOutreach() {
         <TabsContent value="replies" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>Recent Replies ({replies.length})</CardTitle>
-              <CardDescription>Businesses that responded to your outreach</CardDescription>
+              <CardTitle>Email & Chatbot Status</CardTitle>
+              <CardDescription>Track email opens and chatbot link clicks</CardDescription>
             </CardHeader>
             <CardContent>
               {replies.length === 0 ? (
                 <div className="text-center py-8 text-gray-500">
-                  <MessageSquare className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                  <p>No replies yet</p>
+                  <Eye className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                  <p>No email opens or chatbot clicks yet</p>
                 </div>
               ) : (
                 <div className="space-y-3 max-h-96 overflow-y-auto">
@@ -762,19 +707,20 @@ export function AutomatedOutreach() {
                           <p className="font-medium">{reply.businessName}</p>
                           <p className="text-sm text-gray-600">{reply.ownerName}</p>
                         </div>
-                        <Badge className="bg-blue-600">REPLIED</Badge>
                       </div>
-                      <p className="text-sm bg-gray-50 p-2 rounded">{reply.replyText}</p>
-                      <div className="flex gap-2">
-                        <Button size="sm" className="bg-green-600 hover:bg-green-700"
-                          onClick={() => handleReplyStatusChange(reply.id, "interested")}>
-                          Interested
-                        </Button>
-                        <Button size="sm" variant="outline"
-                          onClick={() => handleReplyStatusChange(reply.id, "not_interested")}>
-                          Not Interested
-                        </Button>
+                      <div className="grid grid-cols-2 gap-2 text-sm">
+                        <div className="bg-blue-50 p-2 rounded">
+                          <p className="text-xs text-gray-600">Email Opens</p>
+                          <p className="font-semibold text-blue-600">{reply.emailOpenCount || 0}x</p>
+                        </div>
+                        <div className="bg-green-50 p-2 rounded">
+                          <p className="text-xs text-gray-600">Chatbot Clicks</p>
+                          <p className="font-semibold text-green-600">{reply.chatbotClickCount || 0}x</p>
+                        </div>
                       </div>
+                      {(reply.emailOpenCount > 0 || reply.chatbotClickCount > 0) && (
+                        <p className="text-xs text-gray-500">Last opened: {reply.lastOpenedAt ? new Date(reply.lastOpenedAt).toLocaleDateString() : 'N/A'}</p>
+                      )}
                     </div>
                   ))}
                 </div>
