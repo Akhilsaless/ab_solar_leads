@@ -39,7 +39,7 @@ const menuItems = [
   { icon: Search, label: "Find Leads", path: "/find-leads" },
   { icon: Handshake, label: "Partners", path: "/partners" },
   { icon: BarChart3, label: "Analytics", path: "/analytics" },
-  { icon: Sparkles, label: "AI Copilot", path: "/copilot" },
+  { icon: Sparkles, label: "Klaus", path: "/copilot" },
   { icon: Settings, label: "Settings", path: "/settings" },
 ];
 

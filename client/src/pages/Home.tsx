@@ -4,7 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   MessageSquare, Users, TrendingUp, Zap, ArrowRight,
-  Copy, ExternalLink, Sun, IndianRupee, Clock, Share2, Gift, BookOpen
+  Copy, ExternalLink, Sun, IndianRupee, Clock, Share2, Gift, BookOpen,
+  Mail, Eye, MousePointerClick, Bot, Send, Loader2
 } from "lucide-react";
 import { useState } from "react";
 import { useLocation } from "wouter";
@@ -131,6 +132,9 @@ export default function Home() {
         </Card>
       </div>
 
+      {/* Klaus AI Copilot — First thing visible on dashboard */}
+      <KlausWidget />
+
       {/* Stats Grid */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
@@ -163,28 +167,8 @@ export default function Home() {
         />
       </div>
 
-      {/* Referral Stats */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base">Referral Program</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="bg-orange-500/10 rounded-lg p-4 text-center">
-              <p className="text-2xl font-bold text-orange-400">₹500</p>
-              <p className="text-xs text-muted-foreground mt-1">Per signup</p>
-            </div>
-            <div className="bg-green-500/10 rounded-lg p-4 text-center">
-              <p className="text-2xl font-bold text-green-400">₹1,500</p>
-              <p className="text-xs text-muted-foreground mt-1">Per installation</p>
-            </div>
-          </div>
-          <Button size="sm" className="w-full gap-2" onClick={() => window.open("/admin/referrals", "_blank")}>
-            <Users className="w-4 h-4" />
-            Manage Referrals
-          </Button>
-        </CardContent>
-      </Card>
+      {/* Quick Outreach Stats */}
+      <OutreachQuickStats />
 
       {/* Two Column Layout */}
       <div className="grid lg:grid-cols-2 gap-6">
@@ -277,6 +261,127 @@ export default function Home() {
         </Card>
       </div>
     </div>
+  );
+}
+
+// ─── Klaus Mini Widget ──────────────────────────────────────────────────────
+function KlausWidget() {
+  const [, setLocation] = useLocation();
+  const [question, setQuestion] = useState("");
+  const askCopilot = trpc.copilot.askCopilot.useMutation();
+  const [lastAnswer, setLastAnswer] = useState("");
+
+  const handleAsk = () => {
+    if (!question.trim()) return;
+    askCopilot.mutate({ question }, {
+      onSuccess: (data) => {
+        setLastAnswer(data.answer);
+        setQuestion("");
+      },
+      onError: () => toast.error("Klaus couldn't respond. Try again."),
+    });
+  };
+
+  return (
+    <Card className="border-orange-500/30 bg-gradient-to-r from-orange-500/10 via-orange-500/5 to-transparent">
+      <CardContent className="pt-4 pb-4">
+        <div className="flex items-start gap-3">
+          <div className="w-10 h-10 rounded-xl bg-orange-500 flex items-center justify-center shrink-0 mt-0.5">
+            <Bot className="w-5 h-5 text-white" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center justify-between mb-2">
+              <div>
+                <p className="text-sm font-semibold">Agent Klaus</p>
+                <p className="text-xs text-muted-foreground">Your AI Copilot — ask anything about your leads, outreach, or stats</p>
+              </div>
+              <Button size="sm" variant="ghost" className="text-xs gap-1 shrink-0" onClick={() => setLocation("/copilot")}>
+                Open Full <ArrowRight className="w-3 h-3" />
+              </Button>
+            </div>
+            {lastAnswer && (
+              <div className="text-xs text-muted-foreground bg-secondary/50 rounded-lg px-3 py-2 mb-2 max-h-16 overflow-y-auto">
+                {lastAnswer}
+              </div>
+            )}
+            <div className="flex gap-2">
+              <input
+                className="flex-1 px-3 py-1.5 rounded-lg bg-secondary border border-border text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/50 placeholder:text-muted-foreground"
+                placeholder="Ask Klaus: how many emails sent today? who opened?"
+                value={question}
+                onChange={(e) => setQuestion(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleAsk()}
+              />
+              <Button
+                size="sm"
+                className="bg-orange-500 hover:bg-orange-600 text-white shrink-0"
+                onClick={handleAsk}
+                disabled={askCopilot.isPending || !question.trim()}
+              >
+                {askCopilot.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+              </Button>
+            </div>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ─── Outreach Quick Stats ────────────────────────────────────────────────────
+function OutreachQuickStats() {
+  const [, setLocation] = useLocation();
+  const { data: todayStats, isLoading } = trpc.automatedOutreach.runs.todayStats.useQuery();
+  const { data: leadsContacted } = trpc.automatedOutreach.runs.getLeadsContacted.useQuery();
+  const { data: emailStatus } = trpc.automatedOutreach.runs.getEmailStatus.useQuery();
+
+  const emailsSent = Number(todayStats?.totalEmailSent ?? 0);
+  const businessesContacted = (leadsContacted || []).length;
+  const emailOpens = (emailStatus || []).reduce((sum: number, b: any) => sum + (Number(b.emailOpenCount) || 0), 0);
+  const chatbotClicks = (emailStatus || []).reduce((sum: number, b: any) => sum + (Number(b.chatbotClickCount) || 0), 0);
+
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-base flex items-center gap-2">
+            <Mail className="w-4 h-4 text-orange-400" />
+            Today's Outreach
+          </CardTitle>
+          <Button variant="ghost" size="sm" onClick={() => setLocation("/automated-outreach")} className="text-xs gap-1">
+            View Details <ArrowRight className="w-3 h-3" />
+          </Button>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div className="bg-blue-500/10 rounded-lg p-3 text-center">
+            <p className="text-2xl font-bold text-blue-400">{isLoading ? "—" : emailsSent}</p>
+            <p className="text-xs text-muted-foreground mt-0.5 flex items-center justify-center gap-1">
+              <Mail className="w-3 h-3" /> Emails Sent
+            </p>
+          </div>
+          <div className="bg-green-500/10 rounded-lg p-3 text-center">
+            <p className="text-2xl font-bold text-green-400">{isLoading ? "—" : businessesContacted}</p>
+            <p className="text-xs text-muted-foreground mt-0.5 flex items-center justify-center gap-1">
+              <Users className="w-3 h-3" /> Contacted
+            </p>
+          </div>
+          <div className="bg-amber-500/10 rounded-lg p-3 text-center">
+            <p className="text-2xl font-bold text-amber-400">{isLoading ? "—" : emailOpens}</p>
+            <p className="text-xs text-muted-foreground mt-0.5 flex items-center justify-center gap-1">
+              <Eye className="w-3 h-3" /> Opens
+            </p>
+          </div>
+          <div className="bg-purple-500/10 rounded-lg p-3 text-center">
+            <p className="text-2xl font-bold text-purple-400">{isLoading ? "—" : chatbotClicks}</p>
+            <p className="text-xs text-muted-foreground mt-0.5 flex items-center justify-center gap-1">
+              <MousePointerClick className="w-3 h-3" /> Bot Clicks
+            </p>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 

@@ -94,7 +94,7 @@ export default function Copilot() {
             <Sparkles className="h-5 w-5 text-primary" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold">AI Copilot</h1>
+            <h1 className="text-2xl font-bold">Klaus</h1>
             <p className="text-sm text-muted-foreground">Level 4 Agent — queries live data, takes actions, remembers everything</p>
           </div>
         </div>
@@ -177,7 +177,7 @@ export default function Copilot() {
           <div className="flex items-center justify-between">
             <CardTitle className="text-base flex items-center gap-2">
               <Sparkles className="h-4 w-4 text-primary" />
-              Ask Your Copilot
+              Ask Klaus
               <Badge variant="outline" className="text-xs font-normal ml-1">Level 4 Agent</Badge>
             </CardTitle>
             {chatHistory.length > 0 && (

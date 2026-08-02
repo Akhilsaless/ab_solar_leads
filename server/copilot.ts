@@ -621,10 +621,16 @@ RULES:
         }
       }
 
-      // If loop ended without final answer
+      // If loop ended without final answer — do one more LLM call to summarise tool results into a human-readable response
       if (!finalAnswer) {
-        const lastMsg = messages[messages.length - 1];
-        finalAnswer = lastMsg?.content || "I completed the task. Let me know if you need anything else.";
+        const summaryResp = await invokeLLM({
+          messages: [
+            ...messages,
+            { role: "user", content: "Based on the tool results above, give a clear, concise, human-readable answer to my original question. Be specific with real numbers and business names from the data. Never return raw JSON or empty arrays." }
+          ],
+        });
+        const rawContent = summaryResp?.choices?.[0]?.message?.content;
+        finalAnswer = (typeof rawContent === "string" ? rawContent : rawContent ? JSON.stringify(rawContent) : "") || "I completed the task. Let me know if you need anything else.";
       }
 
       // Save assistant response to memory

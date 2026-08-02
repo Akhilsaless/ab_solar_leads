@@ -158,7 +158,7 @@ function AICopilotCard({ uniqueCode, referrals, referrer }: { uniqueCode: string
           </div>
           {answer && (
             <div style={{ marginTop: 10, background: C.surface2, border: `1px solid ${C.borderGreen}`, borderRadius: 8, padding: "12px 14px" }}>
-              <p style={{ margin: "0 0 4px", fontSize: 11, color: C.green, fontWeight: 600 }}>🤖 Copilot says:</p>
+              <p style={{ margin: "0 0 4px", fontSize: 11, color: C.green, fontWeight: 600 }}>🤖 Klaus says:</p>
               <p style={{ margin: 0, fontSize: 12, color: C.subtle, lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{answer}</p>
             </div>
           )}
