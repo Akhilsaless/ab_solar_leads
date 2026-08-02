@@ -119,8 +119,75 @@ export default function ReferralManagement() {
       {/* Links Tab */}
       {selectedTab === "links" && (
         <div className="space-y-4">
+          {/* Referrer Recruitment Video */}
+          <Card className="bg-gradient-to-r from-green-500/10 via-green-500/5 to-transparent border-green-500/20">
+            <div className="p-5">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-xl bg-green-600 flex items-center justify-center shrink-0 mt-0.5">
+                  <span className="text-white text-lg">🎬</span>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold">Referrer Recruitment Video</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">Share this video to recruit new referrers — ₹50 bonus on signup</p>
+                  <p className="text-xs text-green-500 font-mono mt-1 truncate">{window.location.origin}/product-guide</p>
+                </div>
+                <div className="flex gap-2 shrink-0">
+                  <Button size="sm" variant="ghost" onClick={() => copyToClipboard(`${window.location.origin}/product-guide`)}>
+                    <Copy className="w-4 h-4" />
+                  </Button>
+                  <Button size="sm" variant="outline" className="gap-1.5 text-xs" onClick={() => window.open(`/product-guide`, "_blank")}>
+                    View
+                  </Button>
+                  <Button size="sm" className="gap-1.5 text-xs bg-green-600 hover:bg-green-700 text-white" onClick={() => { const msg = encodeURIComponent(`💰 *Earn ₹1,500 per Solar Installation!*\n\nAgent Klaus does all the work. You just share your link and earn.\n\n🎬 Demo Video:\nhttps://files.manuscdn.com/user_upload_by_module/session_file/310519663486128902/QdycXBdVpQteWfXP.mp4\n\n🔗 Sign Up & Get Your Code:\n${window.location.origin}/referrer-signup\n\n✅ ₹50 bonus on signup\n✅ No selling needed\n✅ Earn ₹1,500 per installation`); window.open(`https://wa.me/?text=${msg}`, "_blank"); }}>
+                    📱 Share
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </Card>
+
+          {/* Chatbot Link + Referral Link */}
+          <div className="grid md:grid-cols-2 gap-4">
+            <Card className="bg-gradient-to-r from-primary/10 via-primary/5 to-transparent border-primary/20">
+              <div className="p-5">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center shrink-0">
+                    <span className="text-white text-base">⚡</span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium">Chatbot Link</p>
+                    <p className="text-xs text-muted-foreground mt-0.5 truncate font-mono">{window.location.origin}/chat/demo</p>
+                  </div>
+                  <Button size="sm" variant="ghost" onClick={() => copyToClipboard(`${window.location.origin}/chat/demo`)}>
+                    <Copy className="w-4 h-4" />
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground mt-3">Share with customers to start a solar quote conversation</p>
+              </div>
+            </Card>
+
+            <Card className="bg-gradient-to-r from-orange-500/10 via-orange-500/5 to-transparent border-orange-500/20">
+              <div className="p-5">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-orange-500 flex items-center justify-center shrink-0">
+                    <span className="text-white text-base">🎁</span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium">Referral Link</p>
+                    <p className="text-xs text-muted-foreground mt-0.5 truncate font-mono">{window.location.origin}/referral-landing</p>
+                  </div>
+                  <Button size="sm" variant="ghost" onClick={() => copyToClipboard(`${window.location.origin}/referral-landing`)}>
+                    <Copy className="w-4 h-4" />
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground mt-3">Landing page for referrers to sign up and get their unique code</p>
+              </div>
+            </Card>
+          </div>
+
+          {/* Existing links */}
           <Card className="bg-white/10 border-white/20 p-6">
-            <h2 className="text-xl font-bold text-white mb-4">Share These Links</h2>
+            <h2 className="text-xl font-bold text-white mb-4">More Share Links</h2>
             <div className="space-y-4">
               <div>
                 <label className="block text-sm text-gray-300 mb-2">Referrer Signup Link</label>

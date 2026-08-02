@@ -65,73 +65,6 @@ export default function Home() {
         </div>
       </div>
 
-      {/* Referrer Recruitment Video Card */}
-      <Card className="bg-gradient-to-r from-green-500/10 via-green-500/5 to-transparent border-green-500/20">
-        <CardContent className="py-4">
-          <div className="flex items-start gap-3">
-            <div className="w-10 h-10 rounded-xl bg-green-600 flex items-center justify-center shrink-0 mt-0.5">
-              <span className="text-white text-lg">🎬</span>
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold">Referrer Recruitment Video</p>
-              <p className="text-xs text-muted-foreground mt-0.5">Share this video to recruit new referrers — ₹50 bonus on signup</p>
-              <p className="text-xs text-green-600 font-mono mt-1 truncate">{window.location.origin}/product-guide</p>
-            </div>
-            <div className="flex gap-2 shrink-0">
-              <Button size="sm" variant="ghost" onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/product-guide`); toast.success("Video link copied!"); }}>
-                <Copy className="w-4 h-4" />
-              </Button>
-              <Button size="sm" variant="outline" className="gap-1.5 text-xs" onClick={() => window.open(`/product-guide`, "_blank")}>
-                <ExternalLink className="w-3.5 h-3.5" />
-                View
-              </Button>
-              <Button size="sm" className="gap-1.5 text-xs bg-green-600 hover:bg-green-700 text-white" onClick={() => { const msg = encodeURIComponent(`💰 *Earn ₹1,500 per Solar Installation!*\n\nAgent Klaus does all the work. You just share your link and earn.\n\n🎬 Demo Video:\nhttps://files.manuscdn.com/user_upload_by_module/session_file/310519663486128902/QdycXBdVpQteWfXP.mp4\n\n🔗 Sign Up & Get Your Code:\n${window.location.origin}/referrer-signup\n\n✅ ₹50 bonus on signup\n✅ No selling needed\n✅ Earn ₹1,500 per installation`); window.open(`https://wa.me/?text=${msg}`, "_blank"); }}>
-                📱 Share
-              </Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Links Banner */}
-      <div className="grid md:grid-cols-2 gap-4">
-        {/* Chat Link */}
-        <Card className="bg-gradient-to-r from-primary/10 via-primary/5 to-transparent border-primary/20">
-          <CardContent className="py-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl solar-gradient flex items-center justify-center shrink-0">
-                <Zap className="w-5 h-5 text-black" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium">Chatbot Link</p>
-                <p className="text-xs text-muted-foreground mt-0.5 truncate font-mono">{chatLink}</p>
-              </div>
-              <Button size="sm" variant="ghost" onClick={() => { navigator.clipboard.writeText(chatLink); toast.success("Copied!"); }}>
-                <Copy className="w-4 h-4" />
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Referral Link */}
-        <Card className="bg-gradient-to-r from-orange-500/10 via-orange-500/5 to-transparent border-orange-500/20">
-          <CardContent className="py-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-orange-500 flex items-center justify-center shrink-0">
-                <Gift className="w-5 h-5 text-white" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium">Referral Link</p>
-                <p className="text-xs text-muted-foreground mt-0.5 truncate font-mono">{window.location.origin}/referral-landing</p>
-              </div>
-              <Button size="sm" variant="ghost" onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/referral-landing`); toast.success("Copied!"); }}>
-                <Copy className="w-4 h-4" />
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
       {/* Klaus AI Copilot — First thing visible on dashboard */}
       <KlausWidget />
 
@@ -265,63 +198,106 @@ export default function Home() {
 }
 
 // ─── Klaus Mini Widget ──────────────────────────────────────────────────────
+const QUICK_PROMPTS = [
+  "How many emails sent today?",
+  "Who opened emails?",
+  "Show hot leads",
+  "Today's full stats",
+];
+
 function KlausWidget() {
   const [, setLocation] = useLocation();
   const [question, setQuestion] = useState("");
   const askCopilot = trpc.copilot.askCopilot.useMutation();
-  const [lastAnswer, setLastAnswer] = useState("");
+  const [messages, setMessages] = useState<Array<{ role: "user" | "assistant"; text: string }>>([]);
 
-  const handleAsk = () => {
-    if (!question.trim()) return;
-    askCopilot.mutate({ question }, {
+  const handleAsk = (q?: string) => {
+    const text = (q || question).trim();
+    if (!text) return;
+    setMessages(prev => [...prev, { role: "user", text }]);
+    setQuestion("");
+    askCopilot.mutate({ question: text }, {
       onSuccess: (data) => {
-        setLastAnswer(data.answer);
-        setQuestion("");
+        setMessages(prev => [...prev, { role: "assistant", text: data.answer }]);
       },
-      onError: () => toast.error("Klaus couldn't respond. Try again."),
+      onError: () => {
+        setMessages(prev => [...prev, { role: "assistant", text: "Sorry, I couldn't get that. Try again." }]);
+      },
     });
   };
 
   return (
-    <Card className="border-orange-500/30 bg-gradient-to-r from-orange-500/10 via-orange-500/5 to-transparent">
-      <CardContent className="pt-4 pb-4">
-        <div className="flex items-start gap-3">
-          <div className="w-10 h-10 rounded-xl bg-orange-500 flex items-center justify-center shrink-0 mt-0.5">
-            <Bot className="w-5 h-5 text-white" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center justify-between mb-2">
-              <div>
-                <p className="text-sm font-semibold">Agent Klaus</p>
-                <p className="text-xs text-muted-foreground">Your AI Copilot — ask anything about your leads, outreach, or stats</p>
-              </div>
-              <Button size="sm" variant="ghost" className="text-xs gap-1 shrink-0" onClick={() => setLocation("/copilot")}>
-                Open Full <ArrowRight className="w-3 h-3" />
-              </Button>
+    <Card className="border-orange-500/30 bg-gradient-to-br from-orange-500/10 via-orange-500/5 to-transparent">
+      <CardHeader className="pb-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-orange-500 flex items-center justify-center shrink-0">
+              <Bot className="w-5 h-5 text-white" />
             </div>
-            {lastAnswer && (
-              <div className="text-xs text-muted-foreground bg-secondary/50 rounded-lg px-3 py-2 mb-2 max-h-16 overflow-y-auto">
-                {lastAnswer}
+            <div>
+              <p className="font-semibold">Agent Klaus</p>
+              <p className="text-xs text-muted-foreground">Level 4 AI Copilot — live data, actions, memory</p>
+            </div>
+          </div>
+          <Button size="sm" variant="outline" className="text-xs gap-1 shrink-0" onClick={() => setLocation("/copilot")}>
+            Full Chat <ArrowRight className="w-3 h-3" />
+          </Button>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {/* Message history */}
+        {messages.length > 0 && (
+          <div className="space-y-2 max-h-48 overflow-y-auto">
+            {messages.map((m, i) => (
+              <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
+                <div className={`max-w-[85%] rounded-xl px-3 py-2 text-sm ${
+                  m.role === "user"
+                    ? "bg-orange-500 text-white"
+                    : "bg-secondary text-foreground"
+                }`}>
+                  {m.text}
+                </div>
+              </div>
+            ))}
+            {askCopilot.isPending && (
+              <div className="flex justify-start">
+                <div className="bg-secondary rounded-xl px-3 py-2">
+                  <Loader2 className="w-4 h-4 animate-spin text-orange-400" />
+                </div>
               </div>
             )}
-            <div className="flex gap-2">
-              <input
-                className="flex-1 px-3 py-1.5 rounded-lg bg-secondary border border-border text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/50 placeholder:text-muted-foreground"
-                placeholder="Ask Klaus: how many emails sent today? who opened?"
-                value={question}
-                onChange={(e) => setQuestion(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleAsk()}
-              />
-              <Button
-                size="sm"
-                className="bg-orange-500 hover:bg-orange-600 text-white shrink-0"
-                onClick={handleAsk}
-                disabled={askCopilot.isPending || !question.trim()}
-              >
-                {askCopilot.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-              </Button>
-            </div>
           </div>
+        )}
+        {/* Quick prompts */}
+        {messages.length === 0 && (
+          <div className="flex flex-wrap gap-2">
+            {QUICK_PROMPTS.map((p) => (
+              <button
+                key={p}
+                onClick={() => handleAsk(p)}
+                className="text-xs px-3 py-1.5 rounded-full bg-orange-500/10 border border-orange-500/20 text-orange-400 hover:bg-orange-500/20 transition-colors"
+              >
+                {p}
+              </button>
+            ))}
+          </div>
+        )}
+        {/* Input */}
+        <div className="flex gap-2">
+          <input
+            className="flex-1 px-3 py-2 rounded-lg bg-secondary border border-border text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/50 placeholder:text-muted-foreground"
+            placeholder="Ask Klaus anything about your business..."
+            value={question}
+            onChange={(e) => setQuestion(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleAsk()}
+          />
+          <Button
+            className="bg-orange-500 hover:bg-orange-600 text-white shrink-0"
+            onClick={() => handleAsk()}
+            disabled={askCopilot.isPending || !question.trim()}
+          >
+            {askCopilot.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+          </Button>
         </div>
       </CardContent>
     </Card>

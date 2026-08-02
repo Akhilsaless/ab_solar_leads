@@ -136,12 +136,12 @@ const normalizeContentPart = (
   throw new Error("Unsupported message content part");
 };
 
-const normalizeMessage = (message: Message) => {
-  const { role, name, tool_call_id } = message;
+const normalizeMessage = (message: any) => {
+  const { role, name, tool_call_id, tool_calls } = message;
 
   if (role === "tool" || role === "function") {
     const content = ensureArray(message.content)
-      .map(part => (typeof part === "string" ? part : JSON.stringify(part)))
+      .map((part: any) => (typeof part === "string" ? part : JSON.stringify(part)))
       .join("\n");
 
     return {
@@ -149,6 +149,16 @@ const normalizeMessage = (message: Message) => {
       name,
       tool_call_id,
       content,
+    };
+  }
+
+  // Assistant messages with tool_calls must preserve them for multi-turn agentic loops
+  if (role === "assistant" && tool_calls && tool_calls.length > 0) {
+    return {
+      role,
+      name,
+      content: typeof message.content === "string" ? message.content : "",
+      tool_calls,
     };
   }
 
@@ -280,7 +290,7 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
   } = params;
 
   const payload: Record<string, unknown> = {
-    model: "gemini-2.5-flash",
+    model: "gpt-5-mini",
     messages: messages.map(normalizeMessage),
   };
 
@@ -296,10 +306,7 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
     payload.tool_choice = normalizedToolChoice;
   }
 
-  payload.max_tokens = 32768
-  payload.thinking = {
-    "budget_tokens": 128
-  }
+  payload.max_tokens = 4096
 
   const normalizedResponseFormat = normalizeResponseFormat({
     responseFormat,
