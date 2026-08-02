@@ -409,7 +409,7 @@ export const partnerRouter = router({
       const dbConn = await db.getDb();
       if (!dbConn) return null;
       const partner = firstRow(await dbConn.execute(
-        sql`SELECT id, companyName, email, phone, whatsappNumber, serviceAreas, status, pricingSheetUrl, productListUrl
+        sql`SELECT id, companyName, email, phone, whatsappNumber, serviceAreas, status, pricingSheetUrl, productListUrl, products, pricing, discounts
             FROM solarPartners WHERE loginToken = ${input.token}`
       ));
       return partner || null;

@@ -400,20 +400,40 @@ export default function PartnerDashboard() {
                 {profileQuery.isLoading ? (
                   <div className="flex items-center justify-center py-8"><Loader2 className="w-6 h-6 animate-spin text-orange-400" /></div>
                 ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {[
-                      { label: "Company Name", value: profile?.companyName },
-                      { label: "Email", value: profile?.email },
-                      { label: "Phone", value: profile?.phone },
-                      { label: "WhatsApp", value: profile?.whatsappNumber },
-                      { label: "Service Areas", value: profile?.serviceAreas },
-                      { label: "Status", value: profile?.status },
-                    ].map(f => f.value ? (
-                      <div key={f.label}>
-                        <p className="text-xs text-muted-foreground mb-0.5">{f.label}</p>
-                        <p className="text-sm text-foreground font-medium">{f.value}</p>
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {[
+                        { label: "Company Name", value: profile?.companyName },
+                        { label: "Email", value: profile?.email },
+                        { label: "Phone", value: profile?.phone },
+                        { label: "WhatsApp", value: profile?.whatsappNumber },
+                        { label: "Service Areas", value: Array.isArray(profile?.serviceAreas) ? profile.serviceAreas.join(", ") : profile?.serviceAreas },
+                        { label: "Status", value: profile?.status },
+                      ].map(f => f.value ? (
+                        <div key={f.label}>
+                          <p className="text-xs text-muted-foreground mb-0.5">{f.label}</p>
+                          <p className="text-sm text-foreground font-medium">{f.value}</p>
+                        </div>
+                      ) : null)}
+                    </div>
+                    {profile?.products && (
+                      <div className="p-3 rounded-lg bg-orange-500/5 border border-orange-500/20">
+                        <p className="text-xs text-orange-400 font-semibold mb-1">Products & Services</p>
+                        <p className="text-sm text-foreground">{profile.products}</p>
                       </div>
-                    ) : null)}
+                    )}
+                    {profile?.pricing && (
+                      <div className="p-3 rounded-lg bg-green-500/5 border border-green-500/20">
+                        <p className="text-xs text-green-400 font-semibold mb-1">Pricing Details</p>
+                        <p className="text-sm text-foreground">{profile.pricing}</p>
+                      </div>
+                    )}
+                    {profile?.discounts && (
+                      <div className="p-3 rounded-lg bg-blue-500/5 border border-blue-500/20">
+                        <p className="text-xs text-blue-400 font-semibold mb-1">Current Discounts & Offers</p>
+                        <p className="text-sm text-foreground">{profile.discounts}</p>
+                      </div>
+                    )}
                   </div>
                 )}
               </CardContent>
