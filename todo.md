@@ -354,13 +354,13 @@
 
 ## Partner Dashboard Improvements (Aug 2026)
 - [x] Add pricingSheetUrl and productListUrl columns to solarPartners table via migration
-- [ ] Add file upload endpoints for partner pricing sheet and product list (S3)
-- [ ] Partner dashboard: add stats cards (total leads, contacted, converted, pending)
-- [ ] Partner dashboard: add lead status update buttons (contacted/converted/lost)
-- [ ] Partner dashboard: show solar estimate per lead (kW, cost, subsidy, net cost)
-- [ ] Partner dashboard: add Marketing Automation "Coming Soon" card with Notify Me button
-- [ ] Chatbot: remove roof type, roof size, structure type, shade/sun exposure questions from system prompt
-- [ ] Chatbot: add property address and installation timeline questions
-- [ ] Chatbot: use partner's uploaded pricing sheet when generating estimates
-- [ ] Leads table: save solar estimate fields (kW, cost, subsidy, net cost) when lead is created from conversation
-- [ ] Leads table: remove roof condition and sun exposure from lead display in admin
+- [x] Add file upload endpoints for partner pricing sheet and product list (S3)
+- [x] Partner dashboard: add stats cards (total leads, contacted, converted, pending)
+- [x] Partner dashboard: add lead status update buttons (contacted/converted/lost)
+- [x] Partner dashboard: show solar estimate per lead (kW, cost, subsidy, net cost)
+- [x] Partner dashboard: add Marketing Automation "Coming Soon" card with Notify Me button
+- [x] Chatbot: remove roof type, roof size, structure type, shade/sun exposure questions from system prompt
+- [x] Chatbot: add property address and installation timeline questions
+- [x] Chatbot: use partner's uploaded pricing sheet when generating estimates
+- [x] Leads table: save solar estimate fields (kW, cost, subsidy, net cost) when lead is created from conversation
+- [x] Leads table: remove roof condition and sun exposure from lead display in admin

@@ -465,6 +465,11 @@ export const appRouter = router({
               homeownershipType: extractedData?.propertyType || undefined,
               installationTimeline: extractedData?.installationTimeline || undefined,
               propertyAddress: extractedData?.propertyAddress || undefined,
+              systemSizeKw: conversation.recommendedKw ? conversation.recommendedKw.toString() : undefined,
+              systemCost: conversation.estimatedCost ? conversation.estimatedCost.toString() : undefined,
+              subsidyAmount: conversation.subsidyAmount ? conversation.subsidyAmount.toString() : undefined,
+              netCost: conversation.netCost ? conversation.netCost.toString() : undefined,
+              monthlySavings: conversation.estimatedSavingsMonthly ? conversation.estimatedSavingsMonthly.toString() : undefined,
               notes: `Lead captured via AI chat bot. Session: ${input.sessionId}`,
             });
 
