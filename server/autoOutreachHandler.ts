@@ -139,6 +139,35 @@ function buildEmailHtml(subject: string, body: string): string {
     + "</div></div></body></html>";
 }
 
+/**
+ * Try to extract an email address from a business website.
+ * Fetches the homepage and looks for mailto: links or email patterns.
+ */
+async function extractEmailFromWebsite(website: string): Promise<string | null> {
+  try {
+    const url = website.startsWith("http") ? website : "https://" + website;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5000);
+    const resp = await fetch(url, { signal: controller.signal, headers: { "User-Agent": "Mozilla/5.0" } });
+    clearTimeout(timeout);
+    const html = await resp.text();
+    // Look for mailto: links first
+    const mailtoMatch = html.match(/mailto:([a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,})/i);
+    if (mailtoMatch) return mailtoMatch[1].toLowerCase();
+    // Fallback: look for email pattern in text
+    const emailMatch = html.match(/[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/g);
+    if (emailMatch) {
+      // Filter out common non-contact emails
+      const filtered = emailMatch.filter(e =>
+        !e.includes("sentry") && !e.includes("example") && !e.includes("noreply") &&
+        !e.includes("@2x") && !e.includes(".png") && !e.includes(".jpg") && !e.endsWith(".js")
+      );
+      if (filtered.length > 0) return filtered[0].toLowerCase();
+    }
+  } catch { /* ignore fetch errors */ }
+  return null;
+}
+
 async function getOutreachConfig(agencyId: number) {
   const db = await getDb();
   if (!db) return null;
@@ -225,7 +254,7 @@ async function upsertScrapedBusiness(biz: any, runId?: number) {
 /**
  * The actual processing work — runs in background after HTTP response is sent.
  */
-async function processOutreachInBackground(slot: number, city: string, state: string, runId: number) {
+async function processOutreachInBackground(slot: number, city: string, state: string, runId: number, config?: any) {
   const slotConfig = SLOT_CONFIG[slot];
   let scrapedCount = 0, eligibleCount = 0, emailSentCount = 0, whatsappSentCount = 0, errorCount = 0;
 
@@ -275,21 +304,41 @@ async function processOutreachInBackground(slot: number, city: string, state: st
 
         await upsertScrapedBusiness(biz, runId);
 
+        // Try to extract email from website if not already available
+        if (!biz.email && biz.website) {
+          biz.email = await extractEmailFromWebsite(biz.website);
+          if (biz.email) {
+            // Update the DB record with the extracted email
+            const db2 = await getDb();
+            if (db2) {
+              await db2.execute(sql`UPDATE scrapedBusinesses SET email = ${biz.email} WHERE agencyId = ${biz.agencyId} AND placeId = ${biz.placeId}`);
+            }
+          }
+        }
+
         const score = calcSolarScore(biz);
         if (score < 70) continue;
         eligibleCount++;
 
+        const contactMethod: string = config?.contactMethod || "both";
+        const hasEmail = !!biz.email;
+        const hasPhone = !!biz.phone;
+
+        // Skip if contact method doesn't match available channels
+        if (contactMethod === "email" && !hasEmail) continue;
+        if (contactMethod === "whatsapp" && !hasPhone) continue;
+
         const { subject, body, whatsapp } = await generateAiPitch(biz, slot, BOT_LINK);
         const emailSentAt = Date.now();
 
-        if (biz.email) {
+        if (hasEmail && (contactMethod === "email" || contactMethod === "both")) {
           const emailHtml = buildEmailHtml(subject, body);
           await sendEmail({ to: biz.email, subject, html: emailHtml });
           emailSentCount++;
           await markContacted(1, biz.placeId, emailSentAt);
         }
 
-        if (biz.phone) {
+        if (hasPhone && (contactMethod === "whatsapp" || contactMethod === "both")) {
           // WhatsApp placeholder — activated when WhatsApp API is connected
           void whatsapp;
           whatsappSentCount++;
@@ -327,6 +376,8 @@ export async function autoOutreachHandler(req: Request, res: Response) {
     const config = await getOutreachConfig(1);
     const city = config?.targetCity || "Hyderabad";
     const state = config?.targetState || "Telangana";
+    const contactMethod = config?.contactMethod || "both";
+    void contactMethod; // passed into processOutreachInBackground via config
 
     // Create the run record immediately
     const runId = await createOutreachRun(1, slot, slotConfig.label, city, state);
@@ -335,7 +386,7 @@ export async function autoOutreachHandler(req: Request, res: Response) {
     res.json({ success: true, slot, city, state, businessType: slotConfig.label, runId, status: "processing" });
 
     // ── Process in background (fire-and-forget) ───────────────────────────────
-    processOutreachInBackground(slot, city, state, runId).catch(err => {
+    processOutreachInBackground(slot, city, state, runId, config).catch(err => {
       console.error("[AutoOutreach] Unhandled background error:", err);
     });
 

@@ -97,6 +97,7 @@ export function AutomatedOutreach() {
   const [smartCity, setSmartCity] = useState("");
   const [smartState, setSmartState] = useState("");
   const [smartEnabled, setSmartEnabled] = useState(true);
+  const [contactMethod, setContactMethod] = useState<"email" | "whatsapp" | "both">("both");
 
   // Smart cron queries
   const smartConfigQuery = trpc.automatedOutreach.smartConfig.get.useQuery();
@@ -116,6 +117,9 @@ export function AutomatedOutreach() {
       setSmartCity(smartConfigQuery.data.targetCity || "Hyderabad");
       setSmartState(smartConfigQuery.data.targetState || "Telangana");
       setSmartEnabled(!!smartConfigQuery.data.isEnabled);
+      if (smartConfigQuery.data.contactMethod) {
+        setContactMethod(smartConfigQuery.data.contactMethod as "email" | "whatsapp" | "both");
+      }
     }
   }, [smartConfigQuery.data]);
 
@@ -265,7 +269,7 @@ export function AutomatedOutreach() {
                     checked={smartEnabled}
                     onCheckedChange={v => {
                       setSmartEnabled(v);
-                      updateSmartConfig.mutate({ targetCity: smartCity, targetState: smartState, isEnabled: v });
+                      updateSmartConfig.mutate({ targetCity: smartCity, targetState: smartState, isEnabled: v, contactMethod });
                     }}
                   />
                 </div>
@@ -290,9 +294,20 @@ export function AutomatedOutreach() {
                     </SelectContent>
                   </Select>
                 </div>
+                <div className="flex-1">
+                  <Label className="text-xs mb-1.5 block">Contact Method</Label>
+                  <Select value={contactMethod} onValueChange={v => setContactMethod(v as "email" | "whatsapp" | "both")}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="both">📧📱 Email + WhatsApp</SelectItem>
+                      <SelectItem value="email">📧 Email Only</SelectItem>
+                      <SelectItem value="whatsapp">📱 WhatsApp Only</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
                 <div className="flex items-end">
                   <Button
-                    onClick={() => updateSmartConfig.mutate({ targetCity: smartCity, targetState: smartState, isEnabled: smartEnabled })}
+                    onClick={() => updateSmartConfig.mutate({ targetCity: smartCity, targetState: smartState, isEnabled: smartEnabled, contactMethod })}
                     disabled={updateSmartConfig.isPending || !smartCity || !smartState}
                     className="bg-orange-500 hover:bg-orange-600 text-white whitespace-nowrap"
                   >

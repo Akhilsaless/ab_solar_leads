@@ -459,6 +459,7 @@ export const automatedOutreachRouter = router({
         targetCity: z.string(),
         targetState: z.string(),
         isEnabled: z.boolean().optional(),
+        contactMethod: z.enum(["email", "whatsapp", "both"]).optional(),
       }))
       .mutation(async ({ ctx, input }) => {
         if (!ctx.user) throw new Error("Unauthorized");
@@ -467,10 +468,11 @@ export const automatedOutreachRouter = router({
         const dbConn = await db.getDb();
         if (!dbConn) throw new Error("DB error");
         const enabled = input.isEnabled !== undefined ? (input.isEnabled ? 1 : 0) : 1;
+        const method = input.contactMethod || "both";
         await dbConn.execute(sql`
-          INSERT INTO outreachConfig (agencyId, targetCity, targetState, isEnabled)
-          VALUES (${agency.id}, ${input.targetCity}, ${input.targetState}, ${enabled})
-          ON DUPLICATE KEY UPDATE targetCity = ${input.targetCity}, targetState = ${input.targetState}, isEnabled = ${enabled}
+          INSERT INTO outreachConfig (agencyId, targetCity, targetState, isEnabled, contactMethod)
+          VALUES (${agency.id}, ${input.targetCity}, ${input.targetState}, ${enabled}, ${method})
+          ON DUPLICATE KEY UPDATE targetCity = ${input.targetCity}, targetState = ${input.targetState}, isEnabled = ${enabled}, contactMethod = ${method}
         `);
         return { success: true };
       }),
