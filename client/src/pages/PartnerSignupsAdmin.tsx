@@ -193,13 +193,13 @@ export default function PartnerSignupsAdmin() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Company</TableHead>
-                    <TableHead>Contact</TableHead>
                     <TableHead>Email</TableHead>
                     <TableHead>Phone</TableHead>
-                    <TableHead>Location</TableHead>
+                    <TableHead>Products</TableHead>
+                    <TableHead>Pricing</TableHead>
+                    <TableHead>Discounts</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Signed Up</TableHead>
-                    <TableHead>Partner Link</TableHead>
                     <TableHead>Action</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -207,24 +207,26 @@ export default function PartnerSignupsAdmin() {
                   {signups.map((signup: any) => (
                     <TableRow key={signup.id}>
                       <TableCell className="font-medium">{signup.companyName}</TableCell>
-                      <TableCell>{signup.contactName}</TableCell>
                       <TableCell>
-                        <a href={`mailto:${signup.email}`} className="text-blue-600 hover:underline flex items-center gap-1">
+                        <a href={`mailto:${signup.email}`} className="text-blue-600 hover:underline flex items-center gap-1 text-sm">
                           <Mail className="w-3.5 h-3.5" />
                           {signup.email}
                         </a>
                       </TableCell>
                       <TableCell>
-                        <a href={`tel:${signup.phone}`} className="text-blue-600 hover:underline flex items-center gap-1">
+                        <a href={`tel:${signup.phone}`} className="text-blue-600 hover:underline flex items-center gap-1 text-sm">
                           <Phone className="w-3.5 h-3.5" />
                           {signup.phone}
                         </a>
                       </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1 text-sm">
-                          <MapPin className="w-3.5 h-3.5" />
-                          {signup.city}, {signup.state}
-                        </div>
+                      <TableCell className="text-sm max-w-xs">
+                        <div className="truncate" title={signup.products}>{signup.products || '-'}</div>
+                      </TableCell>
+                      <TableCell className="text-sm max-w-xs">
+                        <div className="truncate" title={signup.pricing}>{signup.pricing || '-'}</div>
+                      </TableCell>
+                      <TableCell className="text-sm max-w-xs">
+                        <div className="truncate" title={signup.discounts}>{signup.discounts || '-'}</div>
                       </TableCell>
                       <TableCell>
                         <Badge className={getStatusColor(signup.status)}>
@@ -234,20 +236,8 @@ export default function PartnerSignupsAdmin() {
                       <TableCell className="text-sm text-muted-foreground">
                         <div className="flex items-center gap-1">
                           <Calendar className="w-3.5 h-3.5" />
-                          {new Date(signup.createdAt).toLocaleDateString()}
+                          {new Date(signup.signedUpAt).toLocaleDateString()}
                         </div>
-                      </TableCell>
-                      <TableCell>
-                        {signup.partnerSlug ? (
-                          <div className="flex items-center gap-1">
-                            <span className="text-xs font-mono text-muted-foreground truncate max-w-[120px]">/partner/{signup.partnerSlug}</span>
-                            <button onClick={() => copyLink(`${window.location.origin}/partner/${signup.partnerSlug}`)} className="p-1 rounded hover:bg-muted transition-colors" title="Copy partner link">
-                              <Copy className="w-3.5 h-3.5 text-muted-foreground" />
-                            </button>
-                          </div>
-                        ) : (
-                          <span className="text-xs text-muted-foreground italic">No link yet</span>
-                        )}
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
