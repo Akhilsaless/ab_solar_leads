@@ -32,6 +32,8 @@ import { DualLeadPages } from "@/pages/DualLeadPages";
 import { SolarBenefitsVideo } from "@/pages/SolarBenefitsVideo";
 import PartnerSignupsAdmin from "@/pages/PartnerSignupsAdmin";
 import Copilot from "@/pages/Copilot";
+import FindLeads from "@/pages/FindLeads";
+import Partners from "@/pages/Partners";
 import DashboardLayout from "@/components/DashboardLayout";
 import { Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
@@ -48,16 +50,20 @@ function AuthenticatedRoutes() {
         <Route path="/conversations/:id" component={ConversationDetail} />
         <Route path="/products" component={Products} />
         <Route path="/analytics" component={Analytics} />
+        {/* New merged routes */}
+        <Route path="/find-leads" component={FindLeads} />
+        <Route path="/partners" component={Partners} />
+        {/* Legacy routes kept for backward compatibility */}
         <Route path="/scraper" component={BusinessScraper} />
         <Route path="/scraped-contacts" component={ScrapedContacts} />
-      <Route path="/automated-outreach" component={AutomatedOutreach} />
-      <Route path="/whatsapp-settings" component={WhatsAppSettings} />
-      <Route path="/qr-generator" component={QRCodeGenerator} />
-      <Route path="/dual-leads" component={DualLeadPages} />
-      <Route path="/solar-video" component={SolarBenefitsVideo} />
-      <Route path="/partner-signups" component={PartnerSignupsAdmin} />
-      <Route path="/copilot" component={Copilot} />
-      <Route path="/subsidies" component={Subsidies} />
+        <Route path="/automated-outreach" component={AutomatedOutreach} />
+        <Route path="/whatsapp-settings" component={WhatsAppSettings} />
+        <Route path="/qr-generator" component={QRCodeGenerator} />
+        <Route path="/dual-leads" component={DualLeadPages} />
+        <Route path="/solar-video" component={SolarBenefitsVideo} />
+        <Route path="/partner-signups" component={PartnerSignupsAdmin} />
+        <Route path="/copilot" component={Copilot} />
+        <Route path="/subsidies" component={Subsidies} />
         <Route path="/pricing" component={Pricing} />
         <Route path="/settings" component={Settings} />
         <Route component={NotFound} />

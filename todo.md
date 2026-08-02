@@ -385,3 +385,10 @@
 - [x] smartConfig and runs tRPC procedures (city/state selector, run history, today stats)
 - [x] AutomatedOutreach page - Smart Auto tab as default with city/state selector, schedule, run history
 - [x] 5 Heartbeat cron jobs registered (8 AM, 10:30 AM, 1 PM, 4 PM, 7 PM IST)
+
+## Navigation Reorganisation (Aug 2026)
+- [x] DashboardLayout sidebar: 9 items in correct order (Dashboard, Conversations, Leads, Automated Outreach, Find Leads, Partners, Analytics, AI Copilot, Settings)
+- [x] Merge Business Scraper + Scraped Contacts into single Find Leads page with tabs
+- [x] Merge Partner Outreach + Partner Signups + Referral Management into single Partners page with tabs
+- [x] Move WhatsApp Settings, Lead Modes, QR Code Generator, Products, Pricing, Subsidies into Settings tabs
+- [x] Update App.tsx routes to reflect merged pages

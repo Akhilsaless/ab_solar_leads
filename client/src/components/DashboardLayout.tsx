@@ -22,8 +22,8 @@ import {
 import { getLoginUrl } from "@/const";
 import { useIsMobile } from "@/hooks/useMobile";
 import {
-  LayoutDashboard, Users, MessageSquare, Sun, BarChart3,
-  Settings, LogOut, BookOpen, Search, CreditCard, Handshake, UserCheck, Building2, Send, MessageCircle, QrCode, GitCompare, Sparkles
+  LayoutDashboard, Users, MessageSquare, BarChart3,
+  Settings, LogOut, Search, Handshake, Send, Sparkles
 } from "lucide-react";
 import { SalesSquadLogo, SalesSquadIcon } from "./SalesSquadLogo";
 import { CSSProperties, useEffect, useRef, useState } from "react";
@@ -35,19 +35,10 @@ const menuItems = [
   { icon: LayoutDashboard, label: "Dashboard", path: "/" },
   { icon: MessageSquare, label: "Conversations", path: "/conversations" },
   { icon: Users, label: "Leads", path: "/leads" },
-  { icon: Search, label: "Business Scraper", path: "/scraper" },
-  { icon: Building2, label: "Scraped Contacts", path: "/scraped-contacts" },
   { icon: Send, label: "Automated Outreach", path: "/automated-outreach" },
-  { icon: GitCompare, label: "Lead Modes", path: "/dual-leads" },
-  { icon: MessageCircle, label: "WhatsApp Settings", path: "/whatsapp-settings" },
-  { icon: QrCode, label: "QR Code Generator", path: "/qr-generator" },
-  { icon: Handshake, label: "Partner Outreach", path: "/partner-outreach" },
-  { icon: Users, label: "Partner Signups", path: "/partner-signups" },
-  { icon: UserCheck, label: "Referral Management", path: "/admin/referrals" },
-  { icon: Sun, label: "Products", path: "/products" },
-  { icon: BookOpen, label: "Subsidies", path: "/subsidies" },
+  { icon: Search, label: "Find Leads", path: "/find-leads" },
+  { icon: Handshake, label: "Partners", path: "/partners" },
   { icon: BarChart3, label: "Analytics", path: "/analytics" },
-  { icon: CreditCard, label: "Pricing & Plans", path: "/pricing" },
   { icon: Sparkles, label: "AI Copilot", path: "/copilot" },
   { icon: Settings, label: "Settings", path: "/settings" },
 ];
