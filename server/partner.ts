@@ -138,6 +138,9 @@ export const partnerRouter = router({
       phone: z.string(),
       whatsappNumber: z.string().optional(),
       serviceAreas: z.array(z.string()),
+      products: z.string(),
+      pricing: z.string(),
+      discounts: z.string().optional(),
     }))
     .mutation(async ({ input }) => {
       try {
@@ -154,14 +157,17 @@ export const partnerRouter = router({
                 SET companyName = ${input.companyName}, phone = ${input.phone},
                     whatsappNumber = ${input.whatsappNumber || null},
                     serviceAreas = ${JSON.stringify(input.serviceAreas)},
+                    products = ${input.products},
+                    pricing = ${input.pricing},
+                    discounts = ${input.discounts || null},
                     status = 'signed_up', signedUpAt = NOW()
                 WHERE id = ${existing[0].id}`
           );
           return { success: true, partnerId: existing[0].id, isNew: false };
         } else {
           const result = await dbConn.execute(
-            sql`INSERT INTO solarPartners (companyName, email, phone, whatsappNumber, serviceAreas, status, signedUpAt)
-                VALUES (${input.companyName}, ${input.email}, ${input.phone}, ${input.whatsappNumber || null}, ${JSON.stringify(input.serviceAreas)}, 'signed_up', NOW())`
+            sql`INSERT INTO solarPartners (companyName, email, phone, whatsappNumber, serviceAreas, products, pricing, discounts, status, signedUpAt)
+                VALUES (${input.companyName}, ${input.email}, ${input.phone}, ${input.whatsappNumber || null}, ${JSON.stringify(input.serviceAreas)}, ${input.products}, ${input.pricing}, ${input.discounts || null}, 'signed_up', NOW())`
           );
           return { success: true, partnerId: insertId(result), isNew: true };
         }

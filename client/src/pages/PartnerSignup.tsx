@@ -24,6 +24,9 @@ export default function PartnerSignup() {
   const [phone, setPhone] = useState("");
   const [whatsapp, setWhatsapp] = useState("");
   const [selectedStates, setSelectedStates] = useState<string[]>([]);
+  const [products, setProducts] = useState("");
+  const [pricing, setPricing] = useState("");
+  const [discounts, setDiscounts] = useState("");
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitted, setSubmitted] = useState(false);
 
@@ -50,6 +53,8 @@ export default function PartnerSignup() {
     if (!email.trim() || !email.includes("@")) newErrors.email = "Valid email is required";
     if (!phone.trim()) newErrors.phone = "Phone number is required";
     if (selectedStates.length === 0) newErrors.states = "Select at least one service area";
+    if (!products.trim()) newErrors.products = "List your products/services";
+    if (!pricing.trim()) newErrors.pricing = "Enter your pricing info";
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -63,6 +68,9 @@ export default function PartnerSignup() {
       phone,
       whatsappNumber: whatsapp,
       serviceAreas: selectedStates,
+      products,
+      pricing,
+      discounts,
     });
   };
 
@@ -154,6 +162,52 @@ export default function PartnerSignup() {
                 onChange={(e) => setWhatsapp(e.target.value)}
                 placeholder="+91 XXXXX XXXXX"
                 className="bg-slate-700 border-slate-600 text-white"
+              />
+            </div>
+
+            {/* Products */}
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">Products/Services You Offer *</label>
+              <textarea
+                value={products}
+                onChange={(e) => setProducts(e.target.value)}
+                placeholder="e.g., 5kW rooftop solar systems, 10kW commercial systems, installation + 25-year warranty"
+                className={`w-full bg-slate-700 border border-slate-600 text-white rounded px-3 py-2 text-sm focus:outline-none focus:border-orange-500 ${errors.products ? "border-red-500" : ""}`}
+                rows={3}
+              />
+              {errors.products && (
+                <p className="text-red-400 text-sm mt-1 flex items-center gap-1">
+                  <AlertCircle className="w-4 h-4" /> {errors.products}
+                </p>
+              )}
+            </div>
+
+            {/* Pricing */}
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">Pricing Details *</label>
+              <textarea
+                value={pricing}
+                onChange={(e) => setPricing(e.target.value)}
+                placeholder="e.g., ₹4.5 lakh per kW installed, financing available, 0% EMI for 7 years"
+                className={`w-full bg-slate-700 border border-slate-600 text-white rounded px-3 py-2 text-sm focus:outline-none focus:border-orange-500 ${errors.pricing ? "border-red-500" : ""}`}
+                rows={3}
+              />
+              {errors.pricing && (
+                <p className="text-red-400 text-sm mt-1 flex items-center gap-1">
+                  <AlertCircle className="w-4 h-4" /> {errors.pricing}
+                </p>
+              )}
+            </div>
+
+            {/* Discounts */}
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">Current Discounts/Offers (Optional)</label>
+              <textarea
+                value={discounts}
+                onChange={(e) => setDiscounts(e.target.value)}
+                placeholder="e.g., 10% early bird discount, free site survey, ₹50,000 cashback on installation"
+                className="w-full bg-slate-700 border border-slate-600 text-white rounded px-3 py-2 text-sm focus:outline-none focus:border-orange-500"
+                rows={2}
               />
             </div>
 
