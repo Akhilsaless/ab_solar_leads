@@ -274,6 +274,21 @@ export default function ScrapedContacts() {
                       <Badge variant="outline" className={`text-xs ${statusColor[biz.contactStatus || "not_contacted"]}`}>
                         {statusInfo.label}
                       </Badge>
+                      {(biz as any).emailSentAt && (
+                        <Badge variant="outline" className="text-xs text-blue-300 border-blue-500/30 bg-blue-500/10">
+                          Emailed {new Date((biz as any).emailSentAt).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
+                        </Badge>
+                      )}
+                      {(biz as any).followUp3dSent && (
+                        <Badge variant="outline" className="text-xs text-purple-300 border-purple-500/30 bg-purple-500/10">
+                          Day 3 sent
+                        </Badge>
+                      )}
+                      {(biz as any).followUp7dSent && (
+                        <Badge variant="outline" className="text-xs text-orange-300 border-orange-500/30 bg-orange-500/10">
+                          Day 7 sent
+                        </Badge>
+                      )}
                     </div>
                   </div>
 

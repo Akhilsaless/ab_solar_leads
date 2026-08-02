@@ -395,8 +395,8 @@
 
 
 ## Enhanced Auto Outreach with Follow-ups (Aug 2026)
-- [ ] Add emailSentAt, followUp3dSent, followUp7dSent columns to scrapedBusinesses table
-- [ ] Enhance autoOutreachHandler with AI-generated personalized pitches (business name, ROI, savings, benefits)
-- [ ] Build followUpEmailHandler for Day 3 and Day 7 follow-ups
-- [ ] Update ScrapedContacts UI with contact status, email sent date, follow-up tracking columns
-- [ ] Register Day 3 and Day 7 follow-up cron jobs
+- [x] Add emailSentAt, followUp3dSent, followUp7dSent columns to scrapedBusinesses table
+- [x] Enhance autoOutreachHandler with AI-generated personalized pitches (business name, ROI, savings, benefits)
+- [x] Build followUpEmailHandler for Day 3 and Day 7 follow-ups
+- [x] Update ScrapedContacts UI with contact status, email sent date, follow-up tracking columns
+- [x] Register Day 3 and Day 7 follow-up cron jobs
