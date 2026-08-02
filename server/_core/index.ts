@@ -14,6 +14,7 @@ import { adminDigestHandler } from "../adminDigestHandler";
 import { referrerOnboardingHandler } from "../referrerOnboardingHandler";
 import { autoOutreachHandler } from "../autoOutreachHandler";
 import { scrapedFollowUpHandler } from "../scrapedFollowUpHandler";
+import { trackEmailOpenHandler } from "../trackEmailOpenHandler";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -57,6 +58,8 @@ async function startServer() {
   app.post("/api/scheduled/autoOutreach", autoOutreachHandler);
   // Scraped business follow-up emails (Day 3 + Day 7)
   app.post("/api/scheduled/scrapedFollowUp", scrapedFollowUpHandler);
+  // Email open tracking pixel (public GET endpoint)
+  app.get("/api/track/open", trackEmailOpenHandler);
 
   // tRPC API
   app.use(

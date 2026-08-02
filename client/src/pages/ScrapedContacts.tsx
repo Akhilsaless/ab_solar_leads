@@ -289,6 +289,11 @@ export default function ScrapedContacts() {
                           Day 7 sent
                         </Badge>
                       )}
+                      {(biz as any).emailOpenCount > 0 && (
+                        <Badge variant="outline" className="text-xs text-green-300 border-green-500/30 bg-green-500/10">
+                          Opened {(biz as any).emailOpenCount}x{(biz as any).lastOpenedAt ? ` · ${new Date((biz as any).lastOpenedAt).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}` : ""}
+                        </Badge>
+                      )}
                     </div>
                   </div>
 

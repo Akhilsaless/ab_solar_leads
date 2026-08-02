@@ -117,7 +117,11 @@ async function generateAiPitch(biz: any, slot: number, botLink: string): Promise
   };
 }
 
-function buildEmailHtml(subject: string, body: string): string {
+function buildEmailHtml(subject: string, body: string, placeId?: string, agencyId?: number): string {
+  const APP_BASE = "https://salessquadleads-xxxqwsn9.manus.space";
+  const pixelUrl = placeId
+    ? `${APP_BASE}/api/track/open?pid=${encodeURIComponent(placeId)}&aid=${agencyId || 1}`
+    : null;
   return "<!DOCTYPE html><html><head><meta charset=\"utf-8\"><title>" + subject + "</title></head>"
     + "<body style=\"margin:0;padding:0;background:#f9fafb;font-family:Arial,sans-serif;\">"
     + "<div style=\"max-width:600px;margin:40px auto;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);\">"
@@ -136,6 +140,7 @@ function buildEmailHtml(subject: string, body: string): string {
     + "</div>"
     + "<div style=\"background:#f3f4f6;padding:20px 40px;text-align:center;\">"
     + "<p style=\"margin:0;color:#9ca3af;font-size:12px;\">Sales Squad | akhil@salessquadtech.com | This is a one-time outreach email.</p>"
+    + (pixelUrl ? `<img src="${pixelUrl}" width="1" height="1" style="display:none;" alt="" />` : "")
     + "</div></div></body></html>";
 }
 
@@ -341,7 +346,7 @@ async function processOutreachInBackground(slot: number, city: string, state: st
         const emailSentAt = Date.now();
 
         if (hasEmail && (contactMethod === "email" || contactMethod === "both")) {
-          const emailHtml = buildEmailHtml(subject, body);
+          const emailHtml = buildEmailHtml(subject, body, biz.placeId, 1);
           await sendEmail({ to: biz.email, subject, html: emailHtml });
           emailSentCount++;
           await markContacted(1, biz.placeId, emailSentAt);

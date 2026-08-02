@@ -419,6 +419,9 @@ export const scrapedBusinesses = mysqlTable("scrapedBusinesses", {
   emailSentAt: bigint("emailSentAt", { mode: "number" }),
   followUp3dSent: bigint("followUp3dSent", { mode: "number" }),
   followUp7dSent: bigint("followUp7dSent", { mode: "number" }),
+  emailOpenCount: int("emailOpenCount").notNull().default(0),
+  lastOpenedAt: bigint("lastOpenedAt", { mode: "number" }),
+  outreachRunId: int("outreachRunId"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 export type ScrapedBusiness = typeof scrapedBusinesses.$inferSelect;
