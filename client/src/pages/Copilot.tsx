@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { trpc } from "@/lib/trpc";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -6,58 +6,84 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
-  Sparkles, AlertTriangle, Users, TrendingUp, Clock, Wallet,
-  UserCheck, ChevronRight, Send, RefreshCw
+  Sparkles, AlertTriangle, Users, TrendingUp, Mail, Eye,
+  ChevronRight, Send, RefreshCw, Trash2, Zap, BarChart2
 } from "lucide-react";
 
 const PRIORITY_COLORS: Record<string, string> = {
-  critical: "destructive",
-  high: "destructive",
-  medium: "secondary",
-  low: "outline",
+  critical: "destructive", high: "destructive", medium: "secondary", low: "outline",
 };
-
 const PRIORITY_ICONS: Record<string, string> = {
-  critical: "🔴",
-  high: "🟠",
-  medium: "🟡",
-  low: "🟢",
+  critical: "🔴", high: "🟠", medium: "🟡", low: "🟢",
+};
+const TYPE_ICONS: Record<string, string> = {
+  lead: "👤", commission: "💰", associate: "🤝", hot_lead: "🔥",
 };
 
-const TYPE_ICONS: Record<string, string> = {
-  lead: "👤",
-  commission: "💰",
-  associate: "🤝",
-};
+const SUGGESTED_PROMPTS = [
+  "How many emails did we send today?",
+  "Who opened our emails?",
+  "Show me the hottest leads right now",
+  "Send pitch to info@example.com for ABC Factory in Pune",
+  "How many outreach runs today?",
+  "List all businesses that clicked the chatbot",
+];
 
 export default function Copilot() {
   const [question, setQuestion] = useState("");
-  const [chatHistory, setChatHistory] = useState<Array<{ role: "user" | "assistant"; content: string }>>([]);
+  const [chatHistory, setChatHistory] = useState<Array<{
+    role: "user" | "assistant";
+    content: string;
+    toolsUsed?: string[];
+  }>>([]);
+  const chatEndRef = useRef<HTMLDivElement>(null);
 
   const { data: summary, isLoading: summaryLoading, refetch: refetchSummary } =
-    trpc.copilot.getDailySummary.useQuery(undefined, { staleTime: 120000 });
+    trpc.copilot.getDailySummary.useQuery(undefined, { staleTime: 60000 });
 
   const { data: recommendations, isLoading: recsLoading, refetch: refetchRecs } =
-    trpc.copilot.getPriorityRecommendations.useQuery(undefined, { staleTime: 120000 });
+    trpc.copilot.getPriorityRecommendations.useQuery(undefined, { staleTime: 60000 });
+
+  const { data: history } = trpc.copilot.getHistory.useQuery(undefined, { staleTime: 0 });
+
+  const clearHistoryMutation = trpc.copilot.clearHistory.useMutation({
+    onSuccess: () => setChatHistory([]),
+  });
 
   const askMutation = trpc.copilot.askCopilot.useMutation({
     onSuccess: (data) => {
       const answer = typeof data.answer === "string" ? data.answer : String(data.answer ?? "");
-      setChatHistory(prev => [...prev, { role: "assistant", content: answer }]);
+      setChatHistory(prev => [...prev, {
+        role: "assistant",
+        content: answer,
+        toolsUsed: data.toolsUsed,
+      }]);
     },
   });
 
+  // Load history on mount
+  useEffect(() => {
+    if (history && history.length > 0 && chatHistory.length === 0) {
+      setChatHistory(history.map((h: any) => ({
+        role: h.role as "user" | "assistant",
+        content: h.content,
+      })));
+    }
+  }, [history]);
+
+  // Auto-scroll to bottom
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [chatHistory, askMutation.isPending]);
+
   const handleAsk = () => {
-    if (!question.trim()) return;
+    if (!question.trim() || askMutation.isPending) return;
     setChatHistory(prev => [...prev, { role: "user", content: question }]);
     askMutation.mutate({ question });
     setQuestion("");
   };
 
-  const handleRefresh = () => {
-    refetchSummary();
-    refetchRecs();
-  };
+  const handleRefresh = () => { refetchSummary(); refetchRecs(); };
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
@@ -69,12 +95,11 @@ export default function Copilot() {
           </div>
           <div>
             <h1 className="text-2xl font-bold">AI Copilot</h1>
-            <p className="text-sm text-muted-foreground">Your daily business intelligence dashboard</p>
+            <p className="text-sm text-muted-foreground">Level 4 Agent — queries live data, takes actions, remembers everything</p>
           </div>
         </div>
         <Button variant="outline" size="sm" onClick={handleRefresh}>
-          <RefreshCw className="h-4 w-4 mr-2" />
-          Refresh
+          <RefreshCw className="h-4 w-4 mr-2" />Refresh
         </Button>
       </div>
 
@@ -89,45 +114,15 @@ export default function Copilot() {
           </div>
         ) : summary ? (
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-            <SummaryCard
-              icon={<TrendingUp className="h-4 w-4 text-emerald-500" />}
-              label="New Leads Today"
-              value={summary.newLeadsToday}
-              accent="emerald"
-            />
-            <SummaryCard
-              icon={<AlertTriangle className="h-4 w-4 text-red-500" />}
-              label="Urgent Leads"
-              value={summary.urgentLeads}
-              accent={summary.urgentLeads > 0 ? "red" : "muted"}
-            />
-            <SummaryCard
-              icon={<Users className="h-4 w-4 text-orange-500" />}
-              label="Unassigned"
-              value={summary.unassignedLeads}
-              accent={summary.unassignedLeads > 0 ? "orange" : "muted"}
-            />
-            <SummaryCard
-              icon={<Clock className="h-4 w-4 text-yellow-500" />}
-              label="Follow-ups Due"
-              value={summary.followUpsDue}
-              accent={summary.followUpsDue > 0 ? "yellow" : "muted"}
-            />
-            <SummaryCard
-              icon={<Wallet className="h-4 w-4 text-purple-500" />}
-              label="Pending Payouts"
-              value={summary.pendingWithdrawals}
-              accent={summary.pendingWithdrawals > 0 ? "purple" : "muted"}
-            />
-            <SummaryCard
-              icon={<UserCheck className="h-4 w-4 text-blue-500" />}
-              label="New Associates"
-              value={summary.newAssociatesToday}
-              accent="blue"
-            />
+            <SummaryCard icon={<TrendingUp className="h-4 w-4 text-emerald-500" />} label="New Leads Today" value={summary.newLeadsToday} accent="emerald" />
+            <SummaryCard icon={<AlertTriangle className="h-4 w-4 text-red-500" />} label="Urgent Leads" value={summary.urgentLeads} accent={summary.urgentLeads > 0 ? "red" : "muted"} />
+            <SummaryCard icon={<Mail className="h-4 w-4 text-yellow-500" />} label="Emails Sent Today" value={summary.emailsSentToday} accent={summary.emailsSentToday > 0 ? "yellow" : "muted"} />
+            <SummaryCard icon={<Eye className="h-4 w-4 text-purple-500" />} label="Email Opens" value={summary.businessesThatOpened} accent={summary.businessesThatOpened > 0 ? "purple" : "muted"} />
+            <SummaryCard icon={<Zap className="h-4 w-4 text-orange-500" />} label="Runs Today" value={summary.runsToday} accent={summary.runsToday > 0 ? "orange" : "muted"} />
+            <SummaryCard icon={<BarChart2 className="h-4 w-4 text-blue-500" />} label="Unassigned Leads" value={(summary as any).unassignedLeads ?? 0} accent="blue" />
           </div>
         ) : (
-          <Card><CardContent className="p-6 text-center text-muted-foreground text-sm">Could not load summary. Check your connection.</CardContent></Card>
+          <Card><CardContent className="p-6 text-center text-muted-foreground text-sm">Could not load summary.</CardContent></Card>
         )}
       </div>
 
@@ -136,7 +131,7 @@ export default function Copilot() {
         <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">Priority Actions</h2>
         {recsLoading ? (
           <div className="space-y-2">
-            {Array.from({ length: 4 }).map((_, i) => (
+            {Array.from({ length: 3 }).map((_, i) => (
               <Card key={i}><CardContent className="p-4"><Skeleton className="h-12 w-full" /></CardContent></Card>
             ))}
           </div>
@@ -150,7 +145,7 @@ export default function Copilot() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1 flex-wrap">
                         <span className="font-medium text-sm">{rec.record}</span>
-                        <Badge variant={PRIORITY_COLORS[rec.priority] as "destructive" | "secondary" | "outline" | "default"} className="text-xs">
+                        <Badge variant={PRIORITY_COLORS[rec.priority] as any} className="text-xs">
                           {PRIORITY_ICONS[rec.priority]} {rec.priority}
                         </Badge>
                       </div>
@@ -170,77 +165,99 @@ export default function Copilot() {
             <CardContent className="p-8 text-center">
               <div className="text-4xl mb-3">✅</div>
               <p className="font-medium">All clear!</p>
-              <p className="text-sm text-muted-foreground mt-1">No priority actions right now. Check back later.</p>
+              <p className="text-sm text-muted-foreground mt-1">No priority actions right now.</p>
             </CardContent>
           </Card>
         )}
       </div>
 
-      {/* Ask Copilot */}
+      {/* Ask Copilot — Level 4 Agent Chat */}
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-base flex items-center gap-2">
-            <Sparkles className="h-4 w-4 text-primary" />
-            Ask Your Copilot
-          </CardTitle>
-          <p className="text-xs text-muted-foreground">Ask anything about your leads, associates, or business performance.</p>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Sparkles className="h-4 w-4 text-primary" />
+              Ask Your Copilot
+              <Badge variant="outline" className="text-xs font-normal ml-1">Level 4 Agent</Badge>
+            </CardTitle>
+            {chatHistory.length > 0 && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-xs text-muted-foreground h-7"
+                onClick={() => clearHistoryMutation.mutate()}
+              >
+                <Trash2 className="h-3 w-3 mr-1" />Clear
+              </Button>
+            )}
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Queries live data, sends emails, deletes leads, updates config — all from plain text. Remembers your conversations.
+          </p>
         </CardHeader>
         <CardContent className="space-y-3">
           {/* Chat History */}
-          {chatHistory.length > 0 && (
-            <div className="space-y-3 max-h-80 overflow-y-auto rounded-lg border p-3 bg-muted/20">
-              {chatHistory.map((msg, i) => (
-                <div key={i} className={`flex gap-2 ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
-                  {msg.role === "assistant" && (
-                    <div className="h-7 w-7 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
-                      <Sparkles className="h-3.5 w-3.5 text-primary" />
+          <div className="min-h-[120px] max-h-96 overflow-y-auto rounded-lg border p-3 bg-muted/20 space-y-3">
+            {chatHistory.length === 0 ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 py-2">
+                {SUGGESTED_PROMPTS.map((prompt) => (
+                  <button
+                    key={prompt}
+                    onClick={() => setQuestion(prompt)}
+                    className="text-left text-xs px-3 py-2 rounded-lg border border-border hover:bg-accent/50 transition-colors text-muted-foreground hover:text-foreground"
+                  >
+                    {prompt}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <>
+                {chatHistory.map((msg, i) => (
+                  <div key={i} className={`flex gap-2 ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
+                    {msg.role === "assistant" && (
+                      <div className="h-7 w-7 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
+                        <Sparkles className="h-3.5 w-3.5 text-primary" />
+                      </div>
+                    )}
+                    <div className={`max-w-[85%] space-y-1`}>
+                      <div className={`rounded-xl px-3 py-2 text-sm ${
+                        msg.role === "user"
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-card border text-card-foreground"
+                      }`}>
+                        <p className="whitespace-pre-wrap leading-relaxed">{msg.content}</p>
+                      </div>
+                      {msg.toolsUsed && msg.toolsUsed.length > 0 && (
+                        <div className="flex gap-1 flex-wrap px-1">
+                          {msg.toolsUsed.map((tool, ti) => (
+                            <span key={ti} className="text-xs text-muted-foreground bg-muted/50 rounded px-1.5 py-0.5 font-mono">
+                              ⚡ {tool}
+                            </span>
+                          ))}
+                        </div>
+                      )}
                     </div>
-                  )}
-                  <div className={`max-w-[85%] rounded-xl px-3 py-2 text-sm ${
-                    msg.role === "user"
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-card border text-card-foreground"
-                  }`}>
-                    <p className="whitespace-pre-wrap leading-relaxed">{msg.content}</p>
                   </div>
-                </div>
-              ))}
-              {askMutation.isPending && (
-                <div className="flex gap-2 justify-start">
-                  <div className="h-7 w-7 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                    <Sparkles className="h-3.5 w-3.5 text-primary animate-pulse" />
-                  </div>
-                  <div className="bg-card border rounded-xl px-3 py-2">
-                    <div className="flex gap-1">
-                      <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground animate-bounce" style={{ animationDelay: "0ms" }} />
-                      <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground animate-bounce" style={{ animationDelay: "150ms" }} />
-                      <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground animate-bounce" style={{ animationDelay: "300ms" }} />
+                ))}
+                {askMutation.isPending && (
+                  <div className="flex gap-2 justify-start">
+                    <div className="h-7 w-7 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                      <Sparkles className="h-3.5 w-3.5 text-primary animate-pulse" />
+                    </div>
+                    <div className="bg-card border rounded-xl px-3 py-2">
+                      <div className="flex gap-1 items-center">
+                        <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground animate-bounce" style={{ animationDelay: "0ms" }} />
+                        <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground animate-bounce" style={{ animationDelay: "150ms" }} />
+                        <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground animate-bounce" style={{ animationDelay: "300ms" }} />
+                        <span className="text-xs text-muted-foreground ml-1">Querying live data...</span>
+                      </div>
                     </div>
                   </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Suggested Prompts */}
-          {chatHistory.length === 0 && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {[
-                "Which leads should I prioritize today?",
-                "How many leads came in this week?",
-                "Which associates are performing best?",
-                "What's my conversion rate this month?",
-              ].map((prompt) => (
-                <button
-                  key={prompt}
-                  onClick={() => setQuestion(prompt)}
-                  className="text-left text-xs px-3 py-2 rounded-lg border border-border hover:bg-accent/50 transition-colors text-muted-foreground hover:text-foreground"
-                >
-                  {prompt}
-                </button>
-              ))}
-            </div>
-          )}
+                )}
+                <div ref={chatEndRef} />
+              </>
+            )}
+          </div>
 
           {/* Input */}
           <div className="flex gap-2">
@@ -248,7 +265,7 @@ export default function Copilot() {
               value={question}
               onChange={e => setQuestion(e.target.value)}
               onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleAsk(); } }}
-              placeholder="Ask about your leads, associates, or performance..."
+              placeholder="Ask anything or give a command... (e.g. 'how many emails opened today?')"
               className="flex-1 text-sm"
               disabled={askMutation.isPending}
             />
@@ -261,39 +278,27 @@ export default function Copilot() {
               <Send className="h-4 w-4" />
             </Button>
           </div>
+          {askMutation.isError && (
+            <p className="text-xs text-destructive">Error: {askMutation.error?.message || "Something went wrong"}</p>
+          )}
         </CardContent>
       </Card>
     </div>
   );
 }
 
-function SummaryCard({
-  icon,
-  label,
-  value,
-  accent,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  value: number;
-  accent: string;
+function SummaryCard({ icon, label, value, accent }: {
+  icon: React.ReactNode; label: string; value: number; accent: string;
 }) {
   const accentMap: Record<string, string> = {
-    emerald: "text-emerald-500",
-    red: "text-red-500",
-    orange: "text-orange-500",
-    yellow: "text-yellow-500",
-    purple: "text-purple-500",
-    blue: "text-blue-500",
+    emerald: "text-emerald-500", red: "text-red-500", orange: "text-orange-500",
+    yellow: "text-yellow-500", purple: "text-purple-500", blue: "text-blue-500",
     muted: "text-muted-foreground",
   };
   return (
     <Card>
       <CardContent className="p-4">
-        <div className="flex items-center gap-2 mb-2">
-          {icon}
-          <span className="text-xs text-muted-foreground font-medium">{label}</span>
-        </div>
+        <div className="flex items-center gap-2 mb-2">{icon}<span className="text-xs text-muted-foreground font-medium">{label}</span></div>
         <p className={`text-2xl font-bold ${accentMap[accent] || "text-foreground"}`}>{value}</p>
       </CardContent>
     </Card>

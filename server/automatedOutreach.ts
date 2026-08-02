@@ -569,5 +569,43 @@ export const automatedOutreachRouter = router({
         `) as any[];
         return Array.isArray(rows[0]) ? rows[0] : rows;
       }),
+
+    // Get all businesses emailed today (for Leads Contacted tab)
+    getLeadsContacted: protectedProcedure.query(async ({ ctx }) => {
+      if (!ctx.user) throw new Error("Unauthorized");
+      const agency = await db.getAgencyByUserId(ctx.user.id);
+      if (!agency) throw new Error("Agency not found");
+      const dbConn = await db.getDb();
+      if (!dbConn) throw new Error("DB error");
+      const rows = await dbConn.execute(sql`
+        SELECT id, businessName, businessType, businessSize, phone, email, website, address, city, state,
+               rating, reviewCount, contactStatus, emailSentAt, emailOpenCount, chatbotClickCount, lastOpenedAt
+        FROM scrapedBusinesses
+        WHERE agencyId = ${agency.id}
+          AND contactStatus IN ('contacted', 'emailed', 'whatsapp_sent')
+          AND emailSentAt IS NOT NULL
+          AND DATE(FROM_UNIXTIME(emailSentAt/1000)) = CURDATE()
+        ORDER BY emailSentAt DESC LIMIT 100
+      `) as any[];
+      return Array.isArray(rows[0]) ? rows[0] : rows;
+    }),
+
+    // Get email open + chatbot click status (for Status tab)
+    getEmailStatus: protectedProcedure.query(async ({ ctx }) => {
+      if (!ctx.user) throw new Error("Unauthorized");
+      const agency = await db.getAgencyByUserId(ctx.user.id);
+      if (!agency) throw new Error("Agency not found");
+      const dbConn = await db.getDb();
+      if (!dbConn) throw new Error("DB error");
+      const rows = await dbConn.execute(sql`
+        SELECT id, businessName, businessType, phone, email, city, state,
+               emailOpenCount, chatbotClickCount, lastOpenedAt, emailSentAt, contactStatus
+        FROM scrapedBusinesses
+        WHERE agencyId = ${agency.id}
+          AND (emailOpenCount > 0 OR chatbotClickCount > 0)
+        ORDER BY COALESCE(lastOpenedAt, emailSentAt) DESC LIMIT 100
+      `) as any[];
+      return Array.isArray(rows[0]) ? rows[0] : rows;
+    }),
   }),
 });

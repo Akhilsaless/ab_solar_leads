@@ -2,81 +2,447 @@ import { protectedProcedure, router } from "./_core/trpc";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { invokeLLM } from "./_core/llm";
-import { getDb } from "./db";
+import { getDb, getAgencyByUserId } from "./db";
 import { sql } from "drizzle-orm";
+import { sendEmail } from "./_core/emailService";
+import { notifyOwner } from "./_core/notification";
 
-// Helper: extract rows from mysql2 execute result (returns [rows, fields] tuple)
+// ─── Helpers ────────────────────────────────────────────────────────────────
+
 function rows(result: any): any[] {
   if (!result) return [];
-  // mysql2 returns [RowDataPacket[], FieldPacket[]] — first element is the rows array
   if (Array.isArray(result) && Array.isArray(result[0])) return result[0] as any[];
   if (Array.isArray(result)) return result as any[];
   if (result.rows) return result.rows;
   return [];
 }
-function firstRow(result: any): any {
-  return rows(result)[0] || null;
-}
-
-// Safe count: extracts numeric count from a COUNT(*) result row
+function firstRow(result: any): any { return rows(result)[0] || null; }
 function safeCount(result: any): number {
   const row = firstRow(result);
   if (!row) return 0;
-  // MySQL COUNT(*) returns as 'cnt' alias or as a BigInt
   const val = row.cnt ?? row["COUNT(*)"] ?? 0;
   return Number(val) || 0;
 }
 
-// Admin guard middleware
+// Admin guard — any authenticated user is the owner in this single-owner app
 const adminProcedure = protectedProcedure.use(({ ctx, next }) => {
   if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED" });
-  // Allow any authenticated user (owner) — this app has single-owner model
   return next({ ctx });
 });
 
+// ─── Agent Tool Definitions ──────────────────────────────────────────────────
+
+const AGENT_TOOLS = [
+  {
+    type: "function",
+    function: {
+      name: "get_stats",
+      description: "Get live statistics: emails sent today, email opens, chatbot clicks, leads count, outreach runs, scraped businesses, partner signups. Use for any question about numbers, counts, or performance.",
+      parameters: {
+        type: "object",
+        properties: {
+          metric: {
+            type: "string",
+            enum: ["emails_today", "email_opens", "chatbot_clicks", "leads_count", "outreach_runs_today", "scraped_today", "partner_signups", "all"],
+            description: "Which metric to fetch. Use 'all' for a full overview."
+          }
+        },
+        required: ["metric"],
+        additionalProperties: false
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "list_leads_contacted",
+      description: "List businesses that were emailed today or recently. Shows business name, email, city, email open count, chatbot clicks.",
+      parameters: {
+        type: "object",
+        properties: {
+          filter: {
+            type: "string",
+            enum: ["today", "opened", "clicked_chatbot", "all_recent"],
+            description: "Filter: 'today' = emailed today, 'opened' = opened email, 'clicked_chatbot' = clicked chatbot link, 'all_recent' = last 7 days"
+          },
+          limit: { type: "number", description: "Max results to return (default 20)" }
+        },
+        required: ["filter"],
+        additionalProperties: false
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "send_email_to_business",
+      description: "Send a personalised solar pitch email to a specific business. Provide business name, email, and optionally city/state for context.",
+      parameters: {
+        type: "object",
+        properties: {
+          businessName: { type: "string", description: "Name of the business" },
+          email: { type: "string", description: "Email address to send to" },
+          city: { type: "string", description: "City of the business (optional, for personalisation)" },
+          state: { type: "string", description: "State of the business (optional)" },
+          businessType: { type: "string", description: "Type of business e.g. factory, warehouse, hospital (optional)" }
+        },
+        required: ["businessName", "email"],
+        additionalProperties: false
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "delete_lead",
+      description: "Delete a lead from the leads table by name or ID. Always confirm before deleting.",
+      parameters: {
+        type: "object",
+        properties: {
+          leadId: { type: "number", description: "Lead ID to delete (preferred if known)" },
+          leadName: { type: "string", description: "Lead name to search and delete (used if ID not known)" },
+          confirmed: { type: "boolean", description: "Must be true to actually delete. If false, just preview what would be deleted." }
+        },
+        required: ["confirmed"],
+        additionalProperties: false
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "update_outreach_config",
+      description: "Update outreach settings: change target city/state, enable/disable outreach, add city to rotation.",
+      parameters: {
+        type: "object",
+        properties: {
+          action: {
+            type: "string",
+            enum: ["set_city", "enable", "disable", "add_to_rotation"],
+            description: "What to update"
+          },
+          city: { type: "string", description: "City name (for set_city or add_to_rotation)" },
+          state: { type: "string", description: "State name (for set_city or add_to_rotation)" }
+        },
+        required: ["action"],
+        additionalProperties: false
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "list_hot_leads",
+      description: "List the hottest leads — businesses that opened the email or clicked the chatbot link. Ranked by engagement.",
+      parameters: {
+        type: "object",
+        properties: {
+          limit: { type: "number", description: "Max results (default 10)" }
+        },
+        required: [],
+        additionalProperties: false
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "get_run_history",
+      description: "Get the history of automated outreach runs — when they ran, how many scraped, how many emailed.",
+      parameters: {
+        type: "object",
+        properties: {
+          limit: { type: "number", description: "Max runs to return (default 10)" }
+        },
+        required: [],
+        additionalProperties: false
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "search_businesses",
+      description: "Search scraped businesses by name, city, or business type.",
+      parameters: {
+        type: "object",
+        properties: {
+          query: { type: "string", description: "Search term (business name, city, or type)" },
+          limit: { type: "number", description: "Max results (default 10)" }
+        },
+        required: ["query"],
+        additionalProperties: false
+      }
+    }
+  }
+];
+
+// ─── Tool Executor ────────────────────────────────────────────────────────────
+
+async function executeTool(toolName: string, args: any, agencyId: number): Promise<string> {
+  const db = await getDb();
+  if (!db) return "Database unavailable";
+
+  try {
+    switch (toolName) {
+      case "get_stats": {
+        const metric = args.metric || "all";
+        const results: Record<string, number> = {};
+
+        if (metric === "emails_today" || metric === "all") {
+          const r = await db.execute(sql`SELECT COUNT(*) as cnt FROM scrapedBusinesses WHERE agencyId = ${agencyId} AND emailSentAt IS NOT NULL AND DATE(FROM_UNIXTIME(emailSentAt/1000)) = CURDATE()`);
+          results.emailsSentToday = safeCount(r);
+        }
+        if (metric === "email_opens" || metric === "all") {
+          const r = await db.execute(sql`SELECT SUM(emailOpenCount) as cnt FROM scrapedBusinesses WHERE agencyId = ${agencyId}`);
+          results.totalEmailOpens = safeCount(r);
+          const r2 = await db.execute(sql`SELECT COUNT(*) as cnt FROM scrapedBusinesses WHERE agencyId = ${agencyId} AND emailOpenCount > 0`);
+          results.businessesThatOpened = safeCount(r2);
+        }
+        if (metric === "chatbot_clicks" || metric === "all") {
+          const r = await db.execute(sql`SELECT SUM(chatbotClickCount) as cnt FROM scrapedBusinesses WHERE agencyId = ${agencyId}`);
+          results.totalChatbotClicks = safeCount(r);
+        }
+        if (metric === "leads_count" || metric === "all") {
+          const r = await db.execute(sql`SELECT COUNT(*) as cnt FROM leads2 WHERE assignedPartnerId IS NOT NULL OR conversationId IS NOT NULL`);
+          results.totalLeads = safeCount(r);
+        }
+        if (metric === "outreach_runs_today" || metric === "all") {
+          const r = await db.execute(sql`SELECT COUNT(*) as cnt FROM outreachRuns WHERE agencyId = ${agencyId} AND DATE(startedAt) = CURDATE()`);
+          results.runsToday = safeCount(r);
+          const r2 = await db.execute(sql`SELECT COALESCE(SUM(emailSentCount),0) as cnt FROM outreachRuns WHERE agencyId = ${agencyId} AND DATE(startedAt) = CURDATE()`);
+          results.emailsSentInRunsToday = safeCount(r2);
+        }
+        if (metric === "scraped_today" || metric === "all") {
+          const r = await db.execute(sql`SELECT COUNT(*) as cnt FROM scrapedBusinesses WHERE agencyId = ${agencyId} AND DATE(createdAt) = CURDATE()`);
+          results.scrapedToday = safeCount(r);
+        }
+        if (metric === "partner_signups" || metric === "all") {
+          const r = await db.execute(sql`SELECT COUNT(*) as cnt FROM solarPartners WHERE status = 'active'`);
+          results.activePartners = safeCount(r);
+          const r2 = await db.execute(sql`SELECT COUNT(*) as cnt FROM solarPartners WHERE DATE(createdAt) = CURDATE()`);
+          results.newPartnersToday = safeCount(r2);
+        }
+
+        return JSON.stringify(results);
+      }
+
+      case "list_leads_contacted": {
+        const filter = args.filter || "today";
+        const limit = args.limit || 20;
+        let whereClause = sql`agencyId = ${agencyId}`;
+
+        if (filter === "today") {
+          const r = await db.execute(sql`
+            SELECT businessName, email, city, state, contactStatus, emailSentAt, emailOpenCount, chatbotClickCount
+            FROM scrapedBusinesses
+            WHERE agencyId = ${agencyId} AND emailSentAt IS NOT NULL AND DATE(FROM_UNIXTIME(emailSentAt/1000)) = CURDATE()
+            ORDER BY emailSentAt DESC LIMIT ${limit}
+          `);
+          return JSON.stringify(rows(r));
+        } else if (filter === "opened") {
+          const r = await db.execute(sql`
+            SELECT businessName, email, city, state, emailOpenCount, chatbotClickCount, lastOpenedAt
+            FROM scrapedBusinesses
+            WHERE agencyId = ${agencyId} AND emailOpenCount > 0
+            ORDER BY emailOpenCount DESC LIMIT ${limit}
+          `);
+          return JSON.stringify(rows(r));
+        } else if (filter === "clicked_chatbot") {
+          const r = await db.execute(sql`
+            SELECT businessName, email, city, state, emailOpenCount, chatbotClickCount
+            FROM scrapedBusinesses
+            WHERE agencyId = ${agencyId} AND chatbotClickCount > 0
+            ORDER BY chatbotClickCount DESC LIMIT ${limit}
+          `);
+          return JSON.stringify(rows(r));
+        } else {
+          const r = await db.execute(sql`
+            SELECT businessName, email, city, state, contactStatus, emailSentAt, emailOpenCount, chatbotClickCount
+            FROM scrapedBusinesses
+            WHERE agencyId = ${agencyId} AND emailSentAt IS NOT NULL
+            ORDER BY emailSentAt DESC LIMIT ${limit}
+          `);
+          return JSON.stringify(rows(r));
+        }
+      }
+
+      case "send_email_to_business": {
+        const { businessName, email, city, state, businessType } = args;
+        // Build a personalised pitch email
+        const location = [city, state].filter(Boolean).join(", ") || "your area";
+        const bType = businessType || "business";
+        const subject = `Solar Energy Opportunity for ${businessName} — Reduce Bills by 60%`;
+        const body = `
+          <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;background:#000;color:#fff;padding:20px;">
+            <div style="background:#F97316;padding:20px;border-radius:8px 8px 0 0;">
+              <h1 style="margin:0;font-size:24px;">Sales Squad</h1>
+              <p style="margin:4px 0 0;opacity:0.9;">AI-Powered Solar Lead Generation</p>
+            </div>
+            <div style="padding:24px;background:#111;border-radius:0 0 8px 8px;">
+              <p>Dear ${businessName} Team,</p>
+              <p>I'm Agent Klaus from Sales Squad. Your ${bType} in ${location} has strong solar potential — we estimate you could cut electricity bills by <strong>60-70%</strong>.</p>
+              <p>With the <strong>PM Surya Ghar Yojana subsidy of ₹78,000</strong> available right now, the payback period is just 3-5 years — after which you get 20+ years of near-free electricity.</p>
+              <p><strong>Get your free solar estimate in 2 minutes:</strong></p>
+              <a href="https://salessquadleads-xxxqwsn9.manus.space/chat" style="display:inline-block;background:#F97316;color:#fff;padding:12px 24px;border-radius:6px;text-decoration:none;font-weight:bold;">Get Free Solar Estimate →</a>
+              <p style="margin-top:24px;color:#aaa;font-size:13px;">Warm regards,<br><strong>Agent Klaus</strong><br>Sales Squad — Solar Lead Generation</p>
+            </div>
+          </div>
+        `;
+
+        await sendEmail({
+          to: email,
+          subject,
+          html: body,
+        });
+
+        // Log to DB
+        await db.execute(sql`
+          INSERT INTO scrapedBusinesses (agencyId, businessName, email, city, state, businessType, contactStatus, emailSentAt, source)
+          VALUES (${agencyId}, ${businessName}, ${email}, ${city || null}, ${state || null}, ${businessType || null}, 'contacted', ${Date.now()}, 'copilot')
+          ON DUPLICATE KEY UPDATE contactStatus = 'contacted', emailSentAt = ${Date.now()}
+        `);
+
+        return `Email sent successfully to ${email} for ${businessName}.`;
+      }
+
+      case "delete_lead": {
+        const { leadId, leadName, confirmed } = args;
+
+        if (!confirmed) {
+          // Preview mode
+          if (leadId) {
+            const r = await db.execute(sql`SELECT id, firstName, lastName, email, status FROM leads2 WHERE id = ${leadId}`);
+            const lead = firstRow(r);
+            if (!lead) return `No lead found with ID ${leadId}.`;
+            return `Would delete: ${lead.firstName} ${lead.lastName} (${lead.email}) — Status: ${lead.status}. Confirm to proceed.`;
+          } else if (leadName) {
+            const r = await db.execute(sql`SELECT id, firstName, lastName, email, status FROM leads2 WHERE CONCAT(firstName, ' ', lastName) LIKE ${'%' + leadName + '%'} LIMIT 5`);
+            const found = rows(r);
+            if (!found.length) return `No leads found matching "${leadName}".`;
+            return `Found ${found.length} lead(s) matching "${leadName}": ${found.map((l: any) => `${l.firstName} ${l.lastName} (ID: ${l.id})`).join(", ")}. Confirm to delete.`;
+          }
+          return "Please provide a lead ID or name.";
+        }
+
+        // Actual delete
+        if (leadId) {
+          await db.execute(sql`DELETE FROM leads2 WHERE id = ${leadId}`);
+          return `Lead #${leadId} deleted successfully.`;
+        } else if (leadName) {
+          const r = await db.execute(sql`SELECT id FROM leads2 WHERE CONCAT(firstName, ' ', lastName) LIKE ${'%' + leadName + '%'} LIMIT 1`);
+          const lead = firstRow(r);
+          if (!lead) return `No lead found matching "${leadName}".`;
+          await db.execute(sql`DELETE FROM leads2 WHERE id = ${lead.id}`);
+          return `Lead "${leadName}" (ID: ${lead.id}) deleted successfully.`;
+        }
+        return "Please provide a lead ID or name.";
+      }
+
+      case "update_outreach_config": {
+        const { action, city, state } = args;
+
+        if (action === "set_city") {
+          await db.execute(sql`
+            INSERT INTO outreachConfig (agencyId, targetCity, targetState, isEnabled, contactMethod)
+            VALUES (${agencyId}, ${city}, ${state || 'Telangana'}, 1, 'email')
+            ON DUPLICATE KEY UPDATE targetCity = ${city}, targetState = ${state || 'Telangana'}
+          `);
+          return `Outreach target updated to ${city}, ${state || 'Telangana'}.`;
+        } else if (action === "enable") {
+          await db.execute(sql`UPDATE outreachConfig SET isEnabled = 1 WHERE agencyId = ${agencyId}`);
+          return "Outreach enabled.";
+        } else if (action === "disable") {
+          await db.execute(sql`UPDATE outreachConfig SET isEnabled = 0 WHERE agencyId = ${agencyId}`);
+          return "Outreach paused.";
+        } else if (action === "add_to_rotation") {
+          const r = await db.execute(sql`SELECT cityRotation FROM outreachConfig WHERE agencyId = ${agencyId} LIMIT 1`);
+          const row = firstRow(r);
+          let rotation = [];
+          if (row?.cityRotation) {
+            try { rotation = typeof row.cityRotation === "string" ? JSON.parse(row.cityRotation) : row.cityRotation; } catch {}
+          }
+          rotation.push({ city, state: state || 'Telangana' });
+          await db.execute(sql`UPDATE outreachConfig SET cityRotation = ${JSON.stringify(rotation)} WHERE agencyId = ${agencyId}`);
+          return `Added ${city}, ${state || 'Telangana'} to city rotation. Rotation now has ${rotation.length} cities.`;
+        }
+        return "Unknown action.";
+      }
+
+      case "list_hot_leads": {
+        const limit = args.limit || 10;
+        const r = await db.execute(sql`
+          SELECT businessName, email, phone, city, state, businessType, emailOpenCount, chatbotClickCount, lastOpenedAt
+          FROM scrapedBusinesses
+          WHERE agencyId = ${agencyId} AND (emailOpenCount > 0 OR chatbotClickCount > 0)
+          ORDER BY (emailOpenCount * 2 + chatbotClickCount * 5) DESC
+          LIMIT ${limit}
+        `);
+        const hotLeads = rows(r);
+        if (!hotLeads.length) return "No hot leads yet — no one has opened an email or clicked the chatbot link.";
+        return JSON.stringify(hotLeads);
+      }
+
+      case "get_run_history": {
+        const limit = args.limit || 10;
+        const r = await db.execute(sql`
+          SELECT id, businessType, city, state, status, scrapedCount, emailSentCount, startedAt, completedAt
+          FROM outreachRuns
+          WHERE agencyId = ${agencyId}
+          ORDER BY startedAt DESC LIMIT ${limit}
+        `);
+        return JSON.stringify(rows(r));
+      }
+
+      case "search_businesses": {
+        const { query, limit = 10 } = args;
+        const like = `%${query}%`;
+        const r = await db.execute(sql`
+          SELECT businessName, email, phone, city, state, businessType, contactStatus, emailOpenCount, chatbotClickCount
+          FROM scrapedBusinesses
+          WHERE agencyId = ${agencyId}
+            AND (businessName LIKE ${like} OR city LIKE ${like} OR businessType LIKE ${like})
+          ORDER BY createdAt DESC LIMIT ${limit}
+        `);
+        const found = rows(r);
+        if (!found.length) return `No businesses found matching "${query}".`;
+        return JSON.stringify(found);
+      }
+
+      default:
+        return `Unknown tool: ${toolName}`;
+    }
+  } catch (err: any) {
+    console.error(`[Copilot Tool] ${toolName} error:`, err);
+    return `Error executing ${toolName}: ${err?.message || "Unknown error"}`;
+  }
+}
+
+// ─── Router ──────────────────────────────────────────────────────────────────
+
 export const copilotRouter = router({
-  // ── Today Summary ─────────────────────────────────────────────────────────
+  // ── Today Summary (unchanged) ──────────────────────────────────────────────
   getDailySummary: adminProcedure.query(async ({ ctx }) => {
     const db = await getDb();
     if (!db) return null;
-
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const todayStr = today.toISOString().slice(0, 10);
+    const agency = await getAgencyByUserId(ctx.user!.id);
+    if (!agency) return null;
+    const todayStr = new Date().toISOString().slice(0, 10);
 
     try {
-      const [
-        newLeadsTodayRes,
-        urgentLeadsRes,
-        unassignedLeadsRes,
-        overdueLeadsRes,
-        newAssociatesTodayRes,
-        inactiveAssociatesRes,
-        pendingWithdrawalsRes,
-        followUpsDueRes,
-        pendingKycRes,
-      ] = await Promise.all([
+      const [newLeadsTodayRes, urgentLeadsRes, emailsSentTodayRes, emailOpensRes, runsToday] = await Promise.all([
         db.execute(sql`SELECT COUNT(*) as cnt FROM leads2 WHERE DATE(createdAt) = ${todayStr}`),
         db.execute(sql`SELECT COUNT(*) as cnt FROM leads2 WHERE priority IN ('urgent','high') AND status NOT IN ('converted','lost')`),
-        db.execute(sql`SELECT COUNT(*) as cnt FROM leads2 WHERE assignedTo IS NULL AND status NOT IN ('converted','lost')`),
-        db.execute(sql`SELECT COUNT(*) as cnt FROM leads2 WHERE status = 'contacted' AND lastContactedAt < DATE_SUB(NOW(), INTERVAL 7 DAY)`),
-        db.execute(sql`SELECT COUNT(*) as cnt FROM referrers WHERE DATE(createdAt) = ${todayStr}`).catch(() => [[{ cnt: 0 }]]),
-        db.execute(sql`SELECT COUNT(*) as cnt FROM referrers WHERE (lastActiveDate IS NULL OR lastActiveDate < DATE_SUB(NOW(), INTERVAL 14 DAY)) AND status = 'active'`).catch(() => [[{ cnt: 0 }]]),
-        db.execute(sql`SELECT COUNT(*) as cnt FROM withdrawals WHERE status = 'pending'`).catch(() => [[{ cnt: 0 }]]),
-        db.execute(sql`SELECT COUNT(*) as cnt FROM leads2 WHERE status = 'contacted' AND lastContactedAt < DATE_SUB(NOW(), INTERVAL 3 DAY)`),
-        db.execute(sql`SELECT COUNT(*) as cnt FROM referrers WHERE signupBonusPaid = 0 AND status = 'active'`).catch(() => [[{ cnt: 0 }]]),
+        db.execute(sql`SELECT COUNT(*) as cnt FROM scrapedBusinesses WHERE agencyId = ${agency.id} AND emailSentAt IS NOT NULL AND DATE(FROM_UNIXTIME(emailSentAt/1000)) = CURDATE()`),
+        db.execute(sql`SELECT COUNT(*) as cnt FROM scrapedBusinesses WHERE agencyId = ${agency.id} AND emailOpenCount > 0`),
+        db.execute(sql`SELECT COUNT(*) as cnt FROM outreachRuns WHERE agencyId = ${agency.id} AND DATE(startedAt) = CURDATE()`),
       ]);
-
       return {
         newLeadsToday: safeCount(newLeadsTodayRes),
         urgentLeads: safeCount(urgentLeadsRes),
-        unassignedLeads: safeCount(unassignedLeadsRes),
-        overdueLeads: safeCount(overdueLeadsRes),
-        newAssociatesToday: safeCount(newAssociatesTodayRes),
-        inactiveAssociates: safeCount(inactiveAssociatesRes),
-        pendingWithdrawals: safeCount(pendingWithdrawalsRes),
-        followUpsDue: safeCount(followUpsDueRes),
-        pendingKyc: safeCount(pendingKycRes),
+        emailsSentToday: safeCount(emailsSentTodayRes),
+        businessesThatOpened: safeCount(emailOpensRes),
+        runsToday: safeCount(runsToday),
       };
     } catch (err) {
       console.error("[Copilot] getDailySummary error:", err);
@@ -84,163 +450,193 @@ export const copilotRouter = router({
     }
   }),
 
-  // ── Priority Recommendations ───────────────────────────────────────────────
+  // ── Priority Recommendations (unchanged) ──────────────────────────────────
   getPriorityRecommendations: adminProcedure.query(async ({ ctx }) => {
     const db = await getDb();
     if (!db) return [];
+    const agency = await getAgencyByUserId(ctx.user!.id);
+    if (!agency) return [];
 
     const recommendations: Array<{
       priority: "critical" | "high" | "medium" | "low";
-      reason: string;
-      record: string;
-      nextStep: string;
-      type: string;
+      reason: string; record: string; nextStep: string; type: string;
     }> = [];
 
     try {
-      // High-score unassigned leads
+      const hotLeads = rows(await db.execute(sql`
+        SELECT businessName, email, city, emailOpenCount, chatbotClickCount
+        FROM scrapedBusinesses
+        WHERE agencyId = ${agency.id} AND (emailOpenCount > 0 OR chatbotClickCount > 0)
+        ORDER BY (emailOpenCount * 2 + chatbotClickCount * 5) DESC LIMIT 3
+      `));
+      for (const b of hotLeads) {
+        recommendations.push({
+          priority: b.chatbotClickCount > 0 ? "critical" : "high",
+          reason: `Opened email ${b.emailOpenCount}x${b.chatbotClickCount > 0 ? `, clicked chatbot ${b.chatbotClickCount}x` : ""}`,
+          record: `${b.businessName} (${b.city || "unknown city"})`,
+          nextStep: "Follow up by WhatsApp or call — they're interested",
+          type: "hot_lead",
+        });
+      }
+
       const topUnassigned = rows(await db.execute(
-        sql`SELECT id, firstName, lastName, leadScore, state FROM leads2 WHERE assignedTo IS NULL AND status NOT IN ('converted','lost') ORDER BY leadScore DESC LIMIT 3`
+        sql`SELECT id, firstName, lastName, leadScore, state FROM leads2 WHERE assignedTo IS NULL AND status NOT IN ('converted','lost') ORDER BY leadScore DESC LIMIT 2`
       ));
       for (const lead of topUnassigned) {
-        const firstName = lead.firstName || lead.first_name || "";
-        const lastName = lead.lastName || lead.last_name || "";
-        const score = Number(lead.leadScore || lead.lead_score || 0);
-        const state = lead.state || "unknown state";
-        const id = lead.id;
+        const score = Number(lead.leadScore || 0);
         recommendations.push({
           priority: score >= 80 ? "critical" : "high",
-          reason: `Score ${score} — unassigned lead from ${state}`,
-          record: `${firstName} ${lastName} (Lead #${id})`.trim() || `Lead #${id}`,
+          reason: `Score ${score} — unassigned lead from ${lead.state || "unknown"}`,
+          record: `${lead.firstName || ""} ${lead.lastName || ""}`.trim() || `Lead #${lead.id}`,
           nextStep: "Open Leads page → assign to a partner or contact directly",
           type: "lead",
-        });
-      }
-
-      // Overdue contacts
-      const overdueContacts = rows(await db.execute(
-        sql`SELECT id, firstName, lastName, lastContactedAt FROM leads2 WHERE status = 'contacted' AND lastContactedAt < DATE_SUB(NOW(), INTERVAL 7 DAY) ORDER BY lastContactedAt ASC LIMIT 2`
-      ));
-      for (const lead of overdueContacts) {
-        const firstName = lead.firstName || lead.first_name || "";
-        const lastName = lead.lastName || lead.last_name || "";
-        const lastContacted = lead.lastContactedAt || lead.last_contacted_at;
-        const daysSince = lastContacted
-          ? Math.floor((Date.now() - new Date(lastContacted).getTime()) / 86400000)
-          : "many";
-        recommendations.push({
-          priority: "high",
-          reason: `No contact for ${daysSince} days`,
-          record: `${firstName} ${lastName} (Lead #${lead.id})`.trim() || `Lead #${lead.id}`,
-          nextStep: "Open Leads page → update status or send follow-up",
-          type: "lead",
-        });
-      }
-
-      // Pending withdrawals
-      const pendingW = rows(await db.execute(
-        sql`SELECT w.id, w.amount, r.name as referrerName FROM withdrawals w JOIN referrers r ON w.referrerId = r.id WHERE w.status = 'pending' ORDER BY w.createdAt ASC LIMIT 2`
-      ).catch(() => [[]]));
-      for (const w of pendingW) {
-        const name = w.referrerName || w.referrer_name || "Associate";
-        recommendations.push({
-          priority: "medium",
-          reason: `Withdrawal of ₹${w.amount || 0} pending approval`,
-          record: `${name} (Withdrawal #${w.id})`,
-          nextStep: "Open Referral Management → Withdrawals tab → approve or reject",
-          type: "commission",
-        });
-      }
-
-      // Inactive associates
-      const inactiveAssoc = rows(await db.execute(
-        sql`SELECT id, name, email, lastActiveDate FROM referrers WHERE (lastActiveDate IS NULL OR lastActiveDate < DATE_SUB(NOW(), INTERVAL 14 DAY)) AND status = 'active' ORDER BY totalReferrals DESC LIMIT 2`
-      ).catch(() => [[]]));
-      for (const assoc of inactiveAssoc) {
-        const lastActive = assoc.lastActiveDate || assoc.last_active_date;
-        const daysSince = lastActive
-          ? Math.floor((Date.now() - new Date(lastActive).getTime()) / 86400000)
-          : null;
-        recommendations.push({
-          priority: "low",
-          reason: daysSince ? `Inactive for ${daysSince} days` : "Never been active",
-          record: `${assoc.name || "Associate"} (Associate #${assoc.id})`,
-          nextStep: "Open Referral Management → send re-engagement message",
-          type: "associate",
         });
       }
     } catch (err) {
       console.error("[Copilot] getPriorityRecommendations error:", err);
     }
-
     return recommendations.slice(0, 8);
   }),
 
-  // ── Ask Copilot ────────────────────────────────────────────────────────────
+  // ── Get Conversation History ───────────────────────────────────────────────
+  getHistory: adminProcedure.query(async ({ ctx }) => {
+    const db = await getDb();
+    if (!db) return [];
+    const agency = await getAgencyByUserId(ctx.user!.id);
+    if (!agency) return [];
+    const r = await db.execute(sql`
+      SELECT id, role, content, toolCalls, createdAt
+      FROM copilotMemory
+      WHERE agencyId = ${agency.id}
+      ORDER BY createdAt DESC LIMIT 50
+    `);
+    return rows(r).reverse();
+  }),
+
+  // ── Clear History ──────────────────────────────────────────────────────────
+  clearHistory: adminProcedure.mutation(async ({ ctx }) => {
+    const db = await getDb();
+    if (!db) return { success: false };
+    const agency = await getAgencyByUserId(ctx.user!.id);
+    if (!agency) return { success: false };
+    await db.execute(sql`DELETE FROM copilotMemory WHERE agencyId = ${agency.id}`);
+    return { success: true };
+  }),
+
+  // ── Level 4 Agentic Ask ────────────────────────────────────────────────────
   askCopilot: adminProcedure
-    .input(z.object({ question: z.string().min(1).max(500) }))
+    .input(z.object({ question: z.string().min(1).max(1000) }))
     .mutation(async ({ input, ctx }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+      const agency = await getAgencyByUserId(ctx.user!.id);
+      if (!agency) throw new TRPCError({ code: "UNAUTHORIZED" });
 
-      // Gather context data
-      let leadsSnapshot: any[] = [];
-      let associatesSnapshot: any[] = [];
-      let withdrawalsSnapshot: any[] = [];
+      // Load last 20 messages from memory for context
+      const historyRows = rows(await db.execute(sql`
+        SELECT role, content FROM copilotMemory
+        WHERE agencyId = ${agency.id}
+        ORDER BY createdAt DESC LIMIT 20
+      `)).reverse();
 
-      try {
-        const [leadsData, associatesData, withdrawalsData] = await Promise.all([
-          db.execute(sql`SELECT id, firstName, lastName, status, priority, leadScore, state, createdAt, lastContactedAt, assignedTo FROM leads2 ORDER BY createdAt DESC LIMIT 50`),
-          db.execute(sql`SELECT id, name, email, totalEarnings, totalReferrals, status, qualityScore, dailyStreak, lastActiveDate FROM referrers ORDER BY totalReferrals DESC LIMIT 30`),
-          db.execute(sql`SELECT w.id, w.amount, w.status, w.createdAt, r.name as referrerName FROM withdrawals w JOIN referrers r ON w.referrerId = r.id ORDER BY w.createdAt DESC LIMIT 20`).catch(() => [[]]),
-        ]);
-        leadsSnapshot = rows(leadsData).map(l => ({
-          id: l.id,
-          name: `${l.firstName || l.first_name || ""} ${l.lastName || l.last_name || ""}`.trim() || `Lead #${l.id}`,
-          status: l.status, priority: l.priority,
-          score: l.leadScore || l.lead_score, state: l.state,
-          created: l.createdAt, lastContacted: l.lastContactedAt,
-        }));
-        associatesSnapshot = rows(associatesData).map(a => ({
-          id: a.id, name: a.name || "Associate",
-          referrals: a.totalReferrals, earnings: a.totalEarnings,
-          status: a.status, lastActive: a.lastActiveDate,
-        }));
-        withdrawalsSnapshot = rows(withdrawalsData).map(w => ({
-          id: w.id, amount: w.amount, status: w.status,
-          referrer: w.referrerName || w.referrer_name,
-        }));
-      } catch (err) {
-        console.error("[Copilot] askCopilot data fetch error:", err);
+      const historyMessages = historyRows.map((h: any) => ({
+        role: h.role as "user" | "assistant",
+        content: h.content,
+      }));
+
+      const systemPrompt = `You are Agent Klaus — the AI Copilot for Sales Squad, a solar lead generation platform.
+You are speaking to the owner (Klaus). Today is ${new Date().toLocaleDateString("en-IN")}.
+
+You have access to LIVE tools that query and modify the real database. Use them to answer questions accurately.
+
+CAPABILITIES:
+- Query live stats (emails sent, opens, clicks, runs, leads, partners)
+- List businesses contacted today, who opened emails, who clicked chatbot
+- Send personalised solar pitch emails to any business (email + name required)
+- Delete leads by name or ID (always preview first, then confirm)
+- Update outreach config (change city, enable/disable, add to rotation)
+- List hot leads ranked by engagement
+- Get run history
+- Search businesses by name/city/type
+
+PERSONALITY:
+- Be concise, direct, and actionable — like a sharp business assistant
+- When showing lists, format them clearly with bullet points
+- When you take an action (send email, delete, update), confirm what you did
+- If asked to delete something, first show what will be deleted and ask for confirmation
+- Remember previous messages in this conversation — use context
+
+RULES:
+- Always use tools for data questions — never guess or make up numbers
+- For destructive actions (delete), always set confirmed=false first to preview, then confirmed=true only if user confirms
+- If a task requires multiple steps, execute them in sequence`;
+
+      // Save user message to memory
+      await db.execute(sql`
+        INSERT INTO copilotMemory (agencyId, role, content) VALUES (${agency.id}, 'user', ${input.question})
+      `);
+
+      const messages: any[] = [
+        { role: "system", content: systemPrompt },
+        ...historyMessages,
+        { role: "user", content: input.question },
+      ];
+
+      const toolCallLog: Array<{ tool: string; args: any; result: string }> = [];
+      let finalAnswer = "";
+
+      // Agentic loop — up to 5 tool calls
+      for (let i = 0; i < 5; i++) {
+        const response = await invokeLLM({
+          messages,
+          tools: AGENT_TOOLS as any,
+          tool_choice: "auto",
+        });
+
+        const msg = response?.choices?.[0]?.message;
+        if (!msg) break;
+
+        // If no tool calls, we have the final answer
+        if (!msg.tool_calls || msg.tool_calls.length === 0) {
+          finalAnswer = (typeof msg.content === "string" ? msg.content : "") || "Done.";
+          break;
+        }
+
+        // Execute tool calls
+        messages.push({ role: "assistant", content: (typeof msg.content === "string" ? msg.content : "") || "", tool_calls: msg.tool_calls });
+
+        for (const toolCall of msg.tool_calls) {
+          const toolName = toolCall.function?.name;
+          let toolArgs: any = {};
+          try { toolArgs = JSON.parse(toolCall.function?.arguments || "{}"); } catch {}
+
+          const result = await executeTool(toolName, toolArgs, agency.id);
+          toolCallLog.push({ tool: toolName, args: toolArgs, result });
+
+          messages.push({
+            role: "tool",
+            tool_call_id: toolCall.id,
+            content: result,
+          });
+        }
       }
 
-      const context = `
-You are the Owner AI Copilot for Sales Squad Leads — a solar lead generation platform.
-You are speaking to the owner/admin. Today is ${new Date().toLocaleDateString("en-IN")}.
+      // If loop ended without final answer
+      if (!finalAnswer) {
+        const lastMsg = messages[messages.length - 1];
+        finalAnswer = lastMsg?.content || "I completed the task. Let me know if you need anything else.";
+      }
 
-CURRENT DATA SNAPSHOT:
-Leads (last 50): ${JSON.stringify(leadsSnapshot)}
+      // Save assistant response to memory
+      await db.execute(sql`
+        INSERT INTO copilotMemory (agencyId, role, content, toolCalls)
+        VALUES (${agency.id}, 'assistant', ${finalAnswer}, ${toolCallLog.length ? JSON.stringify(toolCallLog) : null})
+      `);
 
-Associates (top 30): ${JSON.stringify(associatesSnapshot)}
-
-Withdrawals (last 20): ${JSON.stringify(withdrawalsSnapshot)}
-
-STRICT RULES:
-- You are READ-ONLY. Never suggest deleting records, sending messages, approving payments, changing commissions, changing pricing, changing roles, or performing bulk actions.
-- Only use the data provided above. Never invent data.
-- Be concise, practical, and actionable.
-- Format responses clearly with sections if needed.
-- If asked to draft a message, draft it but remind the owner to send it manually.
-`;
-
-      const response = await invokeLLM({
-        messages: [
-          { role: "system", content: context },
-          { role: "user", content: input.question },
-        ],
-      });
-
-      const answer = response?.choices?.[0]?.message?.content || "I could not generate a response. Please try again.";
-      return { answer };
+      return {
+        answer: finalAnswer,
+        toolsUsed: toolCallLog.map(t => t.tool),
+        actions: toolCallLog,
+      };
     }),
 });

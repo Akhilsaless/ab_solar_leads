@@ -172,8 +172,8 @@ export function AutomatedOutreach() {
 
   // Legacy queries
   const configQuery = trpc.automatedOutreach.config.get.useQuery();
-  const todayQuery = trpc.automatedOutreach.records.getToday.useQuery();
-  const repliesQuery = trpc.automatedOutreach.records.getReplies.useQuery();
+  const todayQuery = trpc.automatedOutreach.runs.getLeadsContacted.useQuery();
+  const repliesQuery = trpc.automatedOutreach.runs.getEmailStatus.useQuery();
   const dailyAnalyticsQuery = trpc.automatedOutreach.analytics.getDaily.useQuery();
 
   const createConfigMutation = trpc.automatedOutreach.config.create.useMutation();
@@ -279,8 +279,8 @@ export function AutomatedOutreach() {
   };
 
   const analytics = dailyAnalyticsQuery.data;
-  const todayRecords = todayQuery.data || [];
-  const replies = repliesQuery.data || [];
+  const todayRecords = (todayQuery.data || []) as any[];
+  const replies = (repliesQuery.data || []) as any[];
   const todayStats = todayStatsQuery.data;
   const runs = (runsQuery.data || []) as any[];
 
@@ -657,14 +657,14 @@ export function AutomatedOutreach() {
         <TabsContent value="today" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>Today's Outreach ({todayRecords.length})</CardTitle>
-              <CardDescription>Messages scheduled for today</CardDescription>
+              <CardTitle>Leads Contacted Today ({todayRecords.length})</CardTitle>
+              <CardDescription>Businesses emailed or messaged today via Smart Auto</CardDescription>
             </CardHeader>
             <CardContent>
               {todayRecords.length === 0 ? (
                 <div className="text-center py-8 text-gray-500">
                   <Clock className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                  <p>No outreach scheduled yet</p>
+                  <p>No leads contacted today yet</p>
                 </div>
               ) : (
                 <div className="space-y-2 max-h-96 overflow-y-auto">
@@ -672,11 +672,13 @@ export function AutomatedOutreach() {
                     <div key={record.id} className="flex items-center justify-between p-3 border rounded-lg">
                       <div className="flex-1">
                         <p className="font-medium">{record.businessName}</p>
-                        <p className="text-sm text-gray-600">{record.businessType}</p>
+                        <p className="text-sm text-muted-foreground">{record.businessType} · {record.city}, {record.state}</p>
+                        {record.email && <p className="text-xs text-muted-foreground">{record.email}</p>}
                       </div>
-                      <Badge variant={record.status === "sent" ? "default" : "secondary"}>
-                        {record.status.toUpperCase()}
-                      </Badge>
+                      <div className="flex flex-col items-end gap-1">
+                        <Badge variant="default" className="bg-green-600 text-white text-xs">Emailed</Badge>
+                        {record.emailSentAt && <span className="text-xs text-muted-foreground">{new Date(record.emailSentAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>}
+                      </div>
                     </div>
                   ))}
                 </div>

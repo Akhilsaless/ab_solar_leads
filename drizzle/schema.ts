@@ -420,11 +420,25 @@ export const scrapedBusinesses = mysqlTable("scrapedBusinesses", {
   followUp3dSent: bigint("followUp3dSent", { mode: "number" }),
   followUp7dSent: bigint("followUp7dSent", { mode: "number" }),
   emailOpenCount: int("emailOpenCount").notNull().default(0),
+  chatbotClickCount: int("chatbotClickCount").notNull().default(0),
   lastOpenedAt: bigint("lastOpenedAt", { mode: "number" }),
   outreachRunId: int("outreachRunId"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 export type ScrapedBusiness = typeof scrapedBusinesses.$inferSelect;
+
+/**
+ * Copilot Memory — persistent conversation history per agency
+ */
+export const copilotMemory = mysqlTable("copilotMemory", {
+  id: int("id").autoincrement().primaryKey(),
+  agencyId: int("agencyId").notNull(),
+  role: mysqlEnum("role", ["user", "assistant"]).notNull(),
+  content: text("content").notNull(),
+  toolCalls: text("toolCalls"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type CopilotMemory = typeof copilotMemory.$inferSelect;
 
 
 /**
