@@ -547,10 +547,14 @@ export const copilotRouter = router({
         content: h.content,
       }));
 
-      // Get current IST date correctly (server runs UTC, IST = UTC+5:30)
-      const istDate = new Date(Date.now() + 5.5 * 60 * 60 * 1000);
-      const istDateStr = istDate.toLocaleDateString("en-IN", { day: "2-digit", month: "long", year: "numeric" });
-      const systemPrompt = `You are Klaus — AI copilot for Sales Squad. Today is ${istDateStr} (IST).
+      // Get current IST date+time correctly (server runs UTC, IST = UTC+5:30)
+      const istNow = new Date(Date.now() + 5.5 * 60 * 60 * 1000);
+      const istDateStr = istNow.toLocaleDateString("en-IN", { weekday: "long", day: "2-digit", month: "long", year: "numeric" });
+      const istTimeStr = istNow.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true });
+      const systemPrompt = `You are Klaus — AI copilot for Sales Squad.
+CURRENT TIME: ${istTimeStr} IST | DATE: ${istDateStr}
+IMPORTANT: The server runs in UTC. Always use the IST time/date above — NEVER use your own internal date knowledge.
+Outreach schedule today (IST): Slot 1 = 8:00 AM (Factories/Warehouses), Slot 2 = 10:30 AM (Hotels/Resorts), Slot 3 = 1:00 PM (Hospitals/Clinics), Slot 4 = 4:00 PM (Schools/Colleges), Slot 5 = 7:00 PM (Offices/Complexes).
 STRICT RULES:
 1. ALWAYS call a tool first — never guess or make up numbers
 2. Reply in 1-3 lines max. No intros, no "I'll help you", no filler
@@ -558,7 +562,7 @@ STRICT RULES:
 4. For sending emails: DO IT immediately, then say "Done — sent to X"
 5. For deletes: ask ONE short confirmation only ("Delete [name]? yes/no"), then execute
 6. NEVER ask clarifying questions unless info is truly missing
-7. If automation is asked: call get_stats to check run counts, then answer directly
+7. If automation is asked: check get_stats for run counts, then state which slots have run based on current IST time vs schedule above
 8. Be like a sharp exec assistant — fast, direct, zero fluff`;
 
       // Save user message to memory
