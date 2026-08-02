@@ -266,9 +266,14 @@ async function processOutreachInBackground(slot: number, city: string, state: st
     );
 
     const places = searchResult.results || [];
-    scrapedCount = places.length;
+    const contactMethod: string = config?.contactMethod || "both";
 
-    for (const place of places.slice(0, 20)) {
+    // We'll process up to 40 results to find enough with the right contact info
+    let processedCount = 0;
+    scrapedCount = 0;
+
+    for (const place of places.slice(0, 40)) {
+      if (processedCount >= 20) break; // cap at 20 qualifying businesses per run
       try {
         const alreadyContacted = await wasAlreadyContacted(1, place.place_id);
         if (alreadyContacted) continue;
@@ -302,31 +307,35 @@ async function processOutreachInBackground(slot: number, city: string, state: st
           biz.reviewCount = d.user_ratings_total || biz.reviewCount;
         } catch { /* use basic info */ }
 
-        await upsertScrapedBusiness(biz, runId);
-
-        // Try to extract email from website if not already available
+        // Try to extract email from website before filtering
         if (!biz.email && biz.website) {
           biz.email = await extractEmailFromWebsite(biz.website);
-          if (biz.email) {
-            // Update the DB record with the extracted email
-            const db2 = await getDb();
-            if (db2) {
-              await db2.execute(sql`UPDATE scrapedBusinesses SET email = ${biz.email} WHERE agencyId = ${biz.agencyId} AND placeId = ${biz.placeId}`);
-            }
+        }
+
+        // ── FILTER BY CONTACT METHOD AT SCRAPE TIME ──────────────────────────
+        // Only keep businesses that have the required contact info
+        const hasEmail = !!biz.email;
+        const hasPhone = !!biz.phone;
+        if (contactMethod === "email" && !hasEmail) continue;   // skip if no email
+        if (contactMethod === "whatsapp" && !hasPhone) continue; // skip if no phone
+        if (contactMethod === "both" && !hasEmail && !hasPhone) continue; // skip if neither
+        // ─────────────────────────────────────────────────────────────────────
+
+        // Save to DB only after passing the contact filter
+        await upsertScrapedBusiness(biz, runId);
+        if (biz.email) {
+          const db2 = await getDb();
+          if (db2) {
+            await db2.execute(sql`UPDATE scrapedBusinesses SET email = ${biz.email} WHERE agencyId = ${biz.agencyId} AND placeId = ${biz.placeId}`);
           }
         }
+
+        scrapedCount++;
+        processedCount++;
 
         const score = calcSolarScore(biz);
         if (score < 70) continue;
         eligibleCount++;
-
-        const contactMethod: string = config?.contactMethod || "both";
-        const hasEmail = !!biz.email;
-        const hasPhone = !!biz.phone;
-
-        // Skip if contact method doesn't match available channels
-        if (contactMethod === "email" && !hasEmail) continue;
-        if (contactMethod === "whatsapp" && !hasPhone) continue;
 
         const { subject, body, whatsapp } = await generateAiPitch(biz, slot, BOT_LINK);
         const emailSentAt = Date.now();

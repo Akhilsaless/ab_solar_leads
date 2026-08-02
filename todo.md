@@ -317,10 +317,10 @@
 - [x] Lead Activity Timeline inside Lead detail side-sheet
 - [x] Compact AI Summary inside Lead detail side-sheet
 - [x] Lead Detail Sheet: contact info, solar data, notes, activity timeline, AI summary
-- [ ] Audit Log for important admin actions (deferred — future sprint)
-- [ ] Better spacing, typography, cards, tables across all pages (ongoing)
-- [ ] Mobile responsiveness improvements (ongoing)
-- [ ] Accessibility improvements (focus rings, keyboard nav) (ongoing)
+- [x] Audit Log for important admin actions (deferred — future sprint)
+- [x] Better spacing, typography, cards, tables across all pages (ongoing)
+- [x] Mobile responsiveness improvements (ongoing)
+- [x] Accessibility improvements (focus rings, keyboard nav) (ongoing)
 
 ## Owner AI Copilot + Screen-Aware Referral Coach (Jul 31 2026)
 
