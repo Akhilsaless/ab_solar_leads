@@ -208,9 +208,10 @@ async function executeTool(toolName: string, args: any, agencyId: number): Promi
           results.totalLeads = safeCount(r);
         }
         if (metric === "outreach_runs_today" || metric === "all") {
-          const r = await db.execute(sql`SELECT COUNT(*) as cnt FROM outreachRuns WHERE agencyId = ${agencyId} AND DATE(startedAt) = CURDATE()`);
+          // Use IST offset (+5:30) for date comparison
+          const r = await db.execute(sql`SELECT COUNT(*) as cnt FROM outreachRuns WHERE agencyId = ${agencyId} AND DATE(CONVERT_TZ(FROM_UNIXTIME(startedAt/1000), '+00:00', '+05:30')) = DATE(CONVERT_TZ(NOW(), '+00:00', '+05:30'))`);
           results.runsToday = safeCount(r);
-          const r2 = await db.execute(sql`SELECT COALESCE(SUM(emailSentCount),0) as cnt FROM outreachRuns WHERE agencyId = ${agencyId} AND DATE(startedAt) = CURDATE()`);
+          const r2 = await db.execute(sql`SELECT COALESCE(SUM(emailSentCount),0) as cnt FROM outreachRuns WHERE agencyId = ${agencyId} AND DATE(CONVERT_TZ(FROM_UNIXTIME(startedAt/1000), '+00:00', '+05:30')) = DATE(CONVERT_TZ(NOW(), '+00:00', '+05:30'))`);
           results.emailsSentInRunsToday = safeCount(r2);
         }
         if (metric === "scraped_today" || metric === "all") {
@@ -386,12 +387,14 @@ async function executeTool(toolName: string, args: any, agencyId: number): Promi
       case "get_run_history": {
         const limit = args.limit || 10;
         const r = await db.execute(sql`
-          SELECT id, businessType, city, state, status, scrapedCount, emailSentCount, startedAt, completedAt
+          SELECT id, runSlot, businessType, targetCity, targetState, status, scrapedCount, emailSentCount, startedAt, completedAt
           FROM outreachRuns
           WHERE agencyId = ${agencyId}
           ORDER BY startedAt DESC LIMIT ${limit}
         `);
-        return JSON.stringify(rows(r));
+        const runRows = rows(r);
+        if (!runRows.length) return "No outreach runs found yet.";
+        return JSON.stringify(runRows);
       }
 
       case "search_businesses": {
@@ -544,7 +547,10 @@ export const copilotRouter = router({
         content: h.content,
       }));
 
-      const systemPrompt = `You are Klaus — AI copilot for Sales Squad. Today: ${new Date().toLocaleDateString("en-IN")}.
+      // Get current IST date correctly (server runs UTC, IST = UTC+5:30)
+      const istDate = new Date(Date.now() + 5.5 * 60 * 60 * 1000);
+      const istDateStr = istDate.toLocaleDateString("en-IN", { day: "2-digit", month: "long", year: "numeric" });
+      const systemPrompt = `You are Klaus — AI copilot for Sales Squad. Today is ${istDateStr} (IST).
 STRICT RULES:
 1. ALWAYS call a tool first — never guess or make up numbers
 2. Reply in 1-3 lines max. No intros, no "I'll help you", no filler
