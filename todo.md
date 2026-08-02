@@ -400,3 +400,8 @@
 - [x] Build followUpEmailHandler for Day 3 and Day 7 follow-ups
 - [x] Update ScrapedContacts UI with contact status, email sent date, follow-up tracking columns
 - [x] Register Day 3 and Day 7 follow-up cron jobs
+
+## New Features (Aug 2026)
+- [x] Feature 1: Send Now button in Automated Outreach — trigger a run immediately for any slot
+- [x] Feature 2: Hot Leads filter in Scraped Contacts — show only businesses with emailOpenCount > 0
+- [x] Feature 3: City rotation — add Maharashtra (Mumbai/Pune) to rotation cycle alongside Hyderabad/Telangana

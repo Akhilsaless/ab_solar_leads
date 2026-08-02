@@ -12,7 +12,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { toast } from "sonner";
 import {
   AlertCircle, CheckCircle, Clock, MessageSquare, TrendingUp,
-  Zap, Building2, Mail, Phone, CheckCircle2, XCircle, Loader2, Eye
+  Zap, Building2, Mail, Phone, CheckCircle2, XCircle, Loader2, Eye,
+  Play, RotateCcw, Plus, Trash2, ArrowRight
 } from "lucide-react";
 
 function RunBusinessesModal({ runId, open, onClose }: { runId: number | null; open: boolean; onClose: () => void }) {
@@ -87,11 +88,18 @@ const INDIAN_STATES = [
   "Chandigarh","Puducherry","Jammu and Kashmir","Ladakh",
 ];
 
+const DEFAULT_ROTATION = [
+  { city: "Hyderabad", state: "Telangana" },
+  { city: "Mumbai", state: "Maharashtra" },
+  { city: "Pune", state: "Maharashtra" },
+];
+
 export function AutomatedOutreach() {
   const [activeTab, setActiveTab] = useState("smart");
   const [configId, setConfigId] = useState<number | null>(null);
   const [selectedRunId, setSelectedRunId] = useState<number | null>(null);
   const [showBizModal, setShowBizModal] = useState(false);
+  const [triggeringSlot, setTriggeringSlot] = useState<number | null>(null);
 
   // Smart cron state
   const [smartCity, setSmartCity] = useState("");
@@ -99,10 +107,19 @@ export function AutomatedOutreach() {
   const [smartEnabled, setSmartEnabled] = useState(true);
   const [contactMethod, setContactMethod] = useState<"email" | "whatsapp" | "both">("both");
 
+  // City rotation state
+  const [rotation, setRotation] = useState<Array<{ city: string; state: string }>>(DEFAULT_ROTATION);
+  const [rotationIndex, setRotationIndex] = useState(0);
+  const [rotationEnabled, setRotationEnabled] = useState(false);
+  const [newCity, setNewCity] = useState("");
+  const [newState, setNewState] = useState("Telangana");
+
   // Smart cron queries
   const smartConfigQuery = trpc.automatedOutreach.smartConfig.get.useQuery();
   const runsQuery = trpc.automatedOutreach.runs.list.useQuery();
   const todayStatsQuery = trpc.automatedOutreach.runs.todayStats.useQuery();
+  const utils = trpc.useUtils();
+
   const updateSmartConfig = trpc.automatedOutreach.smartConfig.update.useMutation({
     onSuccess: () => {
       toast.success(`Saved! Auto outreach will target ${smartCity}, ${smartState} from next run.`);
@@ -112,6 +129,29 @@ export function AutomatedOutreach() {
     onError: (e) => toast.error(e.message),
   });
 
+  const updateRotationMutation = trpc.automatedOutreach.smartConfig.updateRotation.useMutation({
+    onSuccess: () => {
+      toast.success("City rotation saved!");
+      smartConfigQuery.refetch();
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const triggerNowMutation = trpc.automatedOutreach.smartConfig.triggerNow.useMutation({
+    onSuccess: (data, vars) => {
+      setTriggeringSlot(null);
+      toast.success(`Run started for Slot ${vars.slot} — ${(data as any).businessType} in ${(data as any).city}!`);
+      setTimeout(() => {
+        runsQuery.refetch();
+        todayStatsQuery.refetch();
+      }, 2000);
+    },
+    onError: (e) => {
+      setTriggeringSlot(null);
+      toast.error("Failed to trigger run: " + e.message);
+    },
+  });
+
   useEffect(() => {
     if (smartConfigQuery.data) {
       setSmartCity(smartConfigQuery.data.targetCity || "Hyderabad");
@@ -119,6 +159,13 @@ export function AutomatedOutreach() {
       setSmartEnabled(!!smartConfigQuery.data.isEnabled);
       if (smartConfigQuery.data.contactMethod) {
         setContactMethod(smartConfigQuery.data.contactMethod as "email" | "whatsapp" | "both");
+      }
+      if (smartConfigQuery.data.cityRotation && Array.isArray(smartConfigQuery.data.cityRotation)) {
+        setRotation(smartConfigQuery.data.cityRotation);
+        setRotationEnabled(true);
+      }
+      if (smartConfigQuery.data.rotationIndex !== undefined) {
+        setRotationIndex(smartConfigQuery.data.rotationIndex || 0);
       }
     }
   }, [smartConfigQuery.data]);
@@ -209,11 +256,38 @@ export function AutomatedOutreach() {
     }
   };
 
+  const handleTriggerNow = (slot: number) => {
+    setTriggeringSlot(slot);
+    triggerNowMutation.mutate({ slot });
+  };
+
+  const addRotationCity = () => {
+    if (!newCity.trim()) { toast.error("Enter a city name"); return; }
+    const updated = [...rotation, { city: newCity.trim(), state: newState }];
+    setRotation(updated);
+    setNewCity("");
+    updateRotationMutation.mutate({ cityRotation: updated, rotationIndex });
+  };
+
+  const removeRotationCity = (idx: number) => {
+    if (rotation.length <= 1) { toast.error("Keep at least one city"); return; }
+    const updated = rotation.filter((_, i) => i !== idx);
+    const newIdx = rotationIndex >= updated.length ? 0 : rotationIndex;
+    setRotation(updated);
+    setRotationIndex(newIdx);
+    updateRotationMutation.mutate({ cityRotation: updated, rotationIndex: newIdx });
+  };
+
   const analytics = dailyAnalyticsQuery.data;
   const todayRecords = todayQuery.data || [];
   const replies = repliesQuery.data || [];
   const todayStats = todayStatsQuery.data;
   const runs = (runsQuery.data || []) as any[];
+
+  // Compute which city is "up next" from rotation
+  const nextRotationCity = rotationEnabled && rotation.length > 0
+    ? rotation[rotationIndex % rotation.length]
+    : null;
 
   return (
     <div className="space-y-6">
@@ -261,7 +335,7 @@ export function AutomatedOutreach() {
               <div className="flex items-center justify-between">
                 <div>
                   <CardTitle className="text-base">Today's Target Location</CardTitle>
-                  <CardDescription>Set which city &amp; state to scrape and outreach today. Change it every morning when you log in.</CardDescription>
+                  <CardDescription>Set which city &amp; state to scrape and outreach today.</CardDescription>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
                   <span className="text-xs text-muted-foreground">{smartEnabled ? "Enabled" : "Paused"}</span>
@@ -318,16 +392,101 @@ export function AutomatedOutreach() {
               {smartConfigQuery.data && (
                 <p className="text-xs text-muted-foreground mt-2">
                   Currently targeting: <span className="text-foreground font-medium">{smartConfigQuery.data.targetCity}, {smartConfigQuery.data.targetState}</span>
+                  {nextRotationCity && (
+                    <span className="ml-2 text-orange-400">
+                      · Rotation next: <strong>{nextRotationCity.city}, {nextRotationCity.state}</strong>
+                    </span>
+                  )}
                 </p>
               )}
             </CardContent>
           </Card>
 
-          {/* Daily Schedule */}
+          {/* City Rotation */}
+          <Card>
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <RotateCcw className="w-4 h-4 text-orange-400" />
+                    City Rotation
+                  </CardTitle>
+                  <CardDescription>
+                    System auto-rotates to the next city after each full day (slot 5). Currently on city #{(rotationIndex % Math.max(rotation.length, 1)) + 1}.
+                  </CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {/* Rotation list */}
+              <div className="space-y-2">
+                {rotation.map((item, idx) => (
+                  <div key={idx} className={`flex items-center justify-between p-2.5 rounded-lg border ${
+                    idx === (rotationIndex % rotation.length)
+                      ? "border-orange-500/50 bg-orange-500/10"
+                      : "border-border bg-muted/30"
+                  }`}>
+                    <div className="flex items-center gap-2">
+                      {idx === (rotationIndex % rotation.length) ? (
+                        <ArrowRight className="w-3.5 h-3.5 text-orange-400 shrink-0" />
+                      ) : (
+                        <div className="w-3.5 h-3.5 shrink-0" />
+                      )}
+                      <span className="text-sm font-medium">{item.city}</span>
+                      <span className="text-xs text-muted-foreground">{item.state}</span>
+                      {idx === (rotationIndex % rotation.length) && (
+                        <Badge className="text-xs bg-orange-500/20 text-orange-400 border-orange-500/30 ml-1">Up Next</Badge>
+                      )}
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 w-7 p-0 text-muted-foreground hover:text-red-400"
+                      onClick={() => removeRotationCity(idx)}
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+              {/* Add city */}
+              <div className="flex gap-2 pt-1">
+                <Input
+                  placeholder="City name"
+                  value={newCity}
+                  onChange={e => setNewCity(e.target.value)}
+                  className="flex-1"
+                  onKeyDown={e => e.key === "Enter" && addRotationCity()}
+                />
+                <Select value={newState} onValueChange={setNewState}>
+                  <SelectTrigger className="w-44">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {INDIAN_STATES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="border-orange-500/40 text-orange-400 hover:bg-orange-500/10 shrink-0"
+                  onClick={addRotationCity}
+                  disabled={updateRotationMutation.isPending}
+                >
+                  {updateRotationMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Plus className="w-4 h-4 mr-1" />Add</>}
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Rotation cycles daily: after slot 5 completes, the next city in the list becomes active.
+              </p>
+            </CardContent>
+          </Card>
+
+          {/* Daily Schedule with Send Now */}
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-base">Daily Schedule — 5 Runs/Day</CardTitle>
-              <CardDescription>Each run scrapes a different business type, filters Solar Score 70+, and sends personalised email + WhatsApp with your bot link</CardDescription>
+              <CardDescription>Each run scrapes a different business type, filters Solar Score 30+, and sends personalised email with your bot link. Use "Run Now" to trigger immediately.</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-2">
@@ -342,9 +501,25 @@ export function AutomatedOutreach() {
                         <div className="text-xs text-muted-foreground">{s.time} IST</div>
                       </div>
                     </div>
-                    <Badge variant="outline" className="text-xs text-green-400 border-green-500/30 bg-green-500/10 shrink-0">
-                      Active
-                    </Badge>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <Badge variant="outline" className="text-xs text-green-400 border-green-500/30 bg-green-500/10">
+                        Active
+                      </Badge>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 text-xs border-orange-500/40 text-orange-400 hover:bg-orange-500/10 gap-1"
+                        disabled={triggeringSlot !== null}
+                        onClick={() => handleTriggerNow(s.slot)}
+                      >
+                        {triggeringSlot === s.slot ? (
+                          <Loader2 className="w-3 h-3 animate-spin" />
+                        ) : (
+                          <Play className="w-3 h-3" />
+                        )}
+                        {triggeringSlot === s.slot ? "Starting..." : "Run Now"}
+                      </Button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -360,8 +535,16 @@ export function AutomatedOutreach() {
           {/* Run History */}
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="text-base">Run History</CardTitle>
-              <CardDescription>Last 50 auto outreach runs</CardDescription>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="text-base">Run History</CardTitle>
+                  <CardDescription>Last 50 auto outreach runs</CardDescription>
+                </div>
+                <Button variant="ghost" size="sm" onClick={() => runsQuery.refetch()} className="text-xs text-muted-foreground">
+                  <Loader2 className={`w-3.5 h-3.5 mr-1 ${runsQuery.isFetching ? "animate-spin" : ""}`} />
+                  Refresh
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
               {runsQuery.isLoading ? (
@@ -371,7 +554,7 @@ export function AutomatedOutreach() {
               ) : runs.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
                   <Clock className="w-10 h-10 mx-auto mb-2 opacity-40" />
-                  <p className="text-sm">No runs yet — first run fires at 8:00 AM IST</p>
+                  <p className="text-sm">No runs yet — first run fires at 8:00 AM IST or use "Run Now" above</p>
                   <p className="text-xs mt-1 opacity-60">Make sure you've set your city &amp; state above</p>
                 </div>
               ) : (
@@ -462,7 +645,7 @@ export function AutomatedOutreach() {
           <Card>
             <CardHeader>
               <CardTitle>Campaign Status</CardTitle>
-              <CardDescription>Daily automated outreach to verified Telangana businesses</CardDescription>
+              <CardDescription>Daily automated outreach to verified businesses</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex items-center justify-between p-4 bg-green-50 border border-green-200 rounded-lg">

@@ -57,6 +57,7 @@ function ScoreBadge({ score }: { score: number }) {
 export default function ScrapedContacts() {
   const [search, setSearch] = useState("");
   const [contactStatus, setContactStatus] = useState("all");
+  const [hotOnly, setHotOnly] = useState(false);
   const [generatingPitch, setGeneratingPitch] = useState<number | null>(null);
   const [expandedPitch, setExpandedPitch] = useState<number | null>(null);
   const [sendingEmail, setSendingEmail] = useState<number | null>(null);
@@ -154,7 +155,7 @@ export default function ScrapedContacts() {
     toast.success("CSV exported!");
   };
 
-  const bizList = businesses as any[];
+  const bizList = (businesses as any[]).filter(b => !hotOnly || (b.emailOpenCount && b.emailOpenCount > 0));
 
   return (
     <div className="space-y-6">
@@ -210,6 +211,17 @@ export default function ScrapedContacts() {
                 ))}
               </SelectContent>
             </Select>
+            <Button
+              variant={hotOnly ? "default" : "outline"}
+              size="sm"
+              onClick={() => setHotOnly(v => !v)}
+              className={hotOnly
+                ? "bg-orange-500 hover:bg-orange-600 text-white border-transparent"
+                : "border-orange-500/40 text-orange-400 hover:bg-orange-500/10"}
+            >
+              <Sparkles className="w-4 h-4 mr-1.5" />
+              Hot Leads {hotOnly && `(${bizList.length})`}
+            </Button>
           </div>
         </CardContent>
       </Card>

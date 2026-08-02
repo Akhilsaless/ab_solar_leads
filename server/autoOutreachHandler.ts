@@ -183,6 +183,42 @@ async function getOutreachConfig(agencyId: number) {
   } catch { return null; }
 }
 
+/**
+ * Get the current rotation city/state based on rotationIndex.
+ * If cityRotation is set, returns the city at rotationIndex % length.
+ * Otherwise falls back to targetCity/targetState.
+ */
+function getRotationCity(config: any): { city: string; state: string } {
+  if (config?.cityRotation) {
+    try {
+      const rotation: Array<{ city: string; state: string }> =
+        typeof config.cityRotation === "string"
+          ? JSON.parse(config.cityRotation)
+          : config.cityRotation;
+      if (Array.isArray(rotation) && rotation.length > 0) {
+        const idx = (config.rotationIndex || 0) % rotation.length;
+        return rotation[idx];
+      }
+    } catch { /* fall through */ }
+  }
+  return {
+    city: config?.targetCity || "Hyderabad",
+    state: config?.targetState || "Telangana",
+  };
+}
+
+/**
+ * Advance the rotation index by 1 (called after slot 5 completes a full day).
+ */
+async function advanceRotationIndex(agencyId: number, currentIndex: number, rotationLength: number) {
+  const db = await getDb();
+  if (!db) return;
+  try {
+    const nextIndex = (currentIndex + 1) % rotationLength;
+    await db.execute(sql`UPDATE outreachConfig SET rotationIndex = ${nextIndex} WHERE agencyId = ${agencyId}`);
+  } catch { /* ignore */ }
+}
+
 async function createOutreachRun(agencyId: number, slot: number, businessType: string, city: string, state: string): Promise<number> {
   const db = await getDb();
   if (!db) return 0;
@@ -382,6 +418,20 @@ async function processOutreachInBackground(slot: number, city: string, state: st
     await updateOutreachRun(runId, { scrapedCount, eligibleCount, emailSentCount, whatsappSentCount, errorCount, status: "completed" });
     console.log("[AutoOutreach] Slot " + slot + " completed: scraped=" + scrapedCount + " eligible=" + eligibleCount + " emails=" + emailSentCount + " whatsapp=" + whatsappSentCount);
 
+    // ── Advance rotation after slot 5 (end of day) ────────────────────────────
+    if (slot === 5 && config?.cityRotation) {
+      try {
+        const rotation: Array<{ city: string; state: string }> =
+          typeof config.cityRotation === "string"
+            ? JSON.parse(config.cityRotation)
+            : config.cityRotation;
+        if (Array.isArray(rotation) && rotation.length > 1) {
+          await advanceRotationIndex(1, config.rotationIndex || 0, rotation.length);
+          console.log("[AutoOutreach] Rotation advanced to next city");
+        }
+      } catch { /* ignore */ }
+    }
+
   } catch (err) {
     console.error("[AutoOutreach] Background processing error:", err);
     await updateOutreachRun(runId, { status: "failed", errorCount: errorCount + 1 });
@@ -403,8 +453,7 @@ export async function autoOutreachHandler(req: Request, res: Response) {
     }
 
     const config = await getOutreachConfig(1);
-    const city = config?.targetCity || "Hyderabad";
-    const state = config?.targetState || "Telangana";
+    const { city, state } = getRotationCity(config);
     const contactMethod = config?.contactMethod || "both";
     void contactMethod; // passed into processOutreachInBackground via config
 
@@ -421,6 +470,40 @@ export async function autoOutreachHandler(req: Request, res: Response) {
 
   } catch (err) {
     console.error("[AutoOutreach] Handler error:", err);
+    if (!res.headersSent) {
+      return res.status(500).json({ error: "Internal server error" });
+    }
+  }
+}
+
+/**
+ * Trigger Now handler — called by admin directly (not cron).
+ * Skips cron auth check, uses same logic as autoOutreachHandler.
+ */
+export async function triggerNowHandler(req: Request, res: Response) {
+  const slot = Number(req.body?.slot || req.query?.slot || 1);
+
+  try {
+    const slotConfig = SLOT_CONFIG[slot];
+    if (!slotConfig) {
+      return res.status(400).json({ error: "Invalid slot: " + slot });
+    }
+
+    const config = await getOutreachConfig(1);
+    const { city, state } = getRotationCity(config);
+
+    const runId = await createOutreachRun(1, slot, slotConfig.label, city, state);
+
+    // Respond immediately
+    res.json({ success: true, slot, city, state, businessType: slotConfig.label, runId, status: "processing" });
+
+    // Process in background
+    processOutreachInBackground(slot, city, state, runId, config).catch(err => {
+      console.error("[AutoOutreach TriggerNow] Unhandled background error:", err);
+    });
+
+  } catch (err) {
+    console.error("[AutoOutreach TriggerNow] Handler error:", err);
     if (!res.headersSent) {
       return res.status(500).json({ error: "Internal server error" });
     }

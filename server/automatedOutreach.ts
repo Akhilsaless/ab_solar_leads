@@ -442,7 +442,7 @@ export const automatedOutreachRouter = router({
       }),
   }),
 
-  // ===== SMART CRON OUTREACH CONFIG (city/state selector) =====
+  // ===== SMART CRON OUTREACH CONFIG (city/state selector + city rotation) =====
   smartConfig: router({
     get: protectedProcedure.query(async ({ ctx }) => {
       if (!ctx.user) throw new Error("Unauthorized");
@@ -452,7 +452,13 @@ export const automatedOutreachRouter = router({
       if (!dbConn) throw new Error("DB error");
       const rows = await dbConn.execute(sql`SELECT * FROM outreachConfig WHERE agencyId = ${agency.id} LIMIT 1`) as any[];
       const data = Array.isArray(rows[0]) ? rows[0] : rows;
-      return (data as any[])[0] || { isEnabled: 1, targetCity: "Hyderabad", targetState: "Telangana" };
+      const row = (data as any[])[0];
+      if (!row) return { isEnabled: 1, targetCity: "Hyderabad", targetState: "Telangana", cityRotation: null, rotationIndex: 0 };
+      // Parse cityRotation JSON if stored as string
+      if (row.cityRotation && typeof row.cityRotation === "string") {
+        try { row.cityRotation = JSON.parse(row.cityRotation); } catch { row.cityRotation = null; }
+      }
+      return row;
     }),
     update: protectedProcedure
       .input(z.object({
@@ -475,6 +481,40 @@ export const automatedOutreachRouter = router({
           ON DUPLICATE KEY UPDATE targetCity = ${input.targetCity}, targetState = ${input.targetState}, isEnabled = ${enabled}, contactMethod = ${method}
         `);
         return { success: true };
+      }),
+    updateRotation: protectedProcedure
+      .input(z.object({
+        cityRotation: z.array(z.object({ city: z.string(), state: z.string() })),
+        rotationIndex: z.number().optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        if (!ctx.user) throw new Error("Unauthorized");
+        const agency = await db.getAgencyByUserId(ctx.user.id);
+        if (!agency) throw new Error("Agency not found");
+        const dbConn = await db.getDb();
+        if (!dbConn) throw new Error("DB error");
+        const rotationJson = JSON.stringify(input.cityRotation);
+        const idx = input.rotationIndex ?? 0;
+        await dbConn.execute(sql`
+          INSERT INTO outreachConfig (agencyId, targetCity, targetState, isEnabled, contactMethod, cityRotation, rotationIndex)
+          VALUES (${agency.id}, 'Hyderabad', 'Telangana', 1, 'email', ${rotationJson}, ${idx})
+          ON DUPLICATE KEY UPDATE cityRotation = ${rotationJson}, rotationIndex = ${idx}
+        `);
+        return { success: true };
+      }),
+    triggerNow: protectedProcedure
+      .input(z.object({ slot: z.number().min(1).max(5) }))
+      .mutation(async ({ ctx, input }) => {
+        if (!ctx.user) throw new Error("Unauthorized");
+        // Call the internal triggerNow endpoint
+        const resp = await fetch("http://localhost:" + (process.env.PORT || "3000") + "/api/admin/triggerNow", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ slot: input.slot }),
+        });
+        if (!resp.ok) throw new Error("Failed to trigger run");
+        const data = await resp.json() as any;
+        return { success: true, runId: data.runId, city: data.city, state: data.state, businessType: data.businessType };
       }),
   }),
 

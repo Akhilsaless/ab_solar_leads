@@ -12,7 +12,7 @@ import { initializeEmailService } from "./emailService";
 import { followUpEmailsHandler } from "../followUpEmailHandler";
 import { adminDigestHandler } from "../adminDigestHandler";
 import { referrerOnboardingHandler } from "../referrerOnboardingHandler";
-import { autoOutreachHandler } from "../autoOutreachHandler";
+import { autoOutreachHandler, triggerNowHandler } from "../autoOutreachHandler";
 import { scrapedFollowUpHandler } from "../scrapedFollowUpHandler";
 import { trackEmailOpenHandler } from "../trackEmailOpenHandler";
 
@@ -56,6 +56,8 @@ async function startServer() {
   app.post("/api/scheduled/referrerOnboarding", referrerOnboardingHandler);
   // Auto outreach - 5 daily slots
   app.post("/api/scheduled/autoOutreach", autoOutreachHandler);
+  // Trigger Now - admin-initiated immediate run (no cron auth required)
+  app.post("/api/admin/triggerNow", triggerNowHandler);
   // Scraped business follow-up emails (Day 3 + Day 7)
   app.post("/api/scheduled/scrapedFollowUp", scrapedFollowUpHandler);
   // Email open tracking pixel (public GET endpoint)
