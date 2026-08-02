@@ -392,3 +392,11 @@
 - [x] Merge Partner Outreach + Partner Signups + Referral Management into single Partners page with tabs
 - [x] Move WhatsApp Settings, Lead Modes, QR Code Generator, Products, Pricing, Subsidies into Settings tabs
 - [x] Update App.tsx routes to reflect merged pages
+
+
+## Enhanced Auto Outreach with Follow-ups (Aug 2026)
+- [ ] Add emailSentAt, followUp3dSent, followUp7dSent columns to scrapedBusinesses table
+- [ ] Enhance autoOutreachHandler with AI-generated personalized pitches (business name, ROI, savings, benefits)
+- [ ] Build followUpEmailHandler for Day 3 and Day 7 follow-ups
+- [ ] Update ScrapedContacts UI with contact status, email sent date, follow-up tracking columns
+- [ ] Register Day 3 and Day 7 follow-up cron jobs

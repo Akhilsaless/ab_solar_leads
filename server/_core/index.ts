@@ -13,6 +13,7 @@ import { followUpEmailsHandler } from "../followUpEmailHandler";
 import { adminDigestHandler } from "../adminDigestHandler";
 import { referrerOnboardingHandler } from "../referrerOnboardingHandler";
 import { autoOutreachHandler } from "../autoOutreachHandler";
+import { scrapedFollowUpHandler } from "../scrapedFollowUpHandler";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -54,6 +55,8 @@ async function startServer() {
   app.post("/api/scheduled/referrerOnboarding", referrerOnboardingHandler);
   // Auto outreach - 5 daily slots
   app.post("/api/scheduled/autoOutreach", autoOutreachHandler);
+  // Scraped business follow-up emails (Day 3 + Day 7)
+  app.post("/api/scheduled/scrapedFollowUp", scrapedFollowUpHandler);
 
   // tRPC API
   app.use(

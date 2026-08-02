@@ -1,4 +1,4 @@
-import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, decimal, boolean, json, date } from "drizzle-orm/mysql-core";
+import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, decimal, boolean, json, date, bigint } from "drizzle-orm/mysql-core";
 
 /**
  * Core user table backing auth flow (agency owners/admins).
@@ -416,6 +416,9 @@ export const scrapedBusinesses = mysqlTable("scrapedBusinesses", {
   contactStatus: mysqlEnum("contactStatus", ["not_contacted", "contacted", "interested", "converted"]).default("not_contacted"),
   linkedinUrl: text("linkedinUrl"),
   aiPitch: text("aiPitch"),
+  emailSentAt: bigint("emailSentAt", { mode: "number" }),
+  followUp3dSent: bigint("followUp3dSent", { mode: "number" }),
+  followUp7dSent: bigint("followUp7dSent", { mode: "number" }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 export type ScrapedBusiness = typeof scrapedBusinesses.$inferSelect;
