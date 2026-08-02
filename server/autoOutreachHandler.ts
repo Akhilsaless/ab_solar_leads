@@ -312,12 +312,27 @@ async function processOutreachInBackground(slot: number, city: string, state: st
           biz.reviewCount = d.user_ratings_total || biz.reviewCount;
         } catch { /* use basic info */ }
 
+        // ── VALIDATE MOBILE NUMBER ────────────────────────────────────────
+        // Only accept Indian mobile numbers: starts with 6/7/8/9, exactly 10 digits
+        if (biz.phone) {
+          const digits = biz.phone.replace(/[^0-9]/g, "");
+          // Remove country code if present (91 prefix)
+          const mobile = digits.startsWith("91") && digits.length === 12 ? digits.slice(2) : digits;
+          const isValidMobile = mobile.length === 10 && /^[6789]/.test(mobile);
+          if (!isValidMobile) {
+            biz.phone = null; // reject landlines and invalid numbers
+          } else {
+            biz.phone = mobile; // store clean 10-digit number
+          }
+        }
+        // ─────────────────────────────────────────────────────────────────────
+
         // Try to extract email from website before filtering
         if (!biz.email && biz.website) {
           biz.email = await extractEmailFromWebsite(biz.website);
         }
 
-        // ── FILTER BY CONTACT METHOD AT SCRAPE TIME ──────────────────────────
+        // ── FILTER BY CONTACT METHOD AT SCRAPE TIME ──────────────────────
         // Only keep businesses that have the required contact info
         const hasEmail = !!biz.email;
         const hasPhone = !!biz.phone;
@@ -339,7 +354,7 @@ async function processOutreachInBackground(slot: number, city: string, state: st
         processedCount++;
 
         const score = calcSolarScore(biz);
-        if (score < 70) continue;
+        if (score < 30) continue; // lowered threshold from 70 to 30
         eligibleCount++;
 
         const { subject, body, whatsapp } = await generateAiPitch(biz, slot, BOT_LINK);
