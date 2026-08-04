@@ -527,7 +527,7 @@ export const copilotRouter = router({
   }),
 
   // ── Level 4 Agentic Ask ────────────────────────────────────────────────────
-  askCopilot: adminProcedure
+  askCopilot: protectedProcedure
     .input(z.object({ question: z.string().min(1).max(1000) }))
     .mutation(async ({ input, ctx }) => {
       const db = await getDb();
