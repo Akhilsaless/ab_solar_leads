@@ -50,10 +50,30 @@ const INDUSTRY_PITCHES: Record<string, string> = {
 };
 
 /**
+ * WhatsApp message templates (concise, max 160 chars)
+ */
+const WHATSAPP_PITCHES: Record<string, string> = {
+  textile_mills: "Save 60-70% electricity. Payback 3-4 yrs. GST claim + tax benefit. Free solar report?",
+  cold_storage: "Save 50-60% electricity + 24/7 backup power. Payback 3-5 yrs. Free solar report?",
+  hospitals: "Save 40-50% electricity + zero downtime. Payback 4-6 yrs. Free solar report?",
+  hotels_resorts: "Save 50-60% electricity. Lower costs + eco branding. Payback 3-5 yrs. Free solar report?",
+  factories: "Save 60-70% electricity. No power limits. Payback 3-4 yrs. Free solar report?",
+  shopping_malls: "Save 40-50% electricity. Attracts eco tenants. Payback 3-5 yrs. Free solar report?",
+  warehouses: "Save 50-60% electricity. Better margins. Payback 3-4 yrs. Free solar report?",
+};
+
+/**
  * Get industry-specific benefit text
  */
 function getBenefitText(businessType: string): string {
   return INDUSTRY_PITCHES[businessType] || "Save on electricity with solar. Payback in 3-5 years. Financial benefit: GST claim + tax depreciation.";
+}
+
+/**
+ * Get WhatsApp message
+ */
+function getWhatsAppMessage(businessType: string): string {
+  return WHATSAPP_PITCHES[businessType] || "Save on electricity with solar. Payback 3-5 yrs. Free solar report?";
 }
 
 /**

@@ -316,6 +316,11 @@ function OutreachQuickStats() {
   const emailOpens = (emailStatus || []).reduce((sum: number, b: any) => sum + (Number(b.emailOpenCount) || 0), 0);
   const chatbotClicks = (emailStatus || []).reduce((sum: number, b: any) => sum + (Number(b.chatbotClickCount) || 0), 0);
 
+  // Calculate conversion rates
+  const openRate = emailsSent > 0 ? ((emailOpens / emailsSent) * 100).toFixed(1) : 0;
+  const clickRate = emailOpens > 0 ? ((chatbotClicks / emailOpens) * 100).toFixed(1) : 0;
+  const conversionRate = emailsSent > 0 ? ((chatbotClicks / emailsSent) * 100).toFixed(1) : 0;
+
   return (
     <Card>
       <CardHeader className="pb-2">
@@ -354,6 +359,42 @@ function OutreachQuickStats() {
             <p className="text-xs text-muted-foreground mt-0.5 flex items-center justify-center gap-1">
               <MousePointerClick className="w-3 h-3" /> Bot Clicks
             </p>
+          </div>
+        </div>
+
+        {/* Conversion Funnel */}
+        <div className="bg-slate-900/30 rounded-lg p-3 border border-slate-700/50 mt-4">
+          <p className="text-xs font-semibold text-muted-foreground mb-3">Conversion Funnel</p>
+          <div className="space-y-3">
+            <div>
+              <div className="flex items-center justify-between text-xs mb-1">
+                <span className="text-muted-foreground">Open Rate</span>
+                <span className="font-bold text-amber-400">{isLoading ? "—" : `${openRate}%`}</span>
+              </div>
+              <div className="w-full bg-slate-700/50 rounded-full h-1.5">
+                <div className="bg-amber-400 h-1.5 rounded-full" style={{ width: `${Math.min(Number(openRate), 100)}%` }}></div>
+              </div>
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between text-xs mb-1">
+                <span className="text-muted-foreground">Click Rate (of opens)</span>
+                <span className="font-bold text-purple-400">{isLoading ? "—" : `${clickRate}%`}</span>
+              </div>
+              <div className="w-full bg-slate-700/50 rounded-full h-1.5">
+                <div className="bg-purple-400 h-1.5 rounded-full" style={{ width: `${Math.min(Number(clickRate), 100)}%` }}></div>
+              </div>
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between text-xs mb-1">
+                <span className="text-muted-foreground">Overall Conversion</span>
+                <span className="font-bold text-green-400">{isLoading ? "—" : `${conversionRate}%`}</span>
+              </div>
+              <div className="w-full bg-slate-700/50 rounded-full h-1.5">
+                <div className="bg-green-400 h-1.5 rounded-full" style={{ width: `${Math.min(Number(conversionRate), 100)}%` }}></div>
+              </div>
+            </div>
           </div>
         </div>
       </CardContent>
