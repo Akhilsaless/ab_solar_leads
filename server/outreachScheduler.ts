@@ -8,6 +8,7 @@ import { sendEmail } from "./_core/emailService";
  * - Runs at configured time per config
  * - Only sends when isEnabled = true
  * - Always uses industry-specific pitch (never generic)
+ * - No fake promises: only savings %, payback period, and real benefits
  */
 
 interface OutreachConfig {
@@ -35,22 +36,24 @@ interface ScrapedBusiness {
 
 /**
  * Industry-specific pitch templates
+ * Format: Savings % + Payback + Advantage + Financial benefits (subsidy or tax/GST)
+ * No fake promises - only realistic numbers and real benefits
  */
 const INDUSTRY_PITCHES: Record<string, string> = {
-  textile_mills: "Textile mills typically spend ₹5-15 lakhs/month on electricity. Solar could save you 60-70%, that's ₹3-9 lakhs/month.",
-  cold_storage: "Cold storage facilities are high-energy consumers. Solar could save 50-60%, that's ₹3-6 lakhs/month.",
-  hospitals: "Hospitals can reduce energy costs by 40-50% with solar + backup power.",
-  hotels_resorts: "Hotels can cut AC & lighting costs by 50-60% with solar, that's ₹2-6 lakhs/month saved.",
-  factories: "Factories spend ₹3-12 lakhs/month on electricity. Solar could cut this by 60-70%.",
-  shopping_malls: "Shopping malls can reduce energy costs by 40-50% with solar, that's ₹2-8 lakhs/month.",
-  warehouses: "Warehouses can save 50-60% on electricity with solar, that's ₹1-5 lakhs/month.",
+  textile_mills: "Save ~60-70% on electricity. Payback: 3-4 years. Then 20+ years of free electricity. Advantage: No production downtime. Financial benefit: GST claim + tax depreciation.",
+  cold_storage: "Save ~50-60% on electricity. Payback: 3-5 years. Advantage: 24/7 backup power during outages. Financial benefit: GST claim + tax depreciation.",
+  hospitals: "Save ~40-50% on electricity. Payback: 4-6 years. Advantage: 24/7 backup power + zero downtime. Financial benefit: GST claim + tax depreciation.",
+  hotels_resorts: "Save ~50-60% on electricity. Payback: 3-5 years. Advantage: Lower operating costs + eco-friendly branding. Financial benefit: GST claim + tax depreciation.",
+  factories: "Save ~60-70% on electricity. Payback: 3-4 years. Advantage: Increased production capacity (no power limits). Financial benefit: GST claim + tax depreciation.",
+  shopping_malls: "Save ~40-50% on electricity. Payback: 3-5 years. Advantage: Attracts eco-conscious tenants. Financial benefit: GST claim + tax depreciation.",
+  warehouses: "Save ~50-60% on electricity. Payback: 3-4 years. Advantage: Reduced operating costs + improved margins. Financial benefit: GST claim + tax depreciation.",
 };
 
 /**
  * Get industry-specific benefit text
  */
 function getBenefitText(businessType: string): string {
-  return INDUSTRY_PITCHES[businessType] || "Solar energy can significantly reduce your electricity costs.";
+  return INDUSTRY_PITCHES[businessType] || "Save on electricity with solar. Payback in 3-5 years. Financial benefit: GST claim + tax depreciation.";
 }
 
 /**
@@ -59,7 +62,7 @@ function getBenefitText(businessType: string): string {
  */
 function generateMessage(business: ScrapedBusiness): string {
   const benefit = getBenefitText(business.businessType);
-  return `Hi ${business.ownerName || "there"}, we help businesses like ${business.businessName} cut electricity bills with solar. ${benefit} Plus: Government subsidy up to ₹15 lakhs available. Interested in a free solar potential report?`;
+  return `Hi ${business.ownerName || "there"}, ${benefit} Interested in a free solar potential report?`;
 }
 
 /**
