@@ -66,6 +66,7 @@ function AuthenticatedRoutes() {
         <Route path="/subsidies" component={Subsidies} />
         <Route path="/pricing" component={Pricing} />
         <Route path="/settings" component={Settings} />
+        <Route path="/admin/referrals" component={ReferralManagement} />
         <Route component={NotFound} />
       </Switch>
     </DashboardLayout>
@@ -86,7 +87,6 @@ function Router() {
       <Route path="/referral-landing/:code" component={ReferralLanding} />
       <Route path="/referral-landing" component={ReferralLanding} />
       <Route path="/refer/:code" component={ChatBot} />
-      <Route path="/admin/referrals" component={ReferralManagement} />
       <Route path="/terms-referral" component={ReferralTerms} />
       <Route path="/verify-referral" component={VerifyReferral} />
 

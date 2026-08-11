@@ -311,8 +311,11 @@ export const referrerRouter = router({
     }
   }),
 
-  // Admin procedures
-  getAllReferrers: publicProcedure.query(async () => {
+  // Admin procedures (owner-only)
+  getAllReferrers: protectedProcedure.use(async ({ ctx, next }) => {
+    if (ctx.user?.role !== 'admin') throw new TRPCError({ code: 'FORBIDDEN', message: 'Admin only' });
+    return next({ ctx });
+  }).query(async () => {
     const db = await getDb();
     if (!db) return [];
     try {
@@ -325,7 +328,10 @@ export const referrerRouter = router({
     }
   }),
 
-  getAllReferrals: publicProcedure.query(async () => {
+  getAllReferrals: protectedProcedure.use(async ({ ctx, next }) => {
+    if (ctx.user?.role !== 'admin') throw new TRPCError({ code: 'FORBIDDEN', message: 'Admin only' });
+    return next({ ctx });
+  }).query(async () => {
     const db = await getDb();
     if (!db) return [];
     try {
@@ -343,7 +349,10 @@ export const referrerRouter = router({
     }
   }),
 
-  getPendingWithdrawals: publicProcedure.query(async () => {
+  getPendingWithdrawals: protectedProcedure.use(async ({ ctx, next }) => {
+    if (ctx.user?.role !== 'admin') throw new TRPCError({ code: 'FORBIDDEN', message: 'Admin only' });
+    return next({ ctx });
+  }).query(async () => {
     const db = await getDb();
     if (!db) return [];
     try {
@@ -360,7 +369,10 @@ export const referrerRouter = router({
     }
   }),
 
-  approveWithdrawal: publicProcedure
+  approveWithdrawal: protectedProcedure.use(async ({ ctx, next }) => {
+    if (ctx.user?.role !== 'admin') throw new TRPCError({ code: 'FORBIDDEN', message: 'Admin only' });
+    return next({ ctx });
+  })
     .input(z.object({ withdrawalId: z.number() }))
     .mutation(async ({ input }) => {
       const db = await getDb();
@@ -371,6 +383,15 @@ export const referrerRouter = router({
       );
       const withdrawal = firstRow(withdrawalResult);
       if (!withdrawal) throw new Error("Withdrawal not found");
+      
+      // Prevent double approval
+      if (withdrawal.status === 'approved') return { success: true, message: 'already_processed' };
+      if (withdrawal.status !== 'pending') throw new Error("Only pending withdrawals can be approved");
+      
+      // Check pot balance
+      const potResult = await db.execute(sql`SELECT balance FROM pot_balance WHERE id = 1`);
+      const pot = firstRow(potResult);
+      if (!pot || pot.balance < withdrawal.amount) throw new Error("Insufficient pot balance");
 
       await db.execute(
         sql`UPDATE withdrawals SET status = 'approved', processedAt = NOW() WHERE id = ${input.withdrawalId}`
@@ -378,7 +399,7 @@ export const referrerRouter = router({
 
       // Deduct from pot balance
       await db.execute(
-        sql`UPDATE pot_balance SET balance = GREATEST(0, balance - ${withdrawal.amount}) WHERE id = 1`
+        sql`UPDATE pot_balance SET balance = balance - ${withdrawal.amount} WHERE id = 1`
       );
 
       sendEmail({
@@ -414,7 +435,10 @@ export const referrerRouter = router({
   }),
 
   // Admin: set pot balance
-  setPotBalance: publicProcedure
+  setPotBalance: protectedProcedure.use(async ({ ctx, next }) => {
+    if (ctx.user?.role !== 'admin') throw new TRPCError({ code: 'FORBIDDEN', message: 'Admin only' });
+    return next({ ctx });
+  })
     .input(z.object({ amount: z.number().min(0) }))
     .mutation(async ({ input }) => {
       const db = await getDb();
@@ -423,7 +447,10 @@ export const referrerRouter = router({
       return { success: true };
     }),
 
-  rejectWithdrawal: publicProcedure
+  rejectWithdrawal: protectedProcedure.use(async ({ ctx, next }) => {
+    if (ctx.user?.role !== 'admin') throw new TRPCError({ code: 'FORBIDDEN', message: 'Admin only' });
+    return next({ ctx });
+  })
     .input(z.object({ withdrawalId: z.number(), reason: z.string().optional() }))
     .mutation(async ({ input }) => {
       const db = await getDb();
@@ -435,7 +462,10 @@ export const referrerRouter = router({
     }),
 
   // Admin: mark subsidy applied → ₹500 to referrer
-  markSubsidyApplied: publicProcedure
+  markSubsidyApplied: protectedProcedure.use(async ({ ctx, next }) => {
+    if (ctx.user?.role !== 'admin') throw new TRPCError({ code: 'FORBIDDEN', message: 'Admin only' });
+    return next({ ctx });
+  })
     .input(z.object({ referralId: z.number() }))
     .mutation(async ({ input }) => {
       const db = await getDb();
@@ -444,7 +474,9 @@ export const referrerRouter = router({
       const referralResult = await db.execute(sql`SELECT * FROM referrals WHERE id = ${input.referralId}`);
       const referral = firstRow(referralResult);
       if (!referral) throw new Error("Referral not found");
-      if (referral.subsidyApplied) throw new Error("Subsidy already marked for this referral");
+      
+      // Prevent duplicate subsidy credit
+      if (referral.subsidyApplied) return { success: true, message: 'already_processed' };
 
       await db.execute(
         sql`UPDATE referrals SET subsidyApplied = 1, subsidyAppliedAt = NOW(), signupBonusPaid = 1, status = 'subsidy_applied' WHERE id = ${input.referralId}`
@@ -480,7 +512,10 @@ export const referrerRouter = router({
     }),
 
   // Admin: confirm installation → ₹1500 to referrer
-  confirmInstallation: publicProcedure
+  confirmInstallation: protectedProcedure.use(async ({ ctx, next }) => {
+    if (ctx.user?.role !== 'admin') throw new TRPCError({ code: 'FORBIDDEN', message: 'Admin only' });
+    return next({ ctx });
+  })
     .input(z.object({ referralId: z.number() }))
     .mutation(async ({ input }) => {
       const db = await getDb();
@@ -489,6 +524,9 @@ export const referrerRouter = router({
       const referralResult = await db.execute(sql`SELECT * FROM referrals WHERE id = ${input.referralId}`);
       const referral = firstRow(referralResult);
       if (!referral) throw new Error("Referral not found");
+      
+      // Prevent duplicate installation bonus
+      if (referral.installationBonusPaid) return { success: true, message: 'already_processed' };
 
       await db.execute(
         sql`UPDATE referrals SET status = 'completed', installationBonusPaid = 1, installedAt = NOW() WHERE id = ${input.referralId}`

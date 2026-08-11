@@ -341,6 +341,7 @@ export function AutomatedOutreach() {
                   <Switch
                     checked={smartEnabled}
                     onCheckedChange={v => {
+                      console.log("[DEBUG] Switch toggled:", v, "city:", smartCity, "state:", smartState);
                       setSmartEnabled(v);
                       updateSmartConfig.mutate({ targetCity: smartCity, targetState: smartState, isEnabled: v, contactMethod });
                     }}
