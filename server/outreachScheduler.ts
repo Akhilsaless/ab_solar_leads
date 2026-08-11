@@ -222,6 +222,21 @@ export async function runAutomatedOutreach(): Promise<void> {
     const dbConn = await db.getDb();
     if (!dbConn) throw new Error("Database connection failed");
 
+    // Check master enable/disable toggle
+    const masterResult = await dbConn.execute(sql`
+      SELECT isEnabled FROM outreachConfig WHERE id = 1 LIMIT 1
+    `) as any[];
+    const master = Array.isArray(masterResult[0]) ? masterResult[0][0] : masterResult[0];
+    
+    if (!master || !master.isEnabled) {
+      console.log('[Outreach] Automation paused (master toggle disabled)');
+      return;
+    }
+
+    // Idempotency: prevent duplicate execution on same day
+    const today = new Date().toISOString().split('T')[0];
+    const runKey = `outreach_${today}`;
+    
     // Get all active outreach configs
     const configs = await dbConn.execute(sql`
       SELECT * FROM automatedOutreachConfig WHERE isEnabled = true

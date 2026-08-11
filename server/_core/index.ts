@@ -16,6 +16,17 @@ import { autoOutreachHandler, triggerNowHandler } from "../autoOutreachHandler";
 import { scrapedFollowUpHandler } from "../scrapedFollowUpHandler";
 import { trackEmailOpenHandler } from "../trackEmailOpenHandler";
 
+// Owner auth middleware for admin endpoints
+const authenticateOwner = (req: express.Request, res: express.Response, next: express.NextFunction) => {
+  const ownerId = process.env.OWNER_OPEN_ID;
+  const userId = (req as any).user?.openId;
+  
+  if (!userId || userId !== ownerId) {
+    return res.status(403).json({ error: 'Forbidden: Owner access required' });
+  }
+  next();
+};
+
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
     const server = net.createServer();
@@ -56,8 +67,8 @@ async function startServer() {
   app.post("/api/scheduled/referrerOnboarding", referrerOnboardingHandler);
   // Auto outreach - 5 daily slots
   app.post("/api/scheduled/autoOutreach", autoOutreachHandler);
-  // Trigger Now - admin-initiated immediate run (no cron auth required)
-  app.post("/api/admin/triggerNow", triggerNowHandler);
+  // Trigger Now - admin-initiated immediate run (requires owner auth)
+  app.post("/api/admin/triggerNow", authenticateOwner, triggerNowHandler);
   // Scraped business follow-up emails (Day 3 + Day 7)
   app.post("/api/scheduled/scrapedFollowUp", scrapedFollowUpHandler);
   // Email open tracking pixel (public GET endpoint)

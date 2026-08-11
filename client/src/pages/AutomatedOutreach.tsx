@@ -340,10 +340,21 @@ export function AutomatedOutreach() {
                   <span className="text-xs text-muted-foreground">{smartEnabled ? "Enabled" : "Paused"}</span>
                   <Switch
                     checked={smartEnabled}
+                    disabled={updateSmartConfig.isPending}
                     onCheckedChange={v => {
-                      console.log("[DEBUG] Switch toggled:", v, "city:", smartCity, "state:", smartState);
-                      setSmartEnabled(v);
-                      updateSmartConfig.mutate({ targetCity: smartCity, targetState: smartState, isEnabled: v, contactMethod });
+                      updateSmartConfig.mutate(
+                        { targetCity: smartCity, targetState: smartState, isEnabled: v, contactMethod },
+                        {
+                          onSuccess: () => {
+                            setSmartEnabled(v);
+                            toast.success(v ? 'Automation enabled' : 'Automation paused');
+                            smartConfigQuery.refetch();
+                          },
+                          onError: (e) => {
+                            toast.error('Failed: ' + e.message);
+                          }
+                        }
+                      );
                     }}
                   />
                 </div>
