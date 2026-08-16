@@ -13,7 +13,7 @@
 import { Request, Response } from "express";
 import { invokeLLM } from "./_core/llm";
 import { sdk } from "./_core/sdk";
-import { sendEmail } from "./_core/emailService";
+import { isEmailServiceReady, sendEmail } from "./_core/emailService";
 import { makeRequest, PlacesSearchResult, PlaceDetailsResult } from "./_core/map";
 import { sql } from "drizzle-orm";
 import { getDb } from "./db";
@@ -64,21 +64,17 @@ async function generateAiPitch(biz: any, slot: number, botLink: string): Promise
   const businessTypeLabel = SLOT_CONFIG[slot]?.label || "Commercial Business";
   const solarScore = calcSolarScore(biz);
 
-  let estimatedSavings = "Rs.50,000 - Rs.2,00,000";
-  let estimatedROI = "3-5 years";
-  if (solarScore > 80) { estimatedSavings = "Rs.2,00,000 - Rs.5,00,000"; estimatedROI = "2-3 years"; }
-  else if (solarScore > 60) { estimatedSavings = "Rs.1,00,000 - Rs.3,00,000"; estimatedROI = "3-4 years"; }
-
   const promptLines = [
     "You are an expert solar sales agent for Sales Squad.",
-    "Write a personalized outreach message to a business owner to get a free solar estimate.",
+    "Write a short, personalized outreach message to a business owner inviting them to a preliminary solar assessment.",
     "Business Name: " + name,
     "Business Type: " + businessTypeLabel,
     "City: " + city,
     "Solar Score: " + solarScore + "/100",
-    "Estimated Monthly Savings: " + estimatedSavings,
-    "Estimated ROI: " + estimatedROI,
     "Bot Link: " + botLink,
+    "Use careful, truthful language. Do not quote a system price, do not promise savings or ROI, and do not claim a business subsidy.",
+    "State that any savings estimate is preliminary and depends on the electricity bill, site survey, system design, and applicable regulations.",
+    "If mentioning financial benefits, say GST/input-credit and depreciation treatment must be confirmed by the installer's or customer's tax adviser.",
     "Return JSON with: subject (email subject line), body (HTML email body only, no header/footer), whatsapp (plain text max 160 chars).",
   ];
 
@@ -111,9 +107,9 @@ async function generateAiPitch(biz: any, slot: number, botLink: string): Promise
   } catch { /* fallback below */ }
 
   return {
-    subject: "Save " + estimatedSavings + "/month with Solar — Free Estimate",
-    body: "<p>Hi " + name + ",</p><p>I'm Agent Klaus from Sales Squad. Your " + businessTypeLabel + " in " + city + " could save <strong>" + estimatedSavings + " monthly</strong> with solar + government subsidies. ROI: " + estimatedROI + ".</p>",
-    whatsapp: "Hi " + name + ", save " + estimatedSavings + "/month with solar. Free 2-min estimate: " + botLink,
+    subject: "Preliminary solar assessment for " + name,
+    body: "<p>Hi " + name + ",</p><p>I'm Agent Klaus from Sales Squad. We can prepare a preliminary solar assessment for your " + businessTypeLabel + " in " + city + ". Any savings estimate depends on your bill, site survey and final system design.</p><p>GST/input-credit and depreciation treatment, where applicable, should be confirmed with your installer or tax adviser.</p>",
+    whatsapp: "Hi " + name + ", Sales Squad can prepare a preliminary solar assessment after bill review and a site survey. Check your estimate: " + botLink,
   };
 }
 
@@ -177,10 +173,18 @@ async function getOutreachConfig(agencyId: number) {
   const db = await getDb();
   if (!db) return null;
   try {
-    const result = await db.execute(sql`SELECT * FROM outreachConfig WHERE agencyId = ${agencyId} LIMIT 1`);
+    const result = await db.execute(sql`SELECT * FROM outreachConfig WHERE agencyId = ${agencyId} ORDER BY id ASC LIMIT 1`);
     const rows = Array.isArray(result) && Array.isArray(result[0]) ? result[0] : result;
     return (rows as any[])[0] || null;
   } catch { return null; }
+}
+
+function isConfigEnabled(config: any) {
+  return config?.isEnabled === true || config?.isEnabled === 1 || config?.isEnabled === "1";
+}
+
+async function isOutreachEnabled(agencyId: number) {
+  return isConfigEnabled(await getOutreachConfig(agencyId));
 }
 
 /**
@@ -219,16 +223,36 @@ async function advanceRotationIndex(agencyId: number, currentIndex: number, rota
   } catch { /* ignore */ }
 }
 
-async function createOutreachRun(agencyId: number, slot: number, businessType: string, city: string, state: string): Promise<number> {
+function getIstDateKey() {
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Asia/Kolkata",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
+  const part = (type: string) => parts.find((item) => item.type === type)?.value || "";
+  return `${part("year")}-${part("month")}-${part("day")}`;
+}
+
+type OutreachRunCreateResult = { id: number; duplicate: boolean };
+
+async function createOutreachRun(agencyId: number, slot: number, businessType: string, city: string, state: string): Promise<OutreachRunCreateResult> {
   const db = await getDb();
-  if (!db) return 0;
+  if (!db) throw new Error("Database unavailable for outreach run");
+  const scheduledDate = getIstDateKey();
+  const runKey = `outreach:${agencyId}:${scheduledDate}:slot:${slot}`;
   try {
     const result = await db.execute(
-      sql`INSERT INTO outreachRuns (agencyId, runSlot, businessType, targetCity, targetState, status)
-          VALUES (${agencyId}, ${slot}, ${businessType}, ${city}, ${state}, 'running')`
+      sql`INSERT INTO outreachRuns (agencyId, runSlot, runKey, scheduledDate, businessType, targetCity, targetState, status)
+          VALUES (${agencyId}, ${slot}, ${runKey}, ${scheduledDate}, ${businessType}, ${city}, ${state}, 'queued')`
     );
-    return (result as any)[0]?.insertId || 0;
-  } catch { return 0; }
+    return { id: (result as any)[0]?.insertId || 0, duplicate: false };
+  } catch (error: any) {
+    if (!String(error?.message || error).toLowerCase().includes("duplicate")) throw error;
+    const existing = await db.execute(sql`SELECT id FROM outreachRuns WHERE runKey = ${runKey} LIMIT 1`);
+    const rows = Array.isArray(existing) && Array.isArray(existing[0]) ? existing[0] : existing;
+    return { id: Number((rows as any[])[0]?.id || 0), duplicate: true };
+  }
 }
 
 async function updateOutreachRun(runId: number, data: {
@@ -297,9 +321,20 @@ async function upsertScrapedBusiness(biz: any, runId?: number) {
  */
 async function processOutreachInBackground(slot: number, city: string, state: string, runId: number, config?: any) {
   const slotConfig = SLOT_CONFIG[slot];
+  const agencyId = Number(config?.agencyId || 1);
   let scrapedCount = 0, eligibleCount = 0, emailSentCount = 0, whatsappSentCount = 0, errorCount = 0;
 
   try {
+    if (!await isOutreachEnabled(agencyId)) {
+      await updateOutreachRun(runId, { status: "skipped_paused" });
+      return;
+    }
+    if (!await isEmailServiceReady()) {
+      await updateOutreachRun(runId, { status: "failed", errorCount: 1 });
+      console.error("[AutoOutreach] Aborted because SMTP is not verified");
+      return;
+    }
+
     const query = slotConfig.businessType + " in " + city + ", " + state + ", India";
     const searchResult = await makeRequest<PlacesSearchResult>(
       "/maps/api/place/textsearch/json",
@@ -315,12 +350,16 @@ async function processOutreachInBackground(slot: number, city: string, state: st
 
     for (const place of places.slice(0, 40)) {
       if (processedCount >= 20) break; // cap at 20 qualifying businesses per run
+      if (!await isOutreachEnabled(agencyId)) {
+        await updateOutreachRun(runId, { scrapedCount, eligibleCount, emailSentCount, whatsappSentCount, errorCount, status: "skipped_paused" });
+        return;
+      }
       try {
-        const alreadyContacted = await wasAlreadyContacted(1, place.place_id);
+        const alreadyContacted = await wasAlreadyContacted(agencyId, place.place_id);
         if (alreadyContacted) continue;
 
         let biz: any = {
-          agencyId: 1,
+          agencyId,
           businessName: place.name,
           businessType: slotConfig.label,
           businessSize: classifySize(place.user_ratings_total || 0, place.types || []),
@@ -397,16 +436,23 @@ async function processOutreachInBackground(slot: number, city: string, state: st
         const emailSentAt = Date.now();
 
         if (hasEmail && (contactMethod === "email" || contactMethod === "both")) {
+          if (!await isOutreachEnabled(agencyId)) {
+            await updateOutreachRun(runId, { scrapedCount, eligibleCount, emailSentCount, whatsappSentCount, errorCount, status: "skipped_paused" });
+            return;
+          }
           const emailHtml = buildEmailHtml(subject, body, biz.placeId, 1);
-          await sendEmail({ to: biz.email, subject, html: emailHtml });
-          emailSentCount++;
-          await markContacted(1, biz.placeId, emailSentAt);
+          const delivery = await sendEmail({ to: biz.email, subject, html: emailHtml });
+          if (delivery.success) {
+            emailSentCount++;
+            await markContacted(agencyId, biz.placeId, emailSentAt);
+          } else {
+            errorCount++;
+          }
         }
 
         if (hasPhone && (contactMethod === "whatsapp" || contactMethod === "both")) {
-          // WhatsApp placeholder — activated when WhatsApp API is connected
+          // WhatsApp delivery is disabled until a verified provider is configured.
           void whatsapp;
-          whatsappSentCount++;
         }
 
       } catch (bizErr) {
@@ -415,7 +461,14 @@ async function processOutreachInBackground(slot: number, city: string, state: st
       }
     }
 
-    await updateOutreachRun(runId, { scrapedCount, eligibleCount, emailSentCount, whatsappSentCount, errorCount, status: "completed" });
+    await updateOutreachRun(runId, {
+      scrapedCount,
+      eligibleCount,
+      emailSentCount,
+      whatsappSentCount,
+      errorCount,
+      status: errorCount > 0 ? "partially_completed" : "completed",
+    });
     console.log("[AutoOutreach] Slot " + slot + " completed: scraped=" + scrapedCount + " eligible=" + eligibleCount + " emails=" + emailSentCount + " whatsapp=" + whatsappSentCount);
 
     // ── Advance rotation after slot 5 (end of day) ────────────────────────────
@@ -426,7 +479,7 @@ async function processOutreachInBackground(slot: number, city: string, state: st
             ? JSON.parse(config.cityRotation)
             : config.cityRotation;
         if (Array.isArray(rotation) && rotation.length > 1) {
-          await advanceRotationIndex(1, config.rotationIndex || 0, rotation.length);
+          await advanceRotationIndex(agencyId, config.rotationIndex || 0, rotation.length);
           console.log("[AutoOutreach] Rotation advanced to next city");
         }
       } catch { /* ignore */ }
@@ -438,6 +491,37 @@ async function processOutreachInBackground(slot: number, city: string, state: st
   }
 }
 
+export type OutreachLaunchResult = {
+  success: boolean;
+  slot: number;
+  city?: string;
+  state?: string;
+  businessType?: string;
+  runId?: number;
+  status: "processing" | "skipped_paused" | "skipped_duplicate";
+};
+
+export async function launchOutreachRun(agencyId: number, slot: number): Promise<OutreachLaunchResult> {
+  const slotConfig = SLOT_CONFIG[slot];
+  if (!slotConfig) throw new Error("Invalid outreach slot");
+
+  const config = await getOutreachConfig(agencyId);
+  if (!isConfigEnabled(config)) {
+    return { success: true, slot, status: "skipped_paused" };
+  }
+
+  const { city, state } = getRotationCity(config);
+  const run = await createOutreachRun(agencyId, slot, slotConfig.label, city, state);
+  if (run.duplicate) {
+    return { success: true, slot, city, state, businessType: slotConfig.label, runId: run.id, status: "skipped_duplicate" };
+  }
+
+  processOutreachInBackground(slot, city, state, run.id, config).catch((err) => {
+    console.error("[AutoOutreach] Unhandled background error:", err);
+  });
+  return { success: true, slot, city, state, businessType: slotConfig.label, runId: run.id, status: "processing" };
+}
+
 export async function autoOutreachHandler(req: Request, res: Response) {
   const slot = Number(req.body?.slot || req.query?.slot || 1);
 
@@ -447,26 +531,7 @@ export async function autoOutreachHandler(req: Request, res: Response) {
       return res.status(403).json({ error: "cron-only endpoint" });
     }
 
-    const slotConfig = SLOT_CONFIG[slot];
-    if (!slotConfig) {
-      return res.status(400).json({ error: "Invalid slot: " + slot });
-    }
-
-    const config = await getOutreachConfig(1);
-    const { city, state } = getRotationCity(config);
-    const contactMethod = config?.contactMethod || "both";
-    void contactMethod; // passed into processOutreachInBackground via config
-
-    // Create the run record immediately
-    const runId = await createOutreachRun(1, slot, slotConfig.label, city, state);
-
-    // ── Respond immediately so Heartbeat doesn't timeout ──────────────────────
-    res.json({ success: true, slot, city, state, businessType: slotConfig.label, runId, status: "processing" });
-
-    // ── Process in background (fire-and-forget) ───────────────────────────────
-    processOutreachInBackground(slot, city, state, runId, config).catch(err => {
-      console.error("[AutoOutreach] Unhandled background error:", err);
-    });
+    return res.json(await launchOutreachRun(1, slot));
 
   } catch (err) {
     console.error("[AutoOutreach] Handler error:", err);
@@ -484,23 +549,14 @@ export async function triggerNowHandler(req: Request, res: Response) {
   const slot = Number(req.body?.slot || req.query?.slot || 1);
 
   try {
-    const slotConfig = SLOT_CONFIG[slot];
-    if (!slotConfig) {
-      return res.status(400).json({ error: "Invalid slot: " + slot });
+    const result = await launchOutreachRun(1, slot);
+    if (result.status === "skipped_paused") {
+      return res.status(409).json({ error: "Automation is paused. Enable it before running a slot manually." });
     }
-
-    const config = await getOutreachConfig(1);
-    const { city, state } = getRotationCity(config);
-
-    const runId = await createOutreachRun(1, slot, slotConfig.label, city, state);
-
-    // Respond immediately
-    res.json({ success: true, slot, city, state, businessType: slotConfig.label, runId, status: "processing" });
-
-    // Process in background
-    processOutreachInBackground(slot, city, state, runId, config).catch(err => {
-      console.error("[AutoOutreach TriggerNow] Unhandled background error:", err);
-    });
+    if (result.status === "skipped_duplicate") {
+      return res.status(409).json({ error: "This outreach slot has already run today.", runId: result.runId, status: result.status });
+    }
+    return res.json(result);
 
   } catch (err) {
     console.error("[AutoOutreach TriggerNow] Handler error:", err);

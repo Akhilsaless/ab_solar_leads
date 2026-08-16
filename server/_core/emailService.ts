@@ -1,13 +1,23 @@
 import nodemailer from "nodemailer";
 
+let smtpReady = false;
+let lastSmtpCheckAt = 0;
+const SMTP_RECHECK_MS = 5 * 60 * 1000;
+
 async function verifySmtp() {
+  lastSmtpCheckAt = Date.now();
   try {
     const transporter = getTransporter();
-    if (!transporter) return false;
+    if (!transporter) {
+      smtpReady = false;
+      return false;
+    }
     await transporter.verify();
+    smtpReady = true;
     console.log("[Email] SMTP connection verified successfully");
     return true;
   } catch (error) {
+    smtpReady = false;
     console.error("[Email] SMTP verification failed:", error);
     return false;
   }
@@ -40,6 +50,17 @@ export async function initializeEmailService() {
   return await verifySmtp();
 }
 
+/**
+ * Returns true only after a recent SMTP verification succeeds. Outbound workflows
+ * must fail closed rather than pretending an email was delivered.
+ */
+export async function isEmailServiceReady() {
+  if (Date.now() - lastSmtpCheckAt > SMTP_RECHECK_MS) {
+    await verifySmtp();
+  }
+  return smtpReady;
+}
+
 export async function sendEmail({
   to,
   subject,
@@ -52,6 +73,10 @@ export async function sendEmail({
   text?: string;
 }) {
   try {
+    if (!await isEmailServiceReady()) {
+      console.warn(`[Email] Skipping email to ${to} - SMTP is not verified`);
+      return { success: false, message: "Email service is not verified" };
+    }
     const transporter = getTransporter();
     if (!transporter) {
       console.warn(`[Email] Skipping email to ${to} - credentials not configured`);

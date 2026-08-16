@@ -104,8 +104,8 @@ export function AutomatedOutreach() {
   // Smart cron state
   const [smartCity, setSmartCity] = useState("");
   const [smartState, setSmartState] = useState("");
-  const [smartEnabled, setSmartEnabled] = useState(true);
-  const [contactMethod, setContactMethod] = useState<"email" | "whatsapp" | "both">("both");
+  const [smartEnabled, setSmartEnabled] = useState(false);
+  const [contactMethod, setContactMethod] = useState<"email" | "whatsapp" | "both">("email");
 
   // City rotation state
   const [rotation, setRotation] = useState<Array<{ city: string; state: string }>>(DEFAULT_ROTATION);
@@ -140,6 +140,14 @@ export function AutomatedOutreach() {
   const triggerNowMutation = trpc.automatedOutreach.smartConfig.triggerNow.useMutation({
     onSuccess: (data, vars) => {
       setTriggeringSlot(null);
+      if ((data as any).status === "skipped_paused") {
+        toast.error("Automation is paused. Enable it before running a slot.");
+        return;
+      }
+      if ((data as any).status === "skipped_duplicate") {
+        toast.message(`Slot ${vars.slot} has already run today.`);
+        return;
+      }
       toast.success(`Run started for Slot ${vars.slot} — ${(data as any).businessType} in ${(data as any).city}!`);
       setTimeout(() => {
         runsQuery.refetch();
@@ -317,7 +325,7 @@ export function AutomatedOutreach() {
               { label: "Runs Today", value: todayStats?.totalRuns ?? 0, icon: <Zap className="w-4 h-4 text-orange-400" /> },
               { label: "Scraped", value: todayStats?.totalScraped ?? 0, icon: <Building2 className="w-4 h-4 text-blue-400" /> },
               { label: "Emails Sent", value: todayStats?.totalEmailSent ?? 0, icon: <Mail className="w-4 h-4 text-green-400" /> },
-              { label: "WhatsApp Ready", value: todayStats?.totalWhatsappSent ?? 0, icon: <Phone className="w-4 h-4 text-emerald-400" /> },
+              { label: "WhatsApp API", value: "Not connected", icon: <Phone className="w-4 h-4 text-emerald-400" /> },
             ].map(s => (
               <Card key={s.label} className="bg-card border-border">
                 <CardContent className="pt-4 pb-3">
@@ -384,9 +392,9 @@ export function AutomatedOutreach() {
                   <Select value={contactMethod} onValueChange={v => setContactMethod(v as "email" | "whatsapp" | "both")}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="both">📧📱 Email + WhatsApp</SelectItem>
                       <SelectItem value="email">📧 Email Only</SelectItem>
-                      <SelectItem value="whatsapp">📱 WhatsApp Only</SelectItem>
+                      <SelectItem value="both" disabled>📧📱 Email + WhatsApp — API required</SelectItem>
+                      <SelectItem value="whatsapp" disabled>📱 WhatsApp Only — API required</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -513,14 +521,14 @@ export function AutomatedOutreach() {
                       </div>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
-                      <Badge variant="outline" className="text-xs text-green-400 border-green-500/30 bg-green-500/10">
-                        Active
+                      <Badge variant="outline" className={`text-xs ${smartEnabled ? "text-green-400 border-green-500/30 bg-green-500/10" : "text-amber-400 border-amber-500/30 bg-amber-500/10"}`}>
+                        {smartEnabled ? "Active" : "Paused"}
                       </Badge>
                       <Button
                         size="sm"
                         variant="outline"
                         className="h-7 text-xs border-orange-500/40 text-orange-400 hover:bg-orange-500/10 gap-1"
-                        disabled={triggeringSlot !== null}
+                        disabled={triggeringSlot !== null || !smartEnabled}
                         onClick={() => handleTriggerNow(s.slot)}
                       >
                         {triggeringSlot === s.slot ? (
@@ -537,7 +545,7 @@ export function AutomatedOutreach() {
               <div className="mt-3 p-3 rounded-lg bg-blue-500/5 border border-blue-500/20">
                 <p className="text-xs text-blue-400 font-medium">How it works</p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  Each run: scrapes up to 20 businesses → calculates Solar Score → sends email (if available) + logs WhatsApp message (if phone available) → marks as contacted. Bot link included in every message so businesses can get their estimate instantly.
+                  When enabled, each run scrapes up to 20 businesses, applies the configured eligibility rule, and sends a verified email only when SMTP is healthy. WhatsApp sending stays disabled until a WhatsApp Business API is connected.
                 </p>
               </div>
             </CardContent>

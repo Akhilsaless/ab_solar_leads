@@ -7,6 +7,7 @@ import { nanoid } from "nanoid";
 import { sendEmail } from "./_core/emailService";
 import { notifyOwner } from "./_core/notification";
 import bcrypt from "bcryptjs";
+import { createHash, randomBytes, randomInt } from "crypto";
 
 // DB-backed OTP store (survives server restarts)
 
@@ -27,6 +28,49 @@ function firstRow(result: any): any | null {
 function insertId(result: any): number {
   if (Array.isArray(result)) return (result[0] as any)?.insertId || 0;
   return (result as any)?.insertId || 0;
+}
+
+const OTP_TTL_MS = 10 * 60 * 1000;
+const OTP_RESEND_COOLDOWN_MS = 60 * 1000;
+const OTP_MAX_ATTEMPTS = 5;
+const REFERRER_SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+const PASSWORD_SETUP_TTL_MS = 15 * 60 * 1000;
+
+function hashSecret(value: string) {
+  return createHash("sha256").update(value).digest("hex");
+}
+
+function createOpaqueToken() {
+  return randomBytes(32).toString("base64url");
+}
+
+function createOtp() {
+  return randomInt(100000, 1000000).toString();
+}
+
+async function issueReferrerSession(db: any, referrerId: number) {
+  const token = createOpaqueToken();
+  const expiresAt = Date.now() + REFERRER_SESSION_TTL_MS;
+  await db.execute(sql`
+    UPDATE referrers
+    SET sessionTokenHash = ${hashSecret(token)}, sessionExpiresAt = ${expiresAt}, sessionToken = NULL
+    WHERE id = ${referrerId}
+  `);
+  return { token, expiresAt };
+}
+
+async function requireReferrerSession(db: any, token: string) {
+  const now = Date.now();
+  const result = await db.execute(sql`
+    SELECT * FROM referrers
+    WHERE sessionTokenHash = ${hashSecret(token)} AND sessionExpiresAt > ${now}
+    LIMIT 1
+  `);
+  const referrer = firstRow(result);
+  if (!referrer) {
+    throw new TRPCError({ code: "UNAUTHORIZED", message: "Your session has expired. Please sign in again." });
+  }
+  return referrer;
 }
 
 // Milestone bonus amounts — starts at ₹100, increases ₹100 each task
@@ -71,19 +115,24 @@ export const referrerRouter = router({
     .input(z.object({ name: z.string().min(1), email: z.string().email(), acceptedTnC: z.boolean() }))
     .mutation(async ({ input }) => {
       if (!input.acceptedTnC) throw new Error("You must accept the Terms & Conditions to join.");
-      const otp = Math.floor(100000 + Math.random() * 900000).toString();
-      const expiresAt = Date.now() + 10 * 60 * 1000;
-
       const db = await getDb();
       if (!db) throw new Error("Database not available");
-      // Upsert OTP into persistent store
+      const now = Date.now();
+      const existingResult = await db.execute(sql`SELECT lastSentAt FROM otp_store WHERE email = ${input.email}`);
+      const existing = firstRow(existingResult);
+      if (existing?.lastSentAt && now - Number(existing.lastSentAt) < OTP_RESEND_COOLDOWN_MS) {
+        throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: "Please wait one minute before requesting another code." });
+      }
+
+      const otp = createOtp();
+      const expiresAt = now + OTP_TTL_MS;
       await db.execute(
-        sql`INSERT INTO otp_store (email, otp, name, acceptedTnC, expiresAt)
-            VALUES (${input.email}, ${otp}, ${input.name}, 1, ${expiresAt})
-            ON DUPLICATE KEY UPDATE otp = ${otp}, name = ${input.name}, expiresAt = ${expiresAt}`
+        sql`INSERT INTO otp_store (email, otp, otpHash, name, acceptedTnC, expiresAt, attempts, lastSentAt)
+            VALUES (${input.email}, 'REDACTED', ${hashSecret(otp)}, ${input.name}, 1, ${expiresAt}, 0, ${now})
+            ON DUPLICATE KEY UPDATE otp = 'REDACTED', otpHash = ${hashSecret(otp)}, name = ${input.name}, expiresAt = ${expiresAt}, attempts = 0, lastSentAt = ${now}`
       );
 
-      await sendEmail({
+      const delivery = await sendEmail({
         to: input.email,
         subject: "Your Sales Squad OTP Code",
         html: `
@@ -97,17 +146,21 @@ export const referrerRouter = router({
           </div>
         `,
       });
+      if (!delivery.success) {
+        await db.execute(sql`DELETE FROM otp_store WHERE email = ${input.email}`);
+        throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Email verification is temporarily unavailable. Please try again later." });
+      }
 
       return { success: true, message: "OTP sent to your email" };
     }),
 
   verifyOtpAndSignup: publicProcedure
-    .input(z.object({ email: z.string().email(), otp: z.string() }))
+    .input(z.object({ email: z.string().email(), otp: z.string().regex(/^\d{6}$/) }))
     .mutation(async ({ input }) => {
       const db = await getDb();
       if (!db) throw new Error("Database not available");
       const storedResult = await db.execute(
-        sql`SELECT otp, name, expiresAt FROM otp_store WHERE email = ${input.email}`
+        sql`SELECT otp, otpHash, name, expiresAt, attempts FROM otp_store WHERE email = ${input.email}`
       );
       const stored = firstRow(storedResult);
       if (!stored) throw new Error("OTP expired or not found. Please request a new one.");
@@ -115,16 +168,36 @@ export const referrerRouter = router({
         await db.execute(sql`DELETE FROM otp_store WHERE email = ${input.email}`);
         throw new Error("OTP expired. Please request a new one.");
       }
-      if (stored.otp !== input.otp) throw new Error("Invalid OTP. Please check and try again.");
+      if (Number(stored.attempts || 0) >= OTP_MAX_ATTEMPTS) {
+        await db.execute(sql`DELETE FROM otp_store WHERE email = ${input.email}`);
+        throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: "Too many invalid attempts. Please request a new code." });
+      }
+      const validOtp = stored.otpHash
+        ? hashSecret(input.otp) === stored.otpHash
+        : stored.otp === input.otp;
+      if (!validOtp) {
+        await db.execute(sql`UPDATE otp_store SET attempts = attempts + 1 WHERE email = ${input.email}`);
+        throw new Error("Invalid OTP. Please check and try again.");
+      }
 
       const { name, email } = { name: stored.name as string, email: input.email };
 
       // Return existing account if already registered
-      const existingResult = await db.execute(sql`SELECT id, uniqueCode FROM referrers WHERE email = ${email}`);
+      const existingResult = await db.execute(sql`SELECT id, uniqueCode, passwordHash FROM referrers WHERE email = ${email}`);
       const existing = firstRow(existingResult);
       if (existing) {
         await db.execute(sql`DELETE FROM otp_store WHERE email = ${input.email}`);
-        return { success: true, uniqueCode: existing.uniqueCode, alreadyExists: true };
+        if (existing.passwordHash) {
+          const session = await issueReferrerSession(db, existing.id);
+          return { success: true, uniqueCode: existing.uniqueCode, alreadyExists: true, token: session.token };
+        }
+        const setupToken = createOpaqueToken();
+        await db.execute(sql`
+          UPDATE referrers
+          SET passwordSetupTokenHash = ${hashSecret(setupToken)}, passwordSetupExpiresAt = ${Date.now() + PASSWORD_SETUP_TTL_MS}
+          WHERE id = ${existing.id}
+        `);
+        return { success: true, uniqueCode: existing.uniqueCode, needsPassword: true, setupToken };
       }
 
       const uniqueCode = `REF_${nanoid(8).toUpperCase()}`;
@@ -149,6 +222,13 @@ export const referrerRouter = router({
 
       await db.execute(sql`DELETE FROM otp_store WHERE email = ${input.email}`);
 
+      const setupToken = createOpaqueToken();
+      await db.execute(sql`
+        UPDATE referrers
+        SET passwordSetupTokenHash = ${hashSecret(setupToken)}, passwordSetupExpiresAt = ${Date.now() + PASSWORD_SETUP_TTL_MS}
+        WHERE id = ${newId}
+      `);
+
       sendEmail({
         to: email,
         subject: "Welcome to Sales Squad Referral Program!",
@@ -166,21 +246,30 @@ export const referrerRouter = router({
         `,
       }).catch(console.error);
 
-      return { success: true, uniqueCode, needsPassword: true };
+      return { success: true, uniqueCode, needsPassword: true, setupToken };
     }),
 
   setPassword: publicProcedure
-    .input(z.object({ email: z.string().email(), password: z.string().min(6) }))
+    .input(z.object({ setupToken: z.string().min(20), password: z.string().min(10) }))
     .mutation(async ({ input }) => {
       const db = await getDb();
       if (!db) throw new Error("Database not available");
-      const result = await db.execute(sql`SELECT id, uniqueCode FROM referrers WHERE email = ${input.email}`);
+      const result = await db.execute(sql`
+        SELECT id, uniqueCode FROM referrers
+        WHERE passwordSetupTokenHash = ${hashSecret(input.setupToken)}
+          AND passwordSetupExpiresAt > ${Date.now()}
+        LIMIT 1
+      `);
       const ref = firstRow(result);
-      if (!ref) throw new Error("Account not found.");
+      if (!ref) throw new TRPCError({ code: "UNAUTHORIZED", message: "Password setup link has expired. Please verify your email again." });
       const hash = await bcrypt.hash(input.password, 10);
-      const token = nanoid(32);
-      await db.execute(sql`UPDATE referrers SET passwordHash = ${hash}, sessionToken = ${token} WHERE id = ${ref.id}`);
-      return { success: true, uniqueCode: ref.uniqueCode, token };
+      await db.execute(sql`
+        UPDATE referrers
+        SET passwordHash = ${hash}, passwordSetupTokenHash = NULL, passwordSetupExpiresAt = NULL
+        WHERE id = ${ref.id}
+      `);
+      const session = await issueReferrerSession(db, ref.id);
+      return { success: true, uniqueCode: ref.uniqueCode, token: session.token, expiresAt: session.expiresAt };
     }),
 
   loginWithPassword: publicProcedure
@@ -194,24 +283,18 @@ export const referrerRouter = router({
       if (!ref.passwordHash) throw new Error("Password not set. Please sign up again to set your password.");
       const valid = await bcrypt.compare(input.password, ref.passwordHash);
       if (!valid) throw new Error("Incorrect password. Please try again.");
-      const token = nanoid(32);
-      await db.execute(sql`UPDATE referrers SET sessionToken = ${token} WHERE id = ${ref.id}`);
-      return { success: true, uniqueCode: ref.uniqueCode, token };
+      const session = await issueReferrerSession(db, ref.id);
+      return { success: true, uniqueCode: ref.uniqueCode, token: session.token, expiresAt: session.expiresAt };
     }),
 
   getDashboard: publicProcedure
-    .input(z.object({ uniqueCode: z.string() }))
+    .input(z.object({ token: z.string().min(20) }))
     .query(async ({ input }) => {
-      if (!input.uniqueCode) return null;
       const db = await getDb();
       if (!db) return null;
 
       try {
-        const referrerResult = await db.execute(
-          sql`SELECT * FROM referrers WHERE uniqueCode = ${input.uniqueCode}`
-        );
-        const ref = firstRow(referrerResult);
-        if (!ref) return null;
+        const ref = await requireReferrerSession(db, input.token);
 
         const referralsResult = await db.execute(
           sql`SELECT * FROM referrals WHERE referrerId = ${ref.id} ORDER BY createdAt DESC`
@@ -223,8 +306,18 @@ export const referrerRouter = router({
           sql`SELECT * FROM withdrawals WHERE referrerId = ${ref.id} ORDER BY createdAt DESC`
         );
 
+        const {
+          passwordHash,
+          sessionToken,
+          sessionTokenHash,
+          sessionExpiresAt,
+          passwordSetupTokenHash,
+          passwordSetupExpiresAt,
+          ...safeReferrer
+        } = ref;
+
         return {
-          referrer: ref,
+          referrer: safeReferrer,
           referrals: rows(referralsResult),
           tasks: rows(tasksResult),
           withdrawals: rows(withdrawalsResult),
@@ -269,7 +362,7 @@ export const referrerRouter = router({
 
   requestWithdrawal: publicProcedure
     .input(z.object({
-      uniqueCode: z.string(),
+      token: z.string().min(20),
       amount: z.number().positive(),
       upiId: z.string().optional(),
       bankAccount: z.string().optional(),
@@ -279,9 +372,7 @@ export const referrerRouter = router({
       const db = await getDb();
       if (!db) throw new Error("Database not available");
 
-      const referrerResult = await db.execute(sql`SELECT * FROM referrers WHERE uniqueCode = ${input.uniqueCode}`);
-      const ref = firstRow(referrerResult);
-      if (!ref) throw new Error("Referrer not found");
+      const ref = await requireReferrerSession(db, input.token);
       if (Number(ref.totalEarnings) < input.amount) throw new Error("Insufficient balance");
 
       await db.execute(

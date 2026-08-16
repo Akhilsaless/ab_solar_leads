@@ -27,6 +27,8 @@ export default function PartnerSignup() {
   const [products, setProducts] = useState("");
   const [pricing, setPricing] = useState("");
   const [discounts, setDiscounts] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitted, setSubmitted] = useState(false);
 
@@ -55,6 +57,9 @@ export default function PartnerSignup() {
     if (selectedStates.length === 0) newErrors.states = "Select at least one service area";
     if (!products.trim()) newErrors.products = "List your products/services";
     if (!pricing.trim()) newErrors.pricing = "Enter your pricing info";
+    if (password.length < 10) newErrors.password = "Password must be at least 10 characters";
+    if (password !== confirmPassword) newErrors.confirmPassword = "Passwords do not match";
+    if (!token) newErrors.token = "This partner invitation is invalid or missing.";
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -71,6 +76,7 @@ export default function PartnerSignup() {
       products,
       pricing,
       discounts,
+      password,
     });
   };
 
@@ -197,6 +203,31 @@ export default function PartnerSignup() {
                   <AlertCircle className="w-4 h-4" /> {errors.pricing}
                 </p>
               )}
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">Dashboard Password *</label>
+                <Input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="At least 10 characters"
+                  className={`bg-slate-700 border-slate-600 text-white ${errors.password ? "border-red-500" : ""}`}
+                />
+                {errors.password && <p className="text-red-400 text-sm mt-1">{errors.password}</p>}
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">Confirm Password *</label>
+                <Input
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder="Repeat your password"
+                  className={`bg-slate-700 border-slate-600 text-white ${errors.confirmPassword ? "border-red-500" : ""}`}
+                />
+                {errors.confirmPassword && <p className="text-red-400 text-sm mt-1">{errors.confirmPassword}</p>}
+              </div>
             </div>
 
             {/* Discounts */}

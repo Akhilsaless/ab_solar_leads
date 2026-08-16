@@ -120,15 +120,7 @@ export default function PartnerOutreach() {
       if (!phone) { toast.error("No phone number available for this company"); return; }
       const waUrl = `https://wa.me/${phone.startsWith("91") ? phone : "91" + phone}?text=${encodeURIComponent(customMessage)}`;
       window.open(waUrl, "_blank");
-      sendEmailMutation.mutate({
-        companyName: selectedBusiness.businessName,
-        email: selectedBusiness.email || "noemail@placeholder.com",
-        phone: selectedBusiness.phone,
-        serviceAreas: [selectedCity],
-        customMessage: `[WhatsApp sent] ${customMessage}`,
-        skipEmail: true,
-      });
-      toast.success("WhatsApp opened! Send the message to complete outreach.");
+      toast.message("WhatsApp opened. It will not be recorded as sent until a WhatsApp Business provider is connected.");
       setShowOutreachDialog(false);
     } else {
       if (!selectedBusiness.email) { toast.error("No email available for this company"); return; }

@@ -411,3 +411,17 @@
 
 ## Production Readiness Audit (Current Session)
 - [x] Audit current deployment, automation, authentication, integrations, data safety, and code duplication; provide prioritized production hardening plan
+
+## Production Hardening (Current Session)
+- [x] Stop scheduled outbound email/follow-up jobs until SMTP and pause safety are verified
+- [x] Enforce master outreach pause in the active scheduled handler before runs and before each send
+- [x] Consolidate duplicate outreach configurations into one canonical agency configuration and remove unused scheduler code
+- [x] Add unique scheduled-run idempotency and explicit run states for all outreach slots
+- [x] Remove false WhatsApp-sent reporting until a WhatsApp Business provider is configured
+- [x] Replace unapproved savings/subsidy claims with approved conservative business outreach copy
+- [x] Secure referrer OTP, password setup/reset, sessions, dashboard authorization, and withdrawal access
+- [x] Secure partner invitation/login/session, lead isolation, profile updates, document upload, and email actions
+- [x] Add abuse protection and rate limits to public chatbot, OTP, and lead-capture endpoints
+- [x] Remove browser-exposed sensitive API credentials and move sensitive operations server-side
+- [x] Reconcile Drizzle schema and committed migrations with all live production tables and constraints
+- [x] Add critical production tests, structured run monitoring, and an external credentials checklist

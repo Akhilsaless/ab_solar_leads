@@ -13,8 +13,6 @@ import {
 } from "lucide-react";
 
 const STORAGE_KEY = "partner_token";
-const FORGE_URL = (import.meta as any).env?.VITE_FRONTEND_FORGE_API_URL || "";
-const FORGE_KEY = (import.meta as any).env?.VITE_FRONTEND_FORGE_API_KEY || "";
 
 type Tab = "leads" | "profile" | "marketing";
 
@@ -134,21 +132,18 @@ export default function PartnerDashboard() {
 
   const handleFileUpload = async (file: File, fileType: "pricingSheet" | "productList") => {
     if (!file) return;
-    if (file.size > 10 * 1024 * 1024) { toast.error("File too large. Max 10MB."); return; }
+    if (file.size > 4 * 1024 * 1024) { toast.error("File too large. Max 4MB."); return; }
+    const allowedTypes = ["application/pdf", "image/jpeg", "image/png", "text/csv", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"];
+    if (!allowedTypes.includes(file.type)) { toast.error("Use a PDF, PNG, JPG, CSV, or XLSX file."); return; }
     setUploadingFile(fileType);
     try {
-      const key = `partner-files/${token.slice(0, 8)}-${fileType}-${Date.now()}.${file.name.split(".").pop()}`;
-      const uploadUrl = `${FORGE_URL}/v1/storage/upload?path=${encodeURIComponent(key)}`;
-      const formData = new FormData();
-      formData.append("file", file);
-      const res = await fetch(uploadUrl, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${FORGE_KEY}` },
-        body: formData,
+      const contentBase64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onerror = () => reject(new Error("Could not read the selected file."));
+        reader.onload = () => resolve(String(reader.result).split(",")[1] || "");
+        reader.readAsDataURL(file);
       });
-      if (!res.ok) throw new Error("Upload failed");
-      const { url } = await res.json();
-      uploadFileMutation.mutate({ token, fileUrl: url, fileType });
+      uploadFileMutation.mutate({ token, fileName: file.name, contentType: file.type as any, contentBase64, fileType });
     } catch (e) {
       toast.error("Upload failed. Please try again.");
       setUploadingFile(null);

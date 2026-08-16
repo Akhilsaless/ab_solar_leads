@@ -2,6 +2,7 @@ import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
+import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { sql } from "drizzle-orm";
 import { invokeLLM } from "./_core/llm";
@@ -18,6 +19,7 @@ import { sendEmail } from "./_core/emailService";
 import { extractEmailFromWebsite } from "./emailExtractor";
 import { automatedOutreachRouter } from "./automatedOutreach";
 import { partnerManagementRouter } from "./partnerManagement";
+import { storagePut } from "./storage";
 
 // In-memory OTP store (session → { otp, expiresAt, phone })
 const otpStore = new Map<string, { otp: string; expiresAt: Date; phone: string }>();
@@ -261,15 +263,34 @@ export const appRouter = router({
 
   // ===== AI CHAT BOT (PUBLIC - for customers clicking ads) =====
   chat: router({
+    uploadBill: publicProcedure
+      .input(z.object({
+        sessionId: z.string().trim().min(16).max(128),
+        fileName: z.string().trim().min(1).max(120),
+        contentType: z.enum(["application/pdf", "image/jpeg", "image/png"]),
+        contentBase64: z.string().min(8).max(6_000_000),
+      }))
+      .mutation(async ({ input }) => {
+        const conversation = await db.getConversation(input.sessionId);
+        if (!conversation) throw new TRPCError({ code: "NOT_FOUND", message: "Conversation not found" });
+        const bytes = Buffer.from(input.contentBase64, "base64");
+        if (!bytes.length || bytes.length > 4 * 1024 * 1024) {
+          throw new TRPCError({ code: "PAYLOAD_TOO_LARGE", message: "Bill files must be between 1 byte and 4 MB." });
+        }
+        const safeName = input.fileName.replace(/[^a-zA-Z0-9._-]/g, "_");
+        const { url } = await storagePut(`bill-uploads/${conversation.id}/${Date.now()}-${safeName}`, bytes, input.contentType);
+        return { url };
+      }),
+
     // Start a new conversation when customer lands on chat page
     startConversation: publicProcedure
       .input(z.object({
-        agencySlug: z.string(),
-        sessionId: z.string(),
-        utmSource: z.string().optional(),
-        utmMedium: z.string().optional(),
-        utmCampaign: z.string().optional(),
-        referrerCode: z.string().optional(),
+        agencySlug: z.string().trim().min(2).max(100),
+        sessionId: z.string().trim().min(16).max(128),
+        utmSource: z.string().trim().max(100).optional(),
+        utmMedium: z.string().trim().max(100).optional(),
+        utmCampaign: z.string().trim().max(200).optional(),
+        referrerCode: z.string().trim().max(64).optional(),
       }))
       .mutation(async ({ input }) => {
         const agency = await db.getAgencyBySlug(input.agencySlug);
@@ -314,12 +335,26 @@ export const appRouter = router({
     // Send a message and get AI response
     sendMessage: publicProcedure
       .input(z.object({
-        sessionId: z.string(),
-        message: z.string(),
+        sessionId: z.string().trim().min(16).max(128),
+        message: z.string().trim().min(1).max(1500),
       }))
       .mutation(async ({ input }) => {
         const conversation = await db.getConversation(input.sessionId);
         if (!conversation) throw new Error("Conversation not found");
+
+        const dbConn = await db.getDb();
+        if (!dbConn) throw new Error("Database not available");
+        const recentResult = await dbConn.execute(sql`
+          SELECT COUNT(*) AS count
+          FROM chatMsgs3
+          WHERE conversationId = ${conversation.id}
+            AND role = 'customer'
+            AND createdAt >= DATE_SUB(NOW(), INTERVAL 10 MINUTE)
+        `);
+        const recentRows = Array.isArray(recentResult) && Array.isArray(recentResult[0]) ? recentResult[0] : recentResult;
+        if (Number((recentRows as any[])[0]?.count || 0) >= 20) {
+          throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: "Please wait a few minutes before sending more messages." });
+        }
 
         const agency = await db.getAgencyById(conversation.agencyId);
         if (!agency) throw new Error("Agency not found");
@@ -646,7 +681,7 @@ export const appRouter = router({
 
     // Get conversation history
     getMessages: publicProcedure
-      .input(z.object({ sessionId: z.string() }))
+      .input(z.object({ sessionId: z.string().trim().min(16).max(128) }))
       .query(async ({ input }) => {
         const conversation = await db.getConversation(input.sessionId);
         if (!conversation) return [];
@@ -656,56 +691,26 @@ export const appRouter = router({
     // OTP: Send a 6-digit OTP to the customer's phone via WhatsApp/SMS
     sendOtp: publicProcedure
       .input(z.object({
-        sessionId: z.string(),
-        phone: z.string(),
+        sessionId: z.string().trim().min(16).max(128),
+        phone: z.string().trim().regex(/^\+?[1-9]\d{7,14}$/, "Enter a valid international phone number"),
       }))
-      .mutation(async ({ input }) => {
-        const otp = Math.floor(100000 + Math.random() * 900000).toString();
-        const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 min expiry
-        // Store OTP in conversation metadata (use raw SQL to avoid schema changes)
-        const dbConn = await db.getDb();
-        if (dbConn) {
-          await dbConn.execute(
-            sql`UPDATE conversations3 SET customerPhone = ${input.phone} WHERE sessionId = ${input.sessionId}`
-          );
-          // Store OTP in a simple in-memory map (per session, expires in 10 min)
-          otpStore.set(input.sessionId, { otp, expiresAt, phone: input.phone });
-        }
-        // Send OTP via email as fallback (WhatsApp requires credentials)
-        const conv = await db.getConversation(input.sessionId);
-        if (conv?.customerEmail) {
-          await sendEmail({
-            to: conv.customerEmail,
-            subject: 'Your Sales Squad Verification Code',
-            html: `<p>Your verification code is: <strong>${otp}</strong></p><p>Valid for 10 minutes.</p>`,
-          });
-        }
-        // For now, log OTP to console (WhatsApp integration pending credentials)
-        console.log(`[OTP] Session ${input.sessionId}: ${otp} for phone ${input.phone}`);
-        return { success: true, message: 'OTP sent to your number' };
+      .mutation(async () => {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: "Phone verification is unavailable until a verified WhatsApp Business or SMS provider is connected.",
+        });
       }),
 
     // OTP: Verify the OTP entered by the customer
     verifyOtp: publicProcedure
       .input(z.object({
-        sessionId: z.string(),
-        otp: z.string(),
+        sessionId: z.string().trim().min(16).max(128),
+        otp: z.string().regex(/^\d{6}$/),
       }))
-      .mutation(async ({ input }) => {
-        const stored = otpStore.get(input.sessionId);
-        if (!stored) return { success: false, message: 'OTP expired or not found. Please request a new one.' };
-        if (new Date() > stored.expiresAt) {
-          otpStore.delete(input.sessionId);
-          return { success: false, message: 'OTP expired. Please request a new one.' };
-        }
-        if (stored.otp !== input.otp.trim()) {
-          return { success: false, message: 'Incorrect OTP. Please try again.' };
-        }
-        otpStore.delete(input.sessionId);
-        // Mark phone as verified in conversation
-        await db.updateConversation(input.sessionId, { customerPhone: stored.phone } as any);
-        return { success: true, message: 'Phone verified successfully!' };
-      }),
+      .mutation(async () => ({
+        success: false,
+        message: "Phone verification is not configured yet.",
+      })),
   }),
 
   // ===== CONVERSATIONS (Admin view) =====

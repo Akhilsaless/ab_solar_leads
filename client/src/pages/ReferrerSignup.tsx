@@ -21,6 +21,7 @@ export default function ReferrerSignup() {
   const [showLoginPassword, setShowLoginPassword] = useState(false);
   const [error, setError] = useState("");
   const [uniqueCode, setUniqueCode] = useState("");
+  const [setupToken, setSetupToken] = useState("");
   const [acceptedTnC, setAcceptedTnC] = useState(false);
   const [resendCooldown, setResendCooldown] = useState(0);
   const agencySlugQuery = trpc.agency.getFirst.useQuery();
@@ -51,10 +52,13 @@ export default function ReferrerSignup() {
   const verifyOtp = trpc.referrer.verifyOtpAndSignup.useMutation({
     onSuccess: (data: any) => {
       setUniqueCode(data.uniqueCode);
-      if (data.alreadyExists) {
-        // Account exists but no password set yet — prompt to set password
-        setStep("password");
-      } else if (data.needsPassword) {
+      if (data.token) {
+        localStorage.setItem("referrerCode", data.uniqueCode);
+        localStorage.setItem("referrerToken", data.token);
+        localStorage.setItem("referrerEmail", email);
+        setLocation(`/referrer/dashboard?code=${data.uniqueCode}`);
+      } else if (data.needsPassword && data.setupToken) {
+        setSetupToken(data.setupToken);
         setStep("password");
       }
       setError("");
@@ -98,10 +102,11 @@ export default function ReferrerSignup() {
   };
 
   const handleSetPassword = () => {
-    if (!password || password.length < 6) { setError("Password must be at least 6 characters"); return; }
+    if (!password || password.length < 10) { setError("Password must be at least 10 characters"); return; }
     if (password !== confirmPassword) { setError("Passwords do not match"); return; }
+    if (!setupToken) { setError("Password setup expired. Please verify your email again."); return; }
     setError("");
-    setPasswordMutation.mutate({ email, password });
+    setPasswordMutation.mutate({ setupToken, password });
   };
 
   const handleLogin = () => {

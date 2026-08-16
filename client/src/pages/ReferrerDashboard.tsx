@@ -430,6 +430,7 @@ function FindLeadsCoach({ uniqueCode }: { uniqueCode: string }) {
 export default function ReferrerDashboard() {
   const [, setLocation] = useLocation();
   const [uniqueCode, setUniqueCode] = useState<string>("");
+  const [sessionToken, setSessionToken] = useState<string>("");
   const [copied, setCopied] = useState(false);
   const [withdrawAmount, setWithdrawAmount] = useState("");
   const [upiId, setUpiId] = useState("");
@@ -439,14 +440,16 @@ export default function ReferrerDashboard() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const code = params.get("code") || localStorage.getItem("referrerCode") || "";
-    if (!code) { setLocation("/referrer-signup"); return; }
+    const token = localStorage.getItem("referrerToken") || "";
+    if (!code || !token) { setLocation("/referrer-signup"); return; }
     setUniqueCode(code);
+    setSessionToken(token);
     localStorage.setItem("referrerCode", code);
   }, []);
 
   const { data, isLoading } = trpc.referrer.getDashboard.useQuery(
-    { uniqueCode },
-    { enabled: !!uniqueCode, retry: 1 }
+    { token: sessionToken },
+    { enabled: !!sessionToken, retry: 1 }
   );
 
   const { data: potData } = trpc.referrer.getPotInfo.useQuery(undefined, { staleTime: 30000 });
@@ -839,7 +842,7 @@ export default function ReferrerDashboard() {
                 </div>
                 <button
                   disabled={withdrawMutation.isPending || !withdrawAmount || !upiId}
-                  onClick={() => { setWithdrawMsg(""); withdrawMutation.mutate({ uniqueCode, amount: Number(withdrawAmount), upiId }); }}
+                  onClick={() => { setWithdrawMsg(""); withdrawMutation.mutate({ token: sessionToken, amount: Number(withdrawAmount), upiId }); }}
                   style={{ background: C.green, color: "#000", border: "none", borderRadius: 8, padding: "12px 24px", cursor: "pointer", fontWeight: 700, fontSize: 15, opacity: (withdrawMutation.isPending || !withdrawAmount || !upiId) ? 0.5 : 1, boxShadow: `0 0 15px ${C.green}40` }}>
                   {withdrawMutation.isPending ? "Submitting..." : "Request Withdrawal"}
                 </button>

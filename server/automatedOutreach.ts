@@ -3,6 +3,7 @@ import { z } from "zod";
 import * as db from "./db";
 import { invokeLLM } from "./_core/llm";
 import { sql } from "drizzle-orm";
+import { launchOutreachRun } from "./autoOutreachHandler";
 
 /**
  * Automated Outreach Router
@@ -12,14 +13,14 @@ import { sql } from "drizzle-orm";
 
 // Industry-specific message templates
 const INDUSTRY_PITCHES: Record<string, string> = {
-  textile_mills: "Hi {{ownerName}}, we help textile mills like {{businessName}} cut electricity bills by 60-70%. Your industry typically spends ₹5-15 lakhs/month on power. Solar could save you ₹3-9 lakhs/month. Plus: Government subsidy up to ₹15 lakhs available. Can I send a free solar potential report?",
-  cold_storage: "Hi {{ownerName}}, cold storage facilities are high-energy consumers. {{businessName}} could save 50-60% on electricity with solar. That's ₹3-6 lakhs/month in savings. Government subsidy available. Interested in a free analysis?",
-  hospitals: "Hi {{ownerName}}, {{businessName}} can reduce energy costs by 40-50% with solar + backup power. Hospitals benefit from reliable power + savings. Government subsidy up to ₹15 lakhs. Can we discuss your solar potential?",
-  hotels_resorts: "Hi {{ownerName}}, {{businessName}} can cut AC & lighting costs by 50-60% with solar. That's ₹2-6 lakhs/month saved. Plus: Government subsidy available. Interested in a free solar report?",
-  factories: "Hi {{ownerName}}, factories like {{businessName}} spend ₹3-12 lakhs/month on electricity. Solar could cut this by 60-70%. Government subsidy up to ₹15 lakhs. Can I send you a free analysis?",
-  shopping_malls: "Hi {{ownerName}}, {{businessName}} can reduce energy costs by 40-50% with solar. That's ₹2-8 lakhs/month in savings. Government subsidy available. Interested in exploring solar?",
-  warehouses: "Hi {{ownerName}}, {{businessName}} can save 50-60% on electricity with solar. That's ₹1-5 lakhs/month. Plus: Government subsidy up to ₹15 lakhs. Can we discuss your solar potential?",
-  default: "Hi {{ownerName}}, {{businessName}} can significantly reduce electricity costs with solar energy. Government subsidy available. Interested in a free solar potential report?",
+  textile_mills: "Hi {{ownerName}}, Sales Squad can prepare a preliminary solar assessment for {{businessName}} after reviewing your electricity bill and site conditions. Interested in a no-obligation review?",
+  cold_storage: "Hi {{ownerName}}, high-energy businesses such as {{businessName}} may benefit from a preliminary solar assessment. Final suitability depends on bill review and site survey. Interested?",
+  hospitals: "Hi {{ownerName}}, Sales Squad can assess solar suitability for {{businessName}} based on energy use and site conditions. Any estimate is preliminary until a survey. May we share a review link?",
+  hotels_resorts: "Hi {{ownerName}}, we can prepare a preliminary solar assessment for {{businessName}} based on your energy use and site conditions. Interested in a no-obligation review?",
+  factories: "Hi {{ownerName}}, Sales Squad can assess whether solar is suitable for {{businessName}} after bill review and a site survey. Any savings estimate is preliminary. Interested?",
+  shopping_malls: "Hi {{ownerName}}, we can prepare a preliminary solar assessment for {{businessName}} after bill review and a site survey. Interested in a no-obligation review?",
+  warehouses: "Hi {{ownerName}}, Sales Squad can assess solar suitability for {{businessName}} based on energy use and site conditions. Any estimate is preliminary until a survey. Interested?",
+  default: "Hi {{ownerName}}, Sales Squad can prepare a preliminary solar assessment for {{businessName}} after bill review and a site survey. Interested in a no-obligation review?",
 };
 
 // Lead scoring weights
@@ -450,10 +451,10 @@ export const automatedOutreachRouter = router({
       if (!agency) throw new Error("Agency not found");
       const dbConn = await db.getDb();
       if (!dbConn) throw new Error("DB error");
-      const rows = await dbConn.execute(sql`SELECT * FROM outreachConfig WHERE agencyId = ${agency.id} LIMIT 1`) as any[];
+      const rows = await dbConn.execute(sql`SELECT * FROM outreachConfig WHERE agencyId = ${agency.id} ORDER BY id ASC LIMIT 1`) as any[];
       const data = Array.isArray(rows[0]) ? rows[0] : rows;
       const row = (data as any[])[0];
-      if (!row) return { isEnabled: 1, targetCity: "Hyderabad", targetState: "Telangana", cityRotation: null, rotationIndex: 0 };
+      if (!row) return { isEnabled: 0, targetCity: "Hyderabad", targetState: "Telangana", contactMethod: "email", cityRotation: null, rotationIndex: 0 };
       // Parse cityRotation JSON if stored as string
       if (row.cityRotation && typeof row.cityRotation === "string") {
         try { row.cityRotation = JSON.parse(row.cityRotation); } catch { row.cityRotation = null; }
@@ -473,8 +474,11 @@ export const automatedOutreachRouter = router({
         if (!agency) throw new Error("Agency not found");
         const dbConn = await db.getDb();
         if (!dbConn) throw new Error("DB error");
-        const enabled = input.isEnabled !== undefined ? (input.isEnabled ? 1 : 0) : 1;
-        const method = input.contactMethod || "both";
+        const existingRows = await dbConn.execute(sql`SELECT isEnabled, contactMethod FROM outreachConfig WHERE agencyId = ${agency.id} ORDER BY id ASC LIMIT 1`) as any[];
+        const existingData = Array.isArray(existingRows[0]) ? existingRows[0] : existingRows;
+        const existing = (existingData as any[])[0];
+        const enabled = input.isEnabled !== undefined ? (input.isEnabled ? 1 : 0) : (existing ? Number(existing.isEnabled) : 0);
+        const method = input.contactMethod || existing?.contactMethod || "email";
         await dbConn.execute(sql`
           INSERT INTO outreachConfig (agencyId, targetCity, targetState, isEnabled, contactMethod)
           VALUES (${agency.id}, ${input.targetCity}, ${input.targetState}, ${enabled}, ${method})
@@ -497,7 +501,7 @@ export const automatedOutreachRouter = router({
         const idx = input.rotationIndex ?? 0;
         await dbConn.execute(sql`
           INSERT INTO outreachConfig (agencyId, targetCity, targetState, isEnabled, contactMethod, cityRotation, rotationIndex)
-          VALUES (${agency.id}, 'Hyderabad', 'Telangana', 1, 'email', ${rotationJson}, ${idx})
+          VALUES (${agency.id}, 'Hyderabad', 'Telangana', 0, 'email', ${rotationJson}, ${idx})
           ON DUPLICATE KEY UPDATE cityRotation = ${rotationJson}, rotationIndex = ${idx}
         `);
         return { success: true };
@@ -506,15 +510,9 @@ export const automatedOutreachRouter = router({
       .input(z.object({ slot: z.number().min(1).max(5) }))
       .mutation(async ({ ctx, input }) => {
         if (!ctx.user) throw new Error("Unauthorized");
-        // Call the internal triggerNow endpoint
-        const resp = await fetch("http://localhost:" + (process.env.PORT || "3000") + "/api/admin/triggerNow", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ slot: input.slot }),
-        });
-        if (!resp.ok) throw new Error("Failed to trigger run");
-        const data = await resp.json() as any;
-        return { success: true, runId: data.runId, city: data.city, state: data.state, businessType: data.businessType };
+        const agency = await db.getAgencyByUserId(ctx.user.id);
+        if (!agency) throw new Error("Agency not found");
+        return await launchOutreachRun(agency.id, input.slot);
       }),
   }),
 

@@ -1,4 +1,4 @@
-import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, decimal, boolean, json, date, bigint } from "drizzle-orm/mysql-core";
+import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, decimal, boolean, json, date, bigint, uniqueIndex } from "drizzle-orm/mysql-core";
 
 /**
  * Core user table backing auth flow (agency owners/admins).
@@ -585,3 +585,50 @@ export const partnerSignups = mysqlTable("partnerSignups", {
 
 export type PartnerSignup = typeof partnerSignups.$inferSelect;
 export type InsertPartnerSignup = typeof partnerSignups.$inferInsert;
+
+/**
+ * Canonical master control for an agency's automated outreach.
+ * One row per agency prevents pause/location/contact-method conflicts.
+ */
+export const outreachConfig = mysqlTable("outreachConfig", {
+  id: int("id").autoincrement().primaryKey(),
+  agencyId: int("agencyId").notNull(),
+  isEnabled: boolean("isEnabled").default(false).notNull(),
+  targetCity: varchar("targetCity", { length: 100 }),
+  targetState: varchar("targetState", { length: 100 }),
+  contactMethod: mysqlEnum("contactMethod", ["email", "whatsapp", "both"]).default("email").notNull(),
+  cityRotation: json("cityRotation"),
+  rotationIndex: int("rotationIndex").default(0).notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (table) => ({
+  agencyUnique: uniqueIndex("outreachConfig_agencyId_unique").on(table.agencyId),
+}));
+
+export type OutreachConfig = typeof outreachConfig.$inferSelect;
+
+/**
+ * Execution history for automated outreach. runKey is unique for a scheduled
+ * agency/date/slot, preventing retries or overlapping cron calls from sending twice.
+ */
+export const outreachRuns = mysqlTable("outreachRuns", {
+  id: int("id").autoincrement().primaryKey(),
+  agencyId: int("agencyId").notNull(),
+  runSlot: int("runSlot").notNull(),
+  runKey: varchar("runKey", { length: 120 }),
+  scheduledDate: date("scheduledDate"),
+  businessType: varchar("businessType", { length: 100 }).notNull(),
+  targetCity: varchar("targetCity", { length: 100 }),
+  targetState: varchar("targetState", { length: 100 }),
+  scrapedCount: int("scrapedCount").default(0).notNull(),
+  eligibleCount: int("eligibleCount").default(0).notNull(),
+  emailSentCount: int("emailSentCount").default(0).notNull(),
+  whatsappSentCount: int("whatsappSentCount").default(0).notNull(),
+  errorCount: int("errorCount").default(0).notNull(),
+  status: mysqlEnum("status", ["queued", "running", "skipped_paused", "skipped_duplicate", "completed", "partially_completed", "failed"]).default("queued").notNull(),
+  startedAt: timestamp("startedAt").defaultNow().notNull(),
+  completedAt: timestamp("completedAt"),
+}, (table) => ({
+  runKeyUnique: uniqueIndex("outreachRuns_runKey_unique").on(table.runKey),
+}));
+
+export type OutreachRun = typeof outreachRuns.$inferSelect;

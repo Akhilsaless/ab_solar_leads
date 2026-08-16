@@ -1,10 +1,44 @@
 import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
+import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import * as db from "./db";
 import { sql } from "drizzle-orm";
 import { sendEmail } from "./_core/emailService";
 import { nanoid } from "nanoid";
 import { invokeLLM } from "./_core/llm";
+import { createHash, randomBytes } from "crypto";
+import { storagePut } from "./storage";
+
+const PARTNER_SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+const PARTNER_INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const PARTNER_APP_URL = "https://salessquadleads-xxxqwsn9.manus.space";
+
+const ownerProcedure = protectedProcedure.use(async ({ ctx, next }) => {
+  if (ctx.user?.role !== "admin") {
+    throw new TRPCError({ code: "FORBIDDEN", message: "Administrator access required" });
+  }
+  return next({ ctx });
+});
+
+function hashPartnerSecret(value: string) {
+  return createHash("sha256").update(value).digest("hex");
+}
+
+function createPartnerToken() {
+  return randomBytes(32).toString("base64url");
+}
+
+async function requirePartnerSession(dbConn: any, token: string) {
+  const result = await dbConn.execute(sql`
+    SELECT id, companyName, email, phone, whatsappNumber, serviceAreas, status, pricingSheetUrl, productListUrl, products, pricing, discounts
+    FROM solarPartners
+    WHERE loginTokenHash = ${hashPartnerSecret(token)} AND loginExpiresAt > ${Date.now()}
+    LIMIT 1
+  `);
+  const partner = firstRow(result);
+  if (!partner) throw new TRPCError({ code: "UNAUTHORIZED", message: "Your partner session has expired. Please sign in again." });
+  return partner;
+}
 
 // drizzle-mysql2: execute() returns [rows, fields] tuple — always extract rows[0]
 function rows(result: any): any[] {
@@ -23,7 +57,7 @@ function insertId(result: any): number {
 
 export const partnerRouter = router({
   // Search scraped businesses to add as partners
-  searchBusinesses: protectedProcedure
+  searchBusinesses: ownerProcedure
     .input(z.object({ city: z.string(), businessType: z.string().optional() }))
     .query(async ({ input }) => {
       const dbConn = await db.getDb();
@@ -40,7 +74,7 @@ export const partnerRouter = router({
     }),
 
   // Get all partners with their status
-  getPartners: protectedProcedure.query(async () => {
+  getPartners: ownerProcedure.query(async () => {
     const dbConn = await db.getDb();
     if (!dbConn) return [];
     const query = sql`
@@ -52,7 +86,7 @@ export const partnerRouter = router({
   }),
 
   // Send outreach email to a business
-  sendOutreachEmail: protectedProcedure
+  sendOutreachEmail: ownerProcedure
     .input(z.object({
       companyName: z.string(),
       email: z.string().email(),
@@ -75,25 +109,17 @@ export const partnerRouter = router({
         let partnerId: number;
         if (existing.length > 0) {
           partnerId = existing[0].id;
-          if (existing[0].status !== "signed_up") {
-            await dbConn.execute(
-              sql`UPDATE solarPartners SET status = 'email_sent', emailSentAt = NOW() WHERE id = ${partnerId}`
-            );
-          }
+          if (existing[0].status === "signed_up") throw new Error("This company is already an active partner");
         } else {
           const result = await dbConn.execute(
             sql`INSERT INTO solarPartners (companyName, email, phone, whatsappNumber, serviceAreas, status, emailSentAt)
-                VALUES (${input.companyName}, ${input.email}, ${input.phone || null}, ${input.whatsappNumber || null}, ${JSON.stringify(input.serviceAreas || [])}, 'email_sent', NOW())`
+                VALUES (${input.companyName}, ${input.email}, ${input.phone || null}, ${input.whatsappNumber || null}, ${JSON.stringify(input.serviceAreas || [])}, 'not_contacted', NULL)`
           );
           partnerId = insertId(result);
         }
 
-        // Generate unique signup link
-        const signupToken = nanoid(24);
-        const appUrl = process.env.VITE_APP_ID
-          ? `https://${process.env.VITE_APP_ID}.manus.space`
-          : 'http://localhost:3000';
-        const signupLink = `${appUrl}/partner-signup?token=${signupToken}`;
+        const signupToken = createPartnerToken();
+        const signupLink = `${PARTNER_APP_URL}/partner-signup?token=${signupToken}`;
 
         const emailHtml = input.customMessage || `
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #f9f9f9; padding: 24px; border-radius: 8px;">
@@ -115,12 +141,22 @@ export const partnerRouter = router({
         `;
 
         if (!input.skipEmail) {
-          await sendEmail({
+          const delivery = await sendEmail({
             to: input.email,
             subject: "Earn Commission with Sales Squad — Qualified Solar Leads",
             html: emailHtml,
           });
+          if (!delivery.success) throw new Error("Partner invitation email was not delivered");
         }
+
+        await dbConn.execute(sql`
+          UPDATE solarPartners
+          SET signupTokenHash = ${hashPartnerSecret(signupToken)},
+              signupExpiresAt = ${Date.now() + PARTNER_INVITE_TTL_MS},
+              status = CASE WHEN status = 'signed_up' THEN status ELSE 'email_sent' END,
+              emailSentAt = CASE WHEN ${input.skipEmail ? 1 : 0} = 1 THEN emailSentAt ELSE NOW() END
+          WHERE id = ${partnerId}
+        `);
 
         return { success: true, partnerId, signupLink };
       } catch (error) {
@@ -141,34 +177,40 @@ export const partnerRouter = router({
       products: z.string(),
       pricing: z.string(),
       discounts: z.string().optional(),
+      password: z.string().min(10),
     }))
     .mutation(async ({ input }) => {
       try {
         const dbConn = await db.getDb();
         if (!dbConn) throw new Error("Database connection failed");
 
-        const existing = rows(await dbConn.execute(
-          sql`SELECT id FROM solarPartners WHERE email = ${input.email}`
-        ));
+        const invited = firstRow(await dbConn.execute(sql`
+          SELECT id, email FROM solarPartners
+          WHERE signupTokenHash = ${hashPartnerSecret(input.token)}
+            AND signupExpiresAt > ${Date.now()}
+          LIMIT 1
+        `));
+        if (!invited) throw new TRPCError({ code: "UNAUTHORIZED", message: "This invitation is invalid or has expired." });
+        if (String(invited.email).toLowerCase() !== input.email.toLowerCase()) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "This invitation is only valid for the invited company email." });
+        }
 
-        if (existing.length > 0) {
-          await dbConn.execute(
-            sql`UPDATE solarPartners
-                SET companyName = ${input.companyName}, phone = ${input.phone},
-                    whatsappNumber = ${input.whatsappNumber || null},
-                    serviceAreas = ${JSON.stringify(input.serviceAreas)},
-                    products = ${input.products},
-                    pricing = ${input.pricing},
-                    discounts = ${input.discounts || null},
-                    status = 'signed_up', signedUpAt = NOW()
-                WHERE id = ${existing[0].id}`
-          );
-          return { success: true, partnerId: existing[0].id, isNew: false };
-        } else {
-          const result = await dbConn.execute(
-            sql`INSERT INTO solarPartners (companyName, email, phone, whatsappNumber, serviceAreas, products, pricing, discounts, status, signedUpAt)
-                VALUES (${input.companyName}, ${input.email}, ${input.phone}, ${input.whatsappNumber || null}, ${JSON.stringify(input.serviceAreas)}, ${input.products}, ${input.pricing}, ${input.discounts || null}, 'signed_up', NOW())`
-          );
+        const bcrypt = await import("bcryptjs");
+        const passwordHash = await bcrypt.hash(input.password, 12);
+
+        await dbConn.execute(
+          sql`UPDATE solarPartners
+              SET companyName = ${input.companyName}, phone = ${input.phone},
+                  whatsappNumber = ${input.whatsappNumber || null},
+                  serviceAreas = ${JSON.stringify(input.serviceAreas)},
+                  products = ${input.products},
+                  pricing = ${input.pricing},
+                  discounts = ${input.discounts || null},
+                  passwordHash = ${passwordHash},
+                  status = 'signed_up', signedUpAt = NOW(),
+                  signupTokenHash = NULL, signupExpiresAt = NULL
+              WHERE id = ${invited.id}`
+        );
           // Notify Agent Klaus of new partner signup
           try {
             await sendEmail({
@@ -198,8 +240,7 @@ export const partnerRouter = router({
           } catch (emailErr) {
             console.error("Failed to send partner signup notification:", emailErr);
           }
-          return { success: true, partnerId: insertId(result), isNew: true };
-        }
+          return { success: true, partnerId: invited.id, isNew: false };
       } catch (error) {
         console.error("Partner registration error:", error);
         throw new Error("Failed to register partner");
@@ -207,7 +248,7 @@ export const partnerRouter = router({
     }),
 
   // Get partner by ID
-  getPartnerById: protectedProcedure
+  getPartnerById: ownerProcedure
     .input(z.object({ partnerId: z.number() }))
     .query(async ({ input }) => {
       const dbConn = await db.getDb();
@@ -220,7 +261,7 @@ export const partnerRouter = router({
     }),
 
   // Get leads assigned to a partner
-  getPartnerLeads: protectedProcedure
+  getPartnerLeads: ownerProcedure
     .input(z.object({ partnerId: z.number() }))
     .query(async ({ input }) => {
       const dbConn = await db.getDb();
@@ -233,7 +274,7 @@ export const partnerRouter = router({
     }),
 
   // Get partner stats
-  getPartnerStats: protectedProcedure
+  getPartnerStats: ownerProcedure
     .input(z.object({ partnerId: z.number() }))
     .query(async ({ input }) => {
       const dbConn = await db.getDb();
@@ -270,15 +311,19 @@ export const partnerRouter = router({
       if (!partner.passwordHash) throw new Error("Password not set. Please contact Sales Squad.");
       const valid = await bcrypt.compare(input.password, partner.passwordHash);
       if (!valid) throw new Error("Incorrect password");
-      const { nanoid: nid } = await import('nanoid');
-      const token = nid(32);
-      await dbConn.execute(sql`UPDATE solarPartners SET loginToken = ${token} WHERE id = ${partner.id}`);
-      return { success: true, token, partnerId: partner.id, companyName: partner.companyName };
+      const token = createPartnerToken();
+      const expiresAt = Date.now() + PARTNER_SESSION_TTL_MS;
+      await dbConn.execute(sql`
+        UPDATE solarPartners
+        SET loginTokenHash = ${hashPartnerSecret(token)}, loginExpiresAt = ${expiresAt}, loginToken = NULL
+        WHERE id = ${partner.id}
+      `);
+      return { success: true, token, expiresAt, partnerId: partner.id, companyName: partner.companyName };
     }),
 
   // Set partner password (called during signup)
-  setPartnerPassword: publicProcedure
-    .input(z.object({ email: z.string().email(), password: z.string() }))
+  setPartnerPassword: ownerProcedure
+    .input(z.object({ email: z.string().email(), password: z.string().min(10) }))
     .mutation(async ({ input }) => {
       const bcrypt = await import('bcryptjs');
       const dbConn = await db.getDb();
@@ -290,15 +335,11 @@ export const partnerRouter = router({
 
   // Get partner's assigned leads (by login token)
   getMyLeads: publicProcedure
-    .input(z.object({ token: z.string() }))
+    .input(z.object({ token: z.string().min(20) }))
     .query(async ({ input }) => {
       const dbConn = await db.getDb();
       if (!dbConn) return { partner: null, leads: [] };
-      const partnerRows = rows(await dbConn.execute(
-        sql`SELECT id, companyName, email, phone, serviceAreas, status FROM solarPartners WHERE loginToken = ${input.token}`
-      ));
-      if (!partnerRows.length) return { partner: null, leads: [] };
-      const partner = partnerRows[0];
+      const partner = await requirePartnerSession(dbConn, input.token);
       const leadRows = rows(await dbConn.execute(
         sql`SELECT id, firstName, lastName, email, phone, city, state, monthlyEnergyBill, status, createdAt
             FROM leads2 WHERE assignedPartnerId = ${partner.id} ORDER BY createdAt DESC`
@@ -306,8 +347,8 @@ export const partnerRouter = router({
       return { partner, leads: leadRows };
     }),
 
-  // Referrer sends outreach email to a scraped business
-  referrerSendOutreachEmail: publicProcedure
+  // Referrer-originated outreach is owner-controlled to prevent public email abuse.
+  referrerSendOutreachEmail: ownerProcedure
     .input(z.object({
       businessEmail: z.string().email(),
       businessName: z.string(),
@@ -336,7 +377,7 @@ export const partnerRouter = router({
     }),
 
   // Generate AI outreach pitch
-  generateOutreachPitch: protectedProcedure
+  generateOutreachPitch: ownerProcedure
     .input(z.object({
       companyName: z.string(),
       city: z.string(),
@@ -361,7 +402,7 @@ export const partnerRouter = router({
     }),
 
   // Assign lead to partner
-  assignLeadToPartner: protectedProcedure
+  assignLeadToPartner: ownerProcedure
     .input(z.object({ leadId: z.number(), partnerId: z.number().nullable() }))
     .mutation(async ({ input }) => {
       try {
@@ -414,19 +455,28 @@ export const partnerRouter = router({
   uploadPartnerFile: publicProcedure
     .input(z.object({
       token: z.string(),
-      fileUrl: z.string(),
+      fileName: z.string().trim().min(1).max(120),
+      contentType: z.enum(["application/pdf", "image/jpeg", "image/png", "text/csv", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"]),
+      contentBase64: z.string().min(8).max(6_000_000),
       fileType: z.enum(["pricingSheet", "productList"]),
     }))
     .mutation(async ({ input }) => {
       const dbConn = await db.getDb();
       if (!dbConn) throw new Error("Database connection failed");
-      const partner = firstRow(await dbConn.execute(
-        sql`SELECT id FROM solarPartners WHERE loginToken = ${input.token}`
-      ));
-      if (!partner) throw new Error("Invalid session");
+      const partner = await requirePartnerSession(dbConn, input.token);
       const column = input.fileType === "pricingSheet" ? "pricingSheetUrl" : "productListUrl";
+      const bytes = Buffer.from(input.contentBase64, "base64");
+      if (!bytes.length || bytes.length > 4 * 1024 * 1024) {
+        throw new TRPCError({ code: "PAYLOAD_TOO_LARGE", message: "File must be between 1 byte and 4 MB." });
+      }
+      const safeName = input.fileName.replace(/[^a-zA-Z0-9._-]/g, "_");
+      const { url } = await storagePut(
+        `partner-files/${partner.id}/${Date.now()}-${input.fileType}-${safeName}`,
+        bytes,
+        input.contentType,
+      );
       await dbConn.execute(
-        sql`UPDATE solarPartners SET ${sql.raw(column)} = ${input.fileUrl} WHERE id = ${partner.id}`
+        sql`UPDATE solarPartners SET ${sql.raw(column)} = ${url} WHERE id = ${partner.id}`
       );
       return { success: true };
     }),
@@ -437,17 +487,13 @@ export const partnerRouter = router({
     .query(async ({ input }) => {
       const dbConn = await db.getDb();
       if (!dbConn) return null;
-      const partner = firstRow(await dbConn.execute(
-        sql`SELECT id, companyName, email, phone, whatsappNumber, serviceAreas, status, pricingSheetUrl, productListUrl, products, pricing, discounts
-            FROM solarPartners WHERE loginToken = ${input.token}`
-      ));
-      return partner || null;
+      return await requirePartnerSession(dbConn, input.token);
     }),
 
   // Update partner profile (products, pricing, discounts, phone, whatsapp)
   updateProfile: publicProcedure
     .input(z.object({
-      token: z.string(),
+      token: z.string().min(20),
       products: z.string().optional(),
       pricing: z.string().optional(),
       discounts: z.string().optional(),
@@ -457,10 +503,7 @@ export const partnerRouter = router({
     .mutation(async ({ input }) => {
       const dbConn = await db.getDb();
       if (!dbConn) throw new Error("Database connection failed");
-      const partner = firstRow(await dbConn.execute(
-        sql`SELECT id FROM solarPartners WHERE loginToken = ${input.token}`
-      ));
-      if (!partner) throw new Error("Invalid session");
+      const partner = await requirePartnerSession(dbConn, input.token);
       await dbConn.execute(
         sql`UPDATE solarPartners
             SET products = COALESCE(${input.products ?? null}, products),
@@ -476,17 +519,14 @@ export const partnerRouter = router({
   // Update lead status by partner
   updateLeadStatus: publicProcedure
     .input(z.object({
-      token: z.string(),
+      token: z.string().min(20),
       leadId: z.number(),
       status: z.enum(["new", "contacted", "converted", "lost"]),
     }))
     .mutation(async ({ input }) => {
       const dbConn = await db.getDb();
       if (!dbConn) throw new Error("Database connection failed");
-      const partner = firstRow(await dbConn.execute(
-        sql`SELECT id FROM solarPartners WHERE loginToken = ${input.token}`
-      ));
-      if (!partner) throw new Error("Invalid session");
+      const partner = await requirePartnerSession(dbConn, input.token);
       // Verify lead belongs to this partner
       const lead = firstRow(await dbConn.execute(
         sql`SELECT id FROM leads2 WHERE id = ${input.leadId} AND assignedPartnerId = ${partner.id}`
@@ -500,14 +540,11 @@ export const partnerRouter = router({
 
   // Get partner lead stats (by token, for partner dashboard)
   getMyStats: publicProcedure
-    .input(z.object({ token: z.string() }))
+    .input(z.object({ token: z.string().min(20) }))
     .query(async ({ input }) => {
       const dbConn = await db.getDb();
       if (!dbConn) return { total: 0, new: 0, contacted: 0, converted: 0, lost: 0 };
-      const partner = firstRow(await dbConn.execute(
-        sql`SELECT id FROM solarPartners WHERE loginToken = ${input.token}`
-      ));
-      if (!partner) return { total: 0, new: 0, contacted: 0, converted: 0, lost: 0 };
+      const partner = await requirePartnerSession(dbConn, input.token);
       const stats = rows(await dbConn.execute(
         sql`SELECT status, COUNT(*) as count FROM leads2 WHERE assignedPartnerId = ${partner.id} GROUP BY status`
       ));
@@ -524,14 +561,11 @@ export const partnerRouter = router({
 
   // Get partner leads with solar estimate data
   getMyLeadsDetailed: publicProcedure
-    .input(z.object({ token: z.string() }))
+    .input(z.object({ token: z.string().min(20) }))
     .query(async ({ input }) => {
       const dbConn = await db.getDb();
       if (!dbConn) return [];
-      const partner = firstRow(await dbConn.execute(
-        sql`SELECT id FROM solarPartners WHERE loginToken = ${input.token}`
-      ));
-      if (!partner) return [];
+      const partner = await requirePartnerSession(dbConn, input.token);
       return rows(await dbConn.execute(
         sql`SELECT l.id, l.firstName, l.lastName, l.email, l.phone, l.city, l.state,
                    l.monthlyEnergyBill, l.status, l.createdAt,
@@ -545,14 +579,11 @@ export const partnerRouter = router({
 
   // Register interest in marketing automation
   notifyMeMarketing: publicProcedure
-    .input(z.object({ token: z.string() }))
+    .input(z.object({ token: z.string().min(20) }))
     .mutation(async ({ input }) => {
       const dbConn = await db.getDb();
       if (!dbConn) throw new Error("Database connection failed");
-      const partner = firstRow(await dbConn.execute(
-        sql`SELECT id FROM solarPartners WHERE loginToken = ${input.token}`
-      ));
-      if (!partner) throw new Error("Invalid session");
+      const partner = await requirePartnerSession(dbConn, input.token);
       await dbConn.execute(
         sql`UPDATE solarPartners SET marketingNotifyMe = TRUE WHERE id = ${partner.id}`
       );

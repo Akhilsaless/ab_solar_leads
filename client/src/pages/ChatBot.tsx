@@ -221,29 +221,25 @@ function AgentHandoffCard({ brandColor, agencyWhatsApp }: { brandColor: string; 
 }
 
 // ─── Bill Upload Button ───────────────────────────────────────────────────────
-function BillUploadButton({ onUpload, brandColor, disabled }: { onUpload: (url: string) => void; brandColor: string; disabled: boolean }) {
+function BillUploadButton({ onUpload, brandColor, disabled, sessionId }: { onUpload: (url: string) => void; brandColor: string; disabled: boolean; sessionId: string }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
+  const uploadBill = trpc.chat.uploadBill.useMutation();
 
   const handleFile = async (file: File) => {
     if (!file) return;
-    if (file.size > 16 * 1024 * 1024) { alert("File too large. Max 16MB."); return; }
+    if (file.size > 4 * 1024 * 1024) { alert("File too large. Max 4MB."); return; }
+    if (!["application/pdf", "image/jpeg", "image/png"].includes(file.type)) { alert("Upload a PDF, JPG, or PNG bill."); return; }
     setUploading(true);
     try {
-      const forgeUrl = (import.meta.env.VITE_FRONTEND_FORGE_API_URL || "https://forge.butterfly-effect.dev").replace(/\/$/, "");
-      const apiKey = import.meta.env.VITE_FRONTEND_FORGE_API_KEY;
-      const key = `bill-uploads/${nanoid(16)}-${file.name.replace(/[^a-zA-Z0-9.]/g, "_")}`;
-      const uploadUrl = `${forgeUrl}/v1/storage/upload?path=${encodeURIComponent(key)}`;
-      const res = await fetch(uploadUrl, {
-        method: "PUT",
-        headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": file.type },
-        body: file,
+      const contentBase64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onerror = () => reject(new Error("Could not read the selected bill."));
+        reader.onload = () => resolve(String(reader.result).split(",")[1] || "");
+        reader.readAsDataURL(file);
       });
-      if (!res.ok) throw new Error("Upload failed");
-      const json = await res.json();
-      const url = json.url || json.publicUrl || json.data?.url;
-      if (url) onUpload(url);
-      else throw new Error("No URL returned");
+      const { url } = await uploadBill.mutateAsync({ sessionId, fileName: file.name, contentType: file.type as "application/pdf" | "image/jpeg" | "image/png", contentBase64 });
+      onUpload(url);
     } catch (e) {
       console.error("Bill upload error:", e);
       alert("Upload failed. Please type your bill amount instead.");
@@ -962,7 +958,7 @@ export default function ChatBot() {
               )}
               {billUploadMode === "upload" && (
                 <div className="flex gap-2 mb-2">
-                  <BillUploadButton onUpload={handleBillUpload} brandColor={brandColor} disabled={isLoading} />
+                  <BillUploadButton onUpload={handleBillUpload} brandColor={brandColor} disabled={isLoading} sessionId={sessionId} />
                   <Button onClick={() => setBillUploadMode(null)} variant="outline" className="border-white/20 text-white bg-transparent hover:bg-white/10 h-10 px-3 text-xs">✕</Button>
                 </div>
               )}
@@ -983,22 +979,6 @@ export default function ChatBot() {
             </div>
           )}
 
-          {/* OTP verify button — shown after some messages if not yet verified */}
-          {messages.length >= 3 && !otpVerified && (
-            <div className="mb-2">
-              <button
-                onClick={() => setShowOtpModal(true)}
-                className="w-full text-xs text-emerald-400 border border-emerald-500/30 rounded-xl py-2 hover:bg-emerald-500/10 transition-colors"
-              >
-                🔒 Verify your phone number to confirm your enquiry
-              </button>
-            </div>
-          )}
-          {otpVerified && (
-            <div className="mb-2 text-center">
-              <span className="text-xs text-emerald-400">✅ Phone verified</span>
-            </div>
-          )}
           <div className="flex gap-2 items-end">
             <Textarea
               ref={textareaRef}
