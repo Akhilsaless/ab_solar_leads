@@ -448,3 +448,8 @@
 - [x] Add direct assignment of existing Leads records to the selected campaign workflow
 - [x] Add an inactive, signature-verified email delivery/bounce/reply webhook intake foundation
 - [x] Add focused tests and document the email-provider configuration needed to activate webhooks
+
+## Business Search and Lead Quality Audit (Current Session)
+- [x] Audit current business search, enrichment, contact validation, scoring, and outreach handoff logic
+- [x] Compare search logic with real Indian commercial solar buyer signals and reliable lead sources
+- [x] Deliver a prioritized proper-lead strategy and scoring blueprint before modifying live search behavior
