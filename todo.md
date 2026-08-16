@@ -453,3 +453,8 @@
 - [x] Audit current business search, enrichment, contact validation, scoring, and outreach handoff logic
 - [x] Compare search logic with real Indian commercial solar buyer signals and reliable lead sources
 - [x] Deliver a prioritized proper-lead strategy and scoring blueprint before modifying live search behavior
+
+## Advanced Commercial Solar Lead Intelligence Design (Current Session)
+- [x] Assess current product gaps against advanced B2B lead intelligence and commercial solar sales workflows
+- [x] Define the differentiated evidence graph, buyer-signal, site-feasibility, and decision-maker routing architecture
+- [x] Produce a phased implementation roadmap with required data sources, integrations, operating controls, and success metrics
