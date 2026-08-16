@@ -408,3 +408,6 @@
 - [x] Edit Profile button on partner dashboard to update products/pricing/discounts
 - [x] Chatbot reads partner discounts from DB and mentions them in pitch
 - [x] Email notification to Agent Klaus on new partner signup
+
+## Production Readiness Audit (Current Session)
+- [x] Audit current deployment, automation, authentication, integrations, data safety, and code duplication; provide prioritized production hardening plan
