@@ -30,6 +30,54 @@ const adminProcedure = protectedProcedure.use(({ ctx, next }) => {
   return next({ ctx });
 });
 
+type KlausProviderConfig = {
+  provider: "builtin" | "openai_compatible";
+  externalBaseUrl?: string | null;
+  externalModel?: string | null;
+};
+
+export function normalizeExternalBaseUrl(value: string) {
+  const url = new URL(value);
+  const localHosts = new Set(["localhost", "127.0.0.1", "0.0.0.0", "::1"]);
+  if (url.protocol !== "https:" || localHosts.has(url.hostname)) {
+    throw new TRPCError({ code: "BAD_REQUEST", message: "External AI endpoint must use public HTTPS." });
+  }
+  return url.toString().replace(/\/$/, "");
+}
+
+async function invokeKlaus(
+  params: { messages: any[]; tools?: any; tool_choice?: any },
+  config: KlausProviderConfig,
+) {
+  if (config.provider !== "openai_compatible") {
+    return invokeLLM({ ...params, model: "gpt-5-nano" });
+  }
+
+  const apiKey = process.env.KLAUS_EXTERNAL_API_KEY;
+  if (!apiKey) {
+    throw new TRPCError({
+      code: "PRECONDITION_FAILED",
+      message: "External AI is selected but KLAUS_EXTERNAL_API_KEY has not been configured.",
+    });
+  }
+  const baseUrl = normalizeExternalBaseUrl(config.externalBaseUrl || "https://api.openai.com/v1");
+  const response = await fetch(`${baseUrl}/chat/completions`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: config.externalModel || "gpt-4o-mini",
+      messages: params.messages,
+      ...(params.tools ? { tools: params.tools, tool_choice: params.tool_choice || "auto" } : {}),
+      temperature: 0.2,
+    }),
+  });
+  if (!response.ok) {
+    const detail = (await response.text()).slice(0, 300);
+    throw new TRPCError({ code: "BAD_GATEWAY", message: `External AI request failed: ${detail || response.statusText}` });
+  }
+  return await response.json();
+}
+
 // ─── Agent Tool Definitions ──────────────────────────────────────────────────
 
 const AGENT_TOOLS = [
@@ -526,6 +574,42 @@ export const copilotRouter = router({
     return { success: true };
   }),
 
+  getProviderConfig: adminProcedure.query(async ({ ctx }) => {
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+    const agency = await getAgencyByUserId(ctx.user!.id);
+    if (!agency) throw new TRPCError({ code: "UNAUTHORIZED" });
+    const stored = firstRow(await db.execute(sql`
+      SELECT provider, externalBaseUrl, externalModel, updatedAt
+      FROM klausAiConfig WHERE agencyId = ${agency.id} LIMIT 1
+    `));
+    return stored || { provider: "builtin", externalBaseUrl: null, externalModel: null, updatedAt: null };
+  }),
+
+  updateProviderConfig: adminProcedure
+    .input(z.object({
+      provider: z.enum(["builtin", "openai_compatible"]),
+      externalBaseUrl: z.string().url().max(500).optional(),
+      externalModel: z.string().trim().min(1).max(120).optional(),
+    }).superRefine((value, ctx) => {
+      if (value.provider === "openai_compatible" && (!value.externalBaseUrl || !value.externalModel)) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: "External endpoint and model are required." });
+      }
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+      const agency = await getAgencyByUserId(ctx.user!.id);
+      if (!agency) throw new TRPCError({ code: "UNAUTHORIZED" });
+      const baseUrl = input.provider === "openai_compatible" ? normalizeExternalBaseUrl(input.externalBaseUrl!) : null;
+      await db.execute(sql`
+        INSERT INTO klausAiConfig (agencyId, provider, externalBaseUrl, externalModel)
+        VALUES (${agency.id}, ${input.provider}, ${baseUrl}, ${input.provider === "openai_compatible" ? input.externalModel! : null})
+        ON DUPLICATE KEY UPDATE provider = VALUES(provider), externalBaseUrl = VALUES(externalBaseUrl), externalModel = VALUES(externalModel)
+      `);
+      return { success: true };
+    }),
+
   // ── Level 4 Agentic Ask ────────────────────────────────────────────────────
   askCopilot: protectedProcedure
     .input(z.object({ question: z.string().min(1).max(1000) }))
@@ -534,6 +618,14 @@ export const copilotRouter = router({
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
       const agency = await getAgencyByUserId(ctx.user!.id);
       if (!agency) throw new TRPCError({ code: "UNAUTHORIZED" });
+      const providerRow = firstRow(await db.execute(sql`
+        SELECT provider, externalBaseUrl, externalModel FROM klausAiConfig WHERE agencyId = ${agency.id} LIMIT 1
+      `));
+      const providerConfig: KlausProviderConfig = {
+        provider: providerRow?.provider === "openai_compatible" ? "openai_compatible" : "builtin",
+        externalBaseUrl: providerRow?.externalBaseUrl || null,
+        externalModel: providerRow?.externalModel || null,
+      };
 
       // Load last 20 messages from memory for context
       const historyRows = rows(await db.execute(sql`
@@ -581,12 +673,11 @@ STRICT RULES:
 
       // Agentic loop — up to 5 tool calls (gpt-5-nano for speed)
       for (let i = 0; i < 5; i++) {
-        const response = await invokeLLM({
+        const response = await invokeKlaus({
           messages,
           tools: AGENT_TOOLS as any,
           tool_choice: "auto",
-          model: "gpt-5-nano",
-        });
+        }, providerConfig);
 
         const msg = response?.choices?.[0]?.message;
         if (!msg) break;
@@ -618,13 +709,12 @@ STRICT RULES:
 
       // If loop ended without final answer — do one more LLM call to summarise tool results
       if (!finalAnswer) {
-        const summaryResp = await invokeLLM({
-          model: "gpt-5-nano",
+        const summaryResp = await invokeKlaus({
           messages: [
             ...messages,
             { role: "user", content: "Answer in 1-3 lines max using the tool data above. Show real numbers. No filler." }
           ],
-        });
+        }, providerConfig);
         const rawContent = summaryResp?.choices?.[0]?.message?.content;
         finalAnswer = (typeof rawContent === "string" ? rawContent : rawContent ? JSON.stringify(rawContent) : "") || "I completed the task. Let me know if you need anything else.";
       }

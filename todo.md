@@ -425,3 +425,10 @@
 - [x] Remove browser-exposed sensitive API credentials and move sensitive operations server-side
 - [x] Reconcile Drizzle schema and committed migrations with all live production tables and constraints
 - [x] Add critical production tests, structured run monitoring, and an external credentials checklist
+
+## Klaus AI Provider & Product Readiness (Current Session)
+- [x] Inspect the current Klaus AI invocation path and available external provider configuration
+- [x] Add a server-side selectable Klaus provider: built-in model or OpenAI-compatible endpoint
+- [x] Add secure configuration placeholders and fail-safe validation for an external provider
+- [x] Add selectable presets for OpenAI, Groq, OpenRouter, Together, and self-hosted Ollama-compatible endpoints
+- [x] Reassess production readiness and document recommended features to add, defer, or remove

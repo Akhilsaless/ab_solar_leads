@@ -6,6 +6,15 @@ import { Settings as SettingsIcon, User, Building2, Bot, Copy, ExternalLink, Mes
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
 
+const KLAUS_PROVIDER_PRESETS = {
+  builtin: { label: "Built-in model", baseUrl: "", model: "" },
+  openai: { label: "OpenAI", baseUrl: "https://api.openai.com/v1", model: "gpt-4o-mini" },
+  groq: { label: "Groq (OpenAI-compatible)", baseUrl: "https://api.groq.com/openai/v1", model: "" },
+  openrouter: { label: "OpenRouter", baseUrl: "https://openrouter.ai/api/v1", model: "" },
+  together: { label: "Together AI", baseUrl: "https://api.together.ai/v1", model: "" },
+  custom: { label: "Custom / Ollama-compatible HTTPS endpoint", baseUrl: "", model: "" },
+} as const;
+
 export default function Settings() {
   const { user } = useAuth();
   const { data: agency, isLoading } = trpc.agency.get.useQuery();
@@ -24,6 +33,14 @@ export default function Settings() {
     botGreeting: "", botTone: "friendly", brandColor: "#F97316",
     whatsappNumber: "", linkedinUrl: "",
   });
+  const [klausPreset, setKlausPreset] = useState<keyof typeof KLAUS_PROVIDER_PRESETS>("builtin");
+  const [klausBaseUrl, setKlausBaseUrl] = useState("");
+  const [klausModel, setKlausModel] = useState("");
+  const klausProviderQuery = trpc.copilot.getProviderConfig.useQuery();
+  const updateKlausProvider = trpc.copilot.updateProviderConfig.useMutation({
+    onSuccess: () => { klausProviderQuery.refetch(); toast.success("Klaus provider saved"); },
+    onError: (err: any) => toast.error(err.message),
+  });
 
   useEffect(() => {
     if (agency) {
@@ -41,6 +58,16 @@ export default function Settings() {
       });
     }
   }, [agency]);
+
+  useEffect(() => {
+    if (!klausProviderQuery.data) return;
+    if (klausProviderQuery.data.provider !== "openai_compatible") {
+      setKlausPreset("builtin"); setKlausBaseUrl(""); setKlausModel(""); return;
+    }
+    const baseUrl = klausProviderQuery.data.externalBaseUrl || "";
+    const preset = (Object.entries(KLAUS_PROVIDER_PRESETS).find(([, value]) => value.baseUrl === baseUrl)?.[0] || "custom") as keyof typeof KLAUS_PROVIDER_PRESETS;
+    setKlausPreset(preset); setKlausBaseUrl(baseUrl); setKlausModel(klausProviderQuery.data.externalModel || "");
+  }, [klausProviderQuery.data]);
 
   if (isLoading) {
     return <div className="space-y-4">{[1, 2, 3].map(i => <div key={i} className="h-48 bg-secondary animate-pulse rounded-lg" />)}</div>;
@@ -132,6 +159,47 @@ export default function Settings() {
           <div>
             <label className="text-sm font-medium mb-1.5 block">Custom Greeting</label>
             <textarea className="w-full px-3 py-2 rounded-lg bg-secondary border border-border text-sm min-h-[100px]" value={form.botGreeting} onChange={(e) => setForm({ ...form, botGreeting: e.target.value })} placeholder="Leave empty for default greeting..." />
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2"><Bot className="w-4 h-4" /> Integrations · Klaus AI Engine</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-sm text-muted-foreground">Select the provider Klaus uses. Providers may require their own account, key, and model access. Your key is kept server-side and is never displayed in the application.</p>
+          <div>
+            <label className="text-sm font-medium mb-1.5 block">Provider</label>
+            <select
+              className="w-full px-3 py-2 rounded-lg bg-secondary border border-border text-sm"
+              value={klausPreset}
+              onChange={(event) => {
+                const preset = event.target.value as keyof typeof KLAUS_PROVIDER_PRESETS;
+                setKlausPreset(preset);
+                setKlausBaseUrl(KLAUS_PROVIDER_PRESETS[preset].baseUrl);
+                setKlausModel(KLAUS_PROVIDER_PRESETS[preset].model);
+              }}
+            >
+              {Object.entries(KLAUS_PROVIDER_PRESETS).map(([key, value]) => <option key={key} value={key}>{value.label}</option>)}
+            </select>
+          </div>
+          {klausPreset !== "builtin" && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <Field label="OpenAI-compatible Base URL" value={klausBaseUrl} onChange={setKlausBaseUrl} />
+              <Field label="Model ID" value={klausModel} onChange={setKlausModel} />
+              <p className="sm:col-span-2 text-xs text-muted-foreground">Use an HTTPS endpoint and a model ID available in your provider account. For a self-hosted endpoint, expose it securely over public HTTPS.</p>
+            </div>
+          )}
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between border-t border-border/50 pt-3">
+            <p className="text-xs text-muted-foreground">When you are ready, add <code>KLAUS_EXTERNAL_API_KEY</code> in secure project secrets. Do not paste a key into this page.</p>
+            <Button
+              size="sm"
+              disabled={updateKlausProvider.isPending}
+              onClick={() => updateKlausProvider.mutate(klausPreset === "builtin"
+                ? { provider: "builtin" }
+                : { provider: "openai_compatible", externalBaseUrl: klausBaseUrl, externalModel: klausModel })}
+            >{updateKlausProvider.isPending ? "Saving..." : "Save Klaus provider"}</Button>
           </div>
         </CardContent>
       </Card>
