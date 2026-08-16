@@ -34,6 +34,9 @@ import PartnerSignupsAdmin from "@/pages/PartnerSignupsAdmin";
 import Copilot from "@/pages/Copilot";
 import FindLeads from "@/pages/FindLeads";
 import Partners from "@/pages/Partners";
+import Campaigns from "@/pages/Campaigns";
+import CampaignDetail from "@/pages/CampaignDetail";
+import NorthStar from "@/pages/NorthStar";
 import DashboardLayout from "@/components/DashboardLayout";
 import { Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
@@ -50,6 +53,9 @@ function AuthenticatedRoutes() {
         <Route path="/conversations/:id" component={ConversationDetail} />
         <Route path="/products" component={Products} />
         <Route path="/analytics" component={Analytics} />
+        <Route path="/north-star" component={NorthStar} />
+        <Route path="/campaigns/:id" component={CampaignDetail} />
+        <Route path="/campaigns" component={Campaigns} />
         {/* New merged routes */}
         <Route path="/find-leads" component={FindLeads} />
         <Route path="/partners" component={Partners} />

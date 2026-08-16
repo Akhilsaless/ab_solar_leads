@@ -19,6 +19,7 @@ import { sendEmail } from "./_core/emailService";
 import { extractEmailFromWebsite } from "./emailExtractor";
 import { automatedOutreachRouter } from "./automatedOutreach";
 import { partnerManagementRouter } from "./partnerManagement";
+import { campaignIntelligenceRouter } from "./campaignIntelligence";
 import { storagePut } from "./storage";
 
 // In-memory OTP store (session → { otp, expiresAt, phone })
@@ -29,6 +30,7 @@ export const appRouter = router({
   referrer: referrerRouter,
   partner: partnerRouter,
   partnerManagement: partnerManagementRouter,
+  campaignIntelligence: campaignIntelligenceRouter,
   automatedOutreach: automatedOutreachRouter,
   copilot: copilotRouter,
   referralCoach: referralCoachRouter,

@@ -328,6 +328,99 @@ export const campaignSteps = mysqlTable("campaignSteps2", {
 
 export type CampaignStep = typeof campaignSteps.$inferSelect;
 
+// Outcome-driven campaign intelligence. These tables extend the legacy campaign
+// records and preserve existing lead, outreach, partner, and referral workflows.
+export const campaignClients = mysqlTable("campaignClients", {
+  id: int("id").autoincrement().primaryKey(),
+  agencyId: int("agencyId").notNull(),
+  name: varchar("name", { length: 255 }).notNull(),
+  industry: varchar("industry", { length: 120 }),
+  contactName: varchar("contactName", { length: 160 }),
+  contactEmail: varchar("contactEmail", { length: 320 }),
+  contactPhone: varchar("contactPhone", { length: 40 }),
+  status: mysqlEnum("status", ["active", "inactive"]).default("active").notNull(),
+  notes: text("notes"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export const campaignProfiles = mysqlTable("campaignProfiles", {
+  id: int("id").autoincrement().primaryKey(),
+  campaignId: int("campaignId").notNull().unique(),
+  agencyId: int("agencyId").notNull(),
+  clientId: int("clientId"),
+  industry: varchar("industry", { length: 120 }),
+  geography: text("geography"),
+  leadRequirement: text("leadRequirement"),
+  leadSource: varchar("leadSource", { length: 120 }),
+  appointmentTarget: int("appointmentTarget").default(0).notNull(),
+  campaignCost: decimal("campaignCost", { precision: 14, scale: 2 }),
+  startDate: timestamp("startDate"),
+  endDate: timestamp("endDate"),
+  assignedTeam: json("assignedTeam"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export const campaignLeadRecords = mysqlTable("campaignLeadRecords", {
+  id: int("id").autoincrement().primaryKey(),
+  campaignId: int("campaignId").notNull(),
+  leadId: int("leadId"),
+  source: varchar("source", { length: 120 }).notNull(),
+  status: mysqlEnum("status", ["generated", "validated", "qualified", "contacted", "interested", "appointment", "appointment_validated", "delivered", "accepted", "rejected", "lost"]).default("generated").notNull(),
+  qualityScore: int("qualityScore").default(0).notNull(),
+  scoreExplanation: json("scoreExplanation"),
+  isDuplicate: boolean("isDuplicate").default(false).notNull(),
+  assignedTo: int("assignedTo"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export const campaignLeadEvents = mysqlTable("campaignLeadEvents", {
+  id: int("id").autoincrement().primaryKey(),
+  campaignId: int("campaignId").notNull(),
+  campaignLeadId: int("campaignLeadId").notNull(),
+  eventType: mysqlEnum("eventType", ["generated", "validated", "qualified", "contact_attempt", "conversation", "interested", "appointment_set", "appointment_validated", "delivered", "accepted", "rejected", "revenue_recorded", "note"]).notNull(),
+  eventAt: timestamp("eventAt").defaultNow().notNull(),
+  actorUserId: int("actorUserId"),
+  details: json("details"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export const campaignAppointments = mysqlTable("campaignAppointments", {
+  id: int("id").autoincrement().primaryKey(),
+  campaignLeadId: int("campaignLeadId").notNull(),
+  scheduledAt: timestamp("scheduledAt"),
+  status: mysqlEnum("status", ["scheduled", "validated", "invalid", "no_show", "completed", "cancelled"]).default("scheduled").notNull(),
+  assignedTo: int("assignedTo"),
+  notes: text("notes"),
+  validatedAt: timestamp("validatedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export const campaignDeliveries = mysqlTable("campaignDeliveries", {
+  id: int("id").autoincrement().primaryKey(),
+  campaignLeadId: int("campaignLeadId").notNull(),
+  clientId: int("clientId").notNull(),
+  status: mysqlEnum("status", ["pending", "accepted", "rejected"]).default("pending").notNull(),
+  rejectionReason: varchar("rejectionReason", { length: 160 }),
+  rejectionNotes: text("rejectionNotes"),
+  deliveredAt: timestamp("deliveredAt").defaultNow().notNull(),
+  decidedAt: timestamp("decidedAt"),
+  revenue: decimal("revenue", { precision: 14, scale: 2 }),
+  commission: decimal("commission", { precision: 14, scale: 2 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export const campaignQualityConfigs = mysqlTable("campaignQualityConfigs", {
+  id: int("id").autoincrement().primaryKey(),
+  campaignId: int("campaignId").notNull().unique(),
+  weights: json("weights").notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
 export const scrapeJobs = mysqlTable("scrapeJobs2", {
   id: int("id").autoincrement().primaryKey(),
   source: varchar("source", { length: 100 }).notNull(),

@@ -23,7 +23,7 @@ import { getLoginUrl } from "@/const";
 import { useIsMobile } from "@/hooks/useMobile";
 import {
   LayoutDashboard, Users, MessageSquare, BarChart3,
-  Settings, LogOut, Search, Handshake, Send
+  Settings, LogOut, Search, Handshake, Send, Target, Trophy
 } from "lucide-react";
 import { SalesSquadLogo, SalesSquadIcon } from "./SalesSquadLogo";
 import { CSSProperties, useEffect, useRef, useState } from "react";
@@ -35,6 +35,8 @@ const menuItems = [
   { icon: LayoutDashboard, label: "Dashboard", path: "/" },
   { icon: MessageSquare, label: "Conversations", path: "/conversations" },
   { icon: Users, label: "Leads", path: "/leads" },
+  { icon: Target, label: "Campaigns", path: "/campaigns" },
+  { icon: Trophy, label: "North Star", path: "/north-star" },
   { icon: Send, label: "Automated Outreach", path: "/automated-outreach" },
   { icon: Search, label: "Find Leads", path: "/find-leads" },
   { icon: Handshake, label: "Partners", path: "/partners" },

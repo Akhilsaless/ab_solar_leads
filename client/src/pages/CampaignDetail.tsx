@@ -1,0 +1,78 @@
+import { useMemo, useState } from "react";
+import { Link, useRoute } from "wouter";
+import { trpc } from "@/lib/trpc";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { ArrowLeft, CalendarCheck2, CheckCircle2, CircleDollarSign, ClipboardCheck, Plus, Send, SlidersHorizontal, XCircle } from "lucide-react";
+import { toast } from "sonner";
+
+const SCORE_FACTORS = [
+  ["contactValidity", "Contact validity"], ["locationMatch", "Location match"], ["campaignFit", "Campaign fit"],
+  ["requirementFit", "Requirement fit"], ["intent", "Intent"], ["engagement", "Engagement"],
+  ["sourceQuality", "Source quality"], ["previousInteraction", "Previous interaction"], ["qualificationAnswers", "Qualification answers"],
+] as const;
+
+const STATUSES = ["generated", "validated", "qualified", "contacted", "interested", "appointment", "appointment_validated", "delivered", "accepted", "rejected", "lost"];
+const REJECTION_REASONS = ["wrong_geography", "wrong_requirement", "invalid_contact", "duplicate", "not_interested", "already_purchased", "incorrect_qualification", "appointment_invalid", "no_show", "client_specific"];
+
+export default function CampaignDetail() {
+  const [, params] = useRoute("/campaigns/:id");
+  const campaignId = Number(params?.id || 0);
+  const campaignQuery = trpc.campaignIntelligence.getCampaign.useQuery({ campaignId }, { enabled: Boolean(campaignId), staleTime: 5000 });
+  const clients = trpc.campaignIntelligence.listClients.useQuery();
+  const utils = trpc.useUtils();
+  const [leadId, setLeadId] = useState("");
+  const [source, setSource] = useState("");
+  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [evidence, setEvidence] = useState<Record<string, number>>(() => Object.fromEntries(SCORE_FACTORS.map(([key]) => [key, 0])));
+  const [duplicate, setDuplicate] = useState(false);
+  const [appointmentDate, setAppointmentDate] = useState("");
+  const [outcome, setOutcome] = useState<"accepted" | "rejected">("accepted");
+  const [rejectionReason, setRejectionReason] = useState(REJECTION_REASONS[0]);
+  const [revenue, setRevenue] = useState("");
+  const [commission, setCommission] = useState("");
+  const [weights, setWeights] = useState<Record<string, number> | null>(null);
+
+  const refresh = () => utils.campaignIntelligence.getCampaign.invalidate({ campaignId });
+  const addLead = trpc.campaignIntelligence.addLead.useMutation({ onSuccess: () => { refresh(); setLeadId(""); setSource(""); toast.success("Lead added to campaign"); }, onError: (error) => toast.error(error.message) });
+  const scoreLead = trpc.campaignIntelligence.scoreLead.useMutation({ onSuccess: (data) => { refresh(); toast.success(`Evidence score saved: ${data.score}/100`); }, onError: (error) => toast.error(error.message) });
+  const updateStatus = trpc.campaignIntelligence.updateLeadStatus.useMutation({ onSuccess: refresh, onError: (error) => toast.error(error.message) });
+  const setAppointment = trpc.campaignIntelligence.setAppointment.useMutation({ onSuccess: () => { refresh(); toast.success("Appointment recorded"); }, onError: (error) => toast.error(error.message) });
+  const validateAppointment = trpc.campaignIntelligence.validateAppointment.useMutation({ onSuccess: () => { refresh(); toast.success("Appointment updated"); }, onError: (error) => toast.error(error.message) });
+  const deliverLead = trpc.campaignIntelligence.deliverLead.useMutation({ onSuccess: () => { refresh(); toast.success("Lead delivered for client validation"); }, onError: (error) => toast.error(error.message) });
+  const decideDelivery = trpc.campaignIntelligence.decideDelivery.useMutation({ onSuccess: () => { refresh(); toast.success("Client outcome recorded"); }, onError: (error) => toast.error(error.message) });
+  const updateWeights = trpc.campaignIntelligence.updateQualityWeights.useMutation({ onSuccess: () => { refresh(); toast.success("Quality weights updated"); }, onError: (error) => toast.error(error.message) });
+
+  const data = campaignQuery.data;
+  const records = data?.records || [];
+  const selected = useMemo(() => records.find((record: any) => Number(record.id) === selectedId) || null, [records, selectedId]);
+  const activeWeights = weights || data?.weights || {};
+
+  if (campaignQuery.isLoading) return <div className="h-64 animate-pulse rounded-xl bg-muted" />;
+  if (!data?.campaign) return <div className="space-y-4"><Link href="/campaigns"><Button variant="outline"><ArrowLeft className="mr-2 h-4 w-4" />Campaigns</Button></Link><Card><CardContent className="p-8 text-center text-muted-foreground">Campaign not found.</CardContent></Card></div>;
+
+  return <div className="space-y-6 animate-fade-in">
+    <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between"><div><Link href="/campaigns"><Button variant="ghost" size="sm" className="-ml-2"><ArrowLeft className="mr-2 h-4 w-4" />Campaigns</Button></Link><h1 className="mt-2 text-2xl font-bold">{data.campaign.name}</h1><p className="mt-1 text-sm text-muted-foreground">{data.campaign.clientName || "No client"} · {data.campaign.geography || "Geography not set"} · {data.campaign.leadRequirement || "Requirement not set"}</p></div><Badge variant={data.campaign.status === "active" ? "default" : "secondary"}>{data.campaign.status}</Badge></div>
+
+    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4"><Kpi label="Campaign leads" value={records.length} icon={Plus} /><Kpi label="Qualified" value={records.filter((record: any) => record.status === "qualified").length} icon={ClipboardCheck} /><Kpi label="Validated appointments" value={records.filter((record: any) => record.status === "appointment_validated").length} icon={CalendarCheck2} /><Kpi label="Accepted" value={records.filter((record: any) => record.status === "accepted").length} icon={CheckCircle2} /></div>
+
+    <Card><CardHeader><CardTitle className="text-base">Add real lead to campaign</CardTitle></CardHeader><CardContent><form className="grid gap-3 sm:grid-cols-[1fr_1fr_auto]" onSubmit={(event) => { event.preventDefault(); addLead.mutate({ campaignId, leadId: leadId ? Number(leadId) : undefined, source }); }}><Input type="number" min="1" placeholder="Existing Lead ID (optional)" value={leadId} onChange={(event) => setLeadId(event.target.value)} /><Input placeholder="Actual source, e.g. Google Maps" value={source} onChange={(event) => setSource(event.target.value)} required /><Button disabled={addLead.isPending}>{addLead.isPending ? "Adding..." : "Add lead"}</Button></form><p className="mt-2 text-xs text-muted-foreground">A lead record starts at Generated. Add real source data; this workflow does not manufacture leads.</p></CardContent></Card>
+
+    <Card><CardHeader className="flex flex-row items-center justify-between"><div><CardTitle className="text-base">Lead quality weights</CardTitle><p className="mt-1 text-sm text-muted-foreground">Configurable and explainable. Evidence is entered only from actual validation.</p></div><Button size="sm" variant="outline" onClick={() => setWeights({ ...activeWeights })}><SlidersHorizontal className="mr-2 h-4 w-4" />Edit weights</Button></CardHeader>{weights && <CardContent><div className="grid gap-3 sm:grid-cols-3">{SCORE_FACTORS.map(([key, label]) => <div key={key}><label className="mb-1 block text-xs font-medium">{label}</label><Input type="number" min="0" max="100" value={weights[key] ?? 0} onChange={(event) => setWeights({ ...weights, [key]: Number(event.target.value || 0) })} /></div>)}</div><div className="mt-4 flex justify-end gap-2"><Button variant="outline" onClick={() => setWeights(null)}>Cancel</Button><Button disabled={updateWeights.isPending} onClick={() => updateWeights.mutate({ campaignId, weights })}>Save weights</Button></div></CardContent>}</Card>
+
+    <div className="grid gap-6 lg:grid-cols-[1.35fr_.65fr]">
+      <Card><CardHeader><CardTitle className="text-base">Lifecycle records</CardTitle></CardHeader><CardContent className="space-y-3">{records.length === 0 ? <Empty /> : records.map((record: any) => <button key={record.id} onClick={() => setSelectedId(Number(record.id))} className={`w-full rounded-xl border p-4 text-left transition-colors ${selectedId === Number(record.id) ? "border-primary bg-primary/5" : "hover:bg-muted/40"}`}><div className="flex items-start justify-between gap-3"><div><p className="font-medium">{[record.firstName, record.lastName].filter(Boolean).join(" ") || record.company || `Campaign Lead #${record.id}`}</p><p className="mt-1 text-xs text-muted-foreground">{record.company || "No company"} · {record.source} · Score {record.qualityScore}/100</p></div><Badge variant={record.status === "accepted" ? "default" : record.status === "rejected" ? "destructive" : "secondary"}>{record.status.replaceAll("_", " ")}</Badge></div></button>)}</CardContent></Card>
+      <Card><CardHeader><CardTitle className="text-base">{selected ? "Record actions" : "Select a lead record"}</CardTitle></CardHeader><CardContent>{selected ? <RecordActions record={selected} campaignId={campaignId} clients={clients.data || []} evidence={evidence} setEvidence={setEvidence} duplicate={duplicate} setDuplicate={setDuplicate} appointmentDate={appointmentDate} setAppointmentDate={setAppointmentDate} outcome={outcome} setOutcome={setOutcome} rejectionReason={rejectionReason} setRejectionReason={setRejectionReason} revenue={revenue} setRevenue={setRevenue} commission={commission} setCommission={setCommission} scoreLead={scoreLead} updateStatus={updateStatus} setAppointment={setAppointment} validateAppointment={validateAppointment} deliverLead={deliverLead} decideDelivery={decideDelivery} /> : <p className="text-sm text-muted-foreground">Select a campaign lead to record real evidence and outcomes.</p>}</CardContent></Card>
+    </div>
+  </div>;
+}
+
+function Kpi({ label, value, icon: Icon }: { label: string; value: number; icon: any }) { return <Card><CardContent className="flex items-center gap-3 p-4"><div className="rounded-lg bg-primary/10 p-2"><Icon className="h-4 w-4 text-primary" /></div><div><p className="text-xl font-bold">{value}</p><p className="text-xs text-muted-foreground">{label}</p></div></CardContent></Card>; }
+function Empty() { return <div className="rounded-xl border border-dashed p-8 text-center text-sm text-muted-foreground">No campaign records yet. Add a real lead above.</div>; }
+
+function RecordActions(props: any) {
+  const { record, campaignId, clients, evidence, setEvidence, duplicate, setDuplicate, appointmentDate, setAppointmentDate, outcome, setOutcome, rejectionReason, setRejectionReason, revenue, setRevenue, commission, setCommission, scoreLead, updateStatus, setAppointment, validateAppointment, deliverLead, decideDelivery } = props;
+  return <div className="space-y-5"><div><p className="font-medium">{record.company || `Campaign Lead #${record.id}`}</p><p className="text-xs text-muted-foreground">Current score: {record.qualityScore}/100</p></div><div><label className="mb-1.5 block text-xs font-medium">Lifecycle stage</label><select className="h-10 w-full rounded-md border bg-background px-3 text-sm" value={record.status} onChange={(event) => updateStatus.mutate({ campaignLeadId: record.id, status: event.target.value as any })}>{STATUSES.map((status) => <option key={status} value={status}>{status.replaceAll("_", " ")}</option>)}</select></div><section className="space-y-2 border-t pt-4"><p className="text-sm font-semibold">Evidence quality score</p>{SCORE_FACTORS.map(([key, label]) => <div key={key}><div className="flex justify-between text-xs"><label>{label}</label><span>{Math.round((evidence[key] || 0) * 100)}%</span></div><input type="range" min="0" max="100" value={Math.round((evidence[key] || 0) * 100)} onChange={(event) => setEvidence({ ...evidence, [key]: Number(event.target.value) / 100 })} className="w-full" /></div>)}<label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={duplicate} onChange={(event) => setDuplicate(event.target.checked)} />Duplicate record</label><div className="flex gap-2"><Button size="sm" variant="outline" onClick={() => scoreLead.mutate({ campaignLeadId: record.id, evidence: { ...evidence, isDuplicate: duplicate } })}>Save evidence</Button><Button size="sm" onClick={() => scoreLead.mutate({ campaignLeadId: record.id, evidence: { ...evidence, isDuplicate: duplicate }, status: "qualified" })}>Mark qualified</Button></div></section><section className="space-y-2 border-t pt-4"><p className="text-sm font-semibold">Appointment</p><Input type="datetime-local" value={appointmentDate} onChange={(event) => setAppointmentDate(event.target.value)} /><div className="flex flex-wrap gap-2"><Button size="sm" variant="outline" onClick={() => setAppointment.mutate({ campaignLeadId: record.id, scheduledAt: appointmentDate ? new Date(appointmentDate).toISOString() : undefined })}><CalendarCheck2 className="mr-1 h-3.5 w-3.5" />Set</Button><Button size="sm" variant="outline" onClick={() => validateAppointment.mutate({ campaignLeadId: record.id, status: "validated" })}>Validate</Button><Button size="sm" variant="outline" onClick={() => validateAppointment.mutate({ campaignLeadId: record.id, status: "no_show" })}>No show</Button></div></section><section className="space-y-2 border-t pt-4"><p className="text-sm font-semibold">Client delivery and decision</p><select className="h-10 w-full rounded-md border bg-background px-3 text-sm" defaultValue="" onChange={(event) => { if (event.target.value) deliverLead.mutate({ campaignLeadId: record.id, clientId: Number(event.target.value) }); }}><option value="">Deliver to client…</option>{clients.map((client: any) => <option key={client.id} value={client.id}>{client.name}</option>)}</select><div className="grid grid-cols-2 gap-2"><Input type="number" min="0" placeholder="Revenue ₹" value={revenue} onChange={(event) => setRevenue(event.target.value)} /><Input type="number" min="0" placeholder="Commission ₹" value={commission} onChange={(event) => setCommission(event.target.value)} /></div><select className="h-10 w-full rounded-md border bg-background px-3 text-sm" value={outcome} onChange={(event) => setOutcome(event.target.value as any)}><option value="accepted">Accepted</option><option value="rejected">Rejected</option></select>{outcome === "rejected" && <select className="h-10 w-full rounded-md border bg-background px-3 text-sm" value={rejectionReason} onChange={(event) => setRejectionReason(event.target.value)}>{REJECTION_REASONS.map((reason) => <option key={reason} value={reason}>{reason.replaceAll("_", " ")}</option>)}</select>}<Button size="sm" className="w-full" onClick={() => decideDelivery.mutate({ campaignLeadId: record.id, outcome, ...(outcome === "rejected" ? { rejectionReason } : {}), ...(revenue ? { revenue: Number(revenue) } : {}), ...(commission ? { commission: Number(commission) } : {}) })}>{outcome === "accepted" ? <><CheckCircle2 className="mr-2 h-4 w-4" />Record acceptance</> : <><XCircle className="mr-2 h-4 w-4" />Record rejection</>}</Button></section></div>;
+}

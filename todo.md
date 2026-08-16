@@ -432,3 +432,13 @@
 - [x] Add secure configuration placeholders and fail-safe validation for an external provider
 - [x] Add selectable presets for OpenAI, Groq, OpenRouter, Together, and self-hosted Ollama-compatible endpoints
 - [x] Reassess production readiness and document recommended features to add, defer, or remove
+
+## North Star Campaign Intelligence Upgrade (Current Session)
+- [x] Audit existing campaign, lead, partner, referral, and analytics workflows against the requested North Star funnel
+- [x] Add campaign lifecycle, lead-event, qualification, appointment, delivery, acceptance, rejection, and revenue tables
+- [x] Build campaign creation and client-requirement management with real-data-only states
+- [x] Add explainable lead-quality scoring and evidence-based duplicate/qualification events
+- [x] Add appointment, delivery, acceptance/rejection, and revenue/commission workflows
+- [x] Add North Star owner dashboard with campaign, source, client, and team outcome metrics
+- [x] Add data-grounded Klaus campaign recommendations and target forecasting
+- [x] Test permissions, database integrity, desktop/mobile UI, and empty states; document production blockers
