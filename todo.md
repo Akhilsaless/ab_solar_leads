@@ -458,3 +458,9 @@
 - [x] Assess current product gaps against advanced B2B lead intelligence and commercial solar sales workflows
 - [x] Define the differentiated evidence graph, buyer-signal, site-feasibility, and decision-maker routing architecture
 - [x] Produce a phased implementation roadmap with required data sources, integrations, operating controls, and success metrics
+
+## Full Platform 10× Product and API Audit (Current Session)
+- [x] Inventory every page, workflow, and current integration across the platform
+- [x] Identify the highest-value page-by-page improvements that work with existing data and no new API
+- [x] Compare optional communication, enrichment, property, and automation APIs with clear product impact and prerequisites
+- [x] Deliver a phased platform roadmap that separates no-API improvements from optional integrations
