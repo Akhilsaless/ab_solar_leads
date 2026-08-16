@@ -442,3 +442,9 @@
 - [x] Add North Star owner dashboard with campaign, source, client, and team outcome metrics
 - [x] Add data-grounded Klaus campaign recommendations and target forecasting
 - [x] Test permissions, database integrity, desktop/mobile UI, and empty states; document production blockers
+
+## Campaign Delivery Extensions (Current Session)
+- [x] Add a token-protected client acceptance portal for delivered campaign leads
+- [x] Add direct assignment of existing Leads records to the selected campaign workflow
+- [x] Add an inactive, signature-verified email delivery/bounce/reply webhook intake foundation
+- [x] Add focused tests and document the email-provider configuration needed to activate webhooks

@@ -37,6 +37,7 @@ import Partners from "@/pages/Partners";
 import Campaigns from "@/pages/Campaigns";
 import CampaignDetail from "@/pages/CampaignDetail";
 import NorthStar from "@/pages/NorthStar";
+import ClientDeliveryReview from "@/pages/ClientDeliveryReview";
 import DashboardLayout from "@/components/DashboardLayout";
 import { Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
@@ -86,6 +87,7 @@ function Router() {
     <Switch>
       {/* Public chat route - accessible without login */}
       <Route path="/chat/:slug" component={ChatBot} />
+      <Route path="/client/review/:token" component={ClientDeliveryReview} />
 
       {/* Referrer signup and dashboard */}
       <Route path="/referrer-signup" component={ReferrerSignup} />

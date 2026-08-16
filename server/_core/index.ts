@@ -15,6 +15,7 @@ import { referrerOnboardingHandler } from "../referrerOnboardingHandler";
 import { autoOutreachHandler, triggerNowHandler } from "../autoOutreachHandler";
 import { scrapedFollowUpHandler } from "../scrapedFollowUpHandler";
 import { trackEmailOpenHandler } from "../trackEmailOpenHandler";
+import { emailEventWebhookHandler } from "../emailEventWebhook";
 
 // Owner auth middleware for admin endpoints
 const authenticateOwner = (req: express.Request, res: express.Response, next: express.NextFunction) => {
@@ -73,6 +74,8 @@ async function startServer() {
   app.post("/api/scheduled/scrapedFollowUp", scrapedFollowUpHandler);
   // Email open tracking pixel (public GET endpoint)
   app.get("/api/track/open", trackEmailOpenHandler);
+  // Provider-neutral email events. It fails closed until EMAIL_EVENT_WEBHOOK_SECRET is configured.
+  app.post("/api/webhooks/email-events", emailEventWebhookHandler);
 
   // tRPC API
   app.use(

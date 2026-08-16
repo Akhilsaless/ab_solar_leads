@@ -421,6 +421,27 @@ export const campaignQualityConfigs = mysqlTable("campaignQualityConfigs", {
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
 
+export const campaignDeliveryAccess = mysqlTable("campaignDeliveryAccess", {
+  id: int("id").autoincrement().primaryKey(),
+  deliveryId: int("deliveryId").notNull().unique(),
+  tokenHash: varchar("tokenHash", { length: 128 }).notNull(),
+  expiresAt: timestamp("expiresAt").notNull(),
+  revokedAt: timestamp("revokedAt"),
+  lastViewedAt: timestamp("lastViewedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export const emailEventLogs = mysqlTable("emailEventLogs", {
+  id: int("id").autoincrement().primaryKey(),
+  provider: varchar("provider", { length: 80 }).notNull(),
+  externalEventId: varchar("externalEventId", { length: 200 }).notNull().unique(),
+  eventType: mysqlEnum("eventType", ["delivered", "bounced", "complained", "opened", "clicked", "replied", "unknown"]).notNull(),
+  recipient: varchar("recipient", { length: 320 }),
+  outreachRecordId: int("outreachRecordId"),
+  payload: json("payload").notNull(),
+  receivedAt: timestamp("receivedAt").defaultNow().notNull(),
+});
+
 export const scrapeJobs = mysqlTable("scrapeJobs2", {
   id: int("id").autoincrement().primaryKey(),
   source: varchar("source", { length: 100 }).notNull(),

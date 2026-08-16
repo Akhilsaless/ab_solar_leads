@@ -1,7 +1,8 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { sql } from "drizzle-orm";
-import { protectedProcedure, router } from "./_core/trpc";
+import { createHash, randomBytes } from "crypto";
+import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
 import { getAgencyByUserId, getDb } from "./db";
 
 const lifecycleStatus = z.enum([
@@ -51,6 +52,14 @@ function insertedId(result: any): number {
   const value = row?.insertId ?? row?.[0]?.insertId;
   if (!value) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Could not create record" });
   return Number(value);
+}
+
+export function hashAccessToken(token: string) {
+  return createHash("sha256").update(token).digest("hex");
+}
+
+export function createAccessToken() {
+  return randomBytes(32).toString("base64url");
 }
 
 export function calculateCampaignLeadScore(evidence: Evidence, weights: Weights = DEFAULT_QUALITY_WEIGHTS) {
@@ -217,8 +226,10 @@ export const campaignIntelligenceRouter = router({
         WHERE c.id = ${input.campaignId} AND cp.agencyId = ${agency.id} LIMIT 1
       `));
       const records = rows(await db.execute(sql`
-        SELECT clr.*, l.firstName, l.lastName, l.company, l.email, l.phone
+        SELECT clr.*, l.firstName, l.lastName, l.company, l.email, l.phone,
+               cd.id AS deliveryId, cd.clientId AS deliveryClientId, cd.status AS deliveryStatus
         FROM campaignLeadRecords clr LEFT JOIN leads2 l ON l.id = clr.leadId
+        LEFT JOIN campaignDeliveries cd ON cd.campaignLeadId = clr.id
         WHERE clr.campaignId = ${input.campaignId}
         ORDER BY clr.updatedAt DESC
       `));
@@ -369,6 +380,90 @@ export const campaignIntelligenceRouter = router({
       await db.execute(sql`UPDATE campaignLeadRecords SET status = ${input.outcome} WHERE id = ${input.campaignLeadId}`);
       await addEvent(db, record.campaignId, input.campaignLeadId, input.outcome, ctx.user!.id, { rejectionReason: input.rejectionReason || null, note: input.rejectionNotes || null });
       if (input.revenue !== undefined || input.commission !== undefined) await addEvent(db, record.campaignId, input.campaignLeadId, "revenue_recorded", ctx.user!.id, { revenue: input.revenue ?? null, commission: input.commission ?? null });
+      return { success: true };
+    }),
+
+  createClientReviewLink: protectedProcedure
+    .input(z.object({ deliveryId: z.number().int().positive(), expiresInDays: z.number().int().min(1).max(30).default(14) }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+      const agency = await requireAgency(ctx.user!.id);
+      const delivery = first(await db.execute(sql`
+        SELECT cd.id, clr.campaignId
+        FROM campaignDeliveries cd
+        JOIN campaignLeadRecords clr ON clr.id = cd.campaignLeadId
+        JOIN campaignProfiles cp ON cp.campaignId = clr.campaignId
+        WHERE cd.id = ${input.deliveryId} AND cp.agencyId = ${agency.id}
+        LIMIT 1
+      `));
+      if (!delivery) throw new TRPCError({ code: "NOT_FOUND", message: "Delivery not found" });
+      const token = createAccessToken();
+      const expiresAt = new Date(Date.now() + input.expiresInDays * 86_400_000);
+      await db.execute(sql`
+        INSERT INTO campaignDeliveryAccess (deliveryId, tokenHash, expiresAt, revokedAt, lastViewedAt)
+        VALUES (${input.deliveryId}, ${hashAccessToken(token)}, ${expiresAt}, NULL, NULL)
+        ON DUPLICATE KEY UPDATE tokenHash = VALUES(tokenHash), expiresAt = VALUES(expiresAt), revokedAt = NULL, lastViewedAt = NULL
+      `);
+      return { token, expiresAt };
+    }),
+
+  getClientDeliveryReview: publicProcedure
+    .input(z.object({ token: z.string().trim().min(40).max(200) }))
+    .query(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+      const access = first(await db.execute(sql`
+        SELECT cda.id AS accessId, cda.deliveryId, cda.expiresAt, cda.revokedAt,
+               cd.status AS deliveryStatus, cd.rejectionReason, cd.rejectionNotes, cd.deliveredAt, cd.decidedAt,
+               cc.name AS clientName, c.name AS campaignName, c.description AS campaignDescription,
+               l.firstName, l.lastName, l.company, l.email, l.phone, l.city, l.state, l.propertyAddress, l.monthlyEnergyBill, l.systemSizeKw
+        FROM campaignDeliveryAccess cda
+        JOIN campaignDeliveries cd ON cd.id = cda.deliveryId
+        JOIN campaignClients cc ON cc.id = cd.clientId
+        JOIN campaignLeadRecords clr ON clr.id = cd.campaignLeadId
+        JOIN campaigns2 c ON c.id = clr.campaignId
+        LEFT JOIN leads2 l ON l.id = clr.leadId
+        WHERE cda.tokenHash = ${hashAccessToken(input.token)} AND cda.revokedAt IS NULL AND cda.expiresAt > ${new Date()}
+        LIMIT 1
+      `));
+      if (!access) throw new TRPCError({ code: "NOT_FOUND", message: "This review link is invalid, expired, or revoked." });
+      await db.execute(sql`UPDATE campaignDeliveryAccess SET lastViewedAt = ${new Date()} WHERE id = ${access.accessId}`);
+      return access;
+    }),
+
+  submitClientDeliveryDecision: publicProcedure
+    .input(z.object({
+      token: z.string().trim().min(40).max(200),
+      outcome: z.enum(["accepted", "rejected"]),
+      rejectionReason: z.enum(["wrong_geography", "wrong_requirement", "invalid_contact", "duplicate", "not_interested", "already_purchased", "incorrect_qualification", "appointment_invalid", "no_show", "client_specific"]).optional(),
+      note: z.string().trim().max(5000).optional(),
+    }).superRefine((value, ctx) => {
+      if (value.outcome === "rejected" && !value.rejectionReason) ctx.addIssue({ code: z.ZodIssueCode.custom, message: "A rejection reason is required." });
+    }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+      const access = first(await db.execute(sql`
+        SELECT cda.id AS accessId, cda.deliveryId, clr.id AS campaignLeadId, clr.campaignId, cd.status AS deliveryStatus
+        FROM campaignDeliveryAccess cda
+        JOIN campaignDeliveries cd ON cd.id = cda.deliveryId
+        JOIN campaignLeadRecords clr ON clr.id = cd.campaignLeadId
+        WHERE cda.tokenHash = ${hashAccessToken(input.token)} AND cda.revokedAt IS NULL AND cda.expiresAt > ${new Date()}
+        LIMIT 1
+      `));
+      if (!access) throw new TRPCError({ code: "NOT_FOUND", message: "This review link is invalid, expired, or revoked." });
+      if (access.deliveryStatus !== "pending") throw new TRPCError({ code: "CONFLICT", message: "A decision has already been recorded for this lead." });
+      await db.execute(sql`
+        UPDATE campaignDeliveries
+        SET status = ${input.outcome}, rejectionReason = ${input.outcome === "rejected" ? input.rejectionReason! : null}, rejectionNotes = ${input.note || null}, decidedAt = ${new Date()}
+        WHERE id = ${access.deliveryId}
+      `);
+      await db.execute(sql`UPDATE campaignLeadRecords SET status = ${input.outcome} WHERE id = ${access.campaignLeadId}`);
+      await db.execute(sql`
+        INSERT INTO campaignLeadEvents (campaignId, campaignLeadId, eventType, actorUserId, details)
+        VALUES (${access.campaignId}, ${access.campaignLeadId}, ${input.outcome}, NULL, ${JSON.stringify({ source: "client_portal", rejectionReason: input.rejectionReason || null, note: input.note || null })})
+      `);
       return { success: true };
     }),
 

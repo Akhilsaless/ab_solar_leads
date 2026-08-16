@@ -325,6 +325,7 @@ export default function Leads() {
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
   const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
   const [selectedLead, setSelectedLead] = useState<any | null>(null);
+  const [campaignAssignmentLead, setCampaignAssignmentLead] = useState<any | null>(null);
 
   const leads = trpc.leads.list.useQuery({
     status: statusFilter !== "all" ? statusFilter : undefined,
@@ -378,6 +379,16 @@ export default function Leads() {
 
   const partnersQuery = trpc.partner.getPartners.useQuery();
   const partners = (partnersQuery.data as any[]) || [];
+  const campaignsQuery = trpc.campaignIntelligence.listCampaigns.useQuery();
+  const campaignAssignment = trpc.campaignIntelligence.addLead.useMutation({
+    onSuccess: (data) => {
+      setCampaignAssignmentLead(null);
+      toast.success("Lead added to the campaign workflow");
+      setLocation(`/campaigns/${data.id}`);
+    },
+    onError: (error) => toast.error(error.message || "Could not add this lead to the campaign"),
+  });
+  const campaigns = (campaignsQuery.data as any[]) || [];
 
   const allLeadsRaw = (leads.data as any[]) || [];
   const allLeads = propertyFilter === "all" ? allLeadsRaw : allLeadsRaw.filter((l: any) => (l.homeownershipType || "").toLowerCase() === propertyFilter);
@@ -444,6 +455,18 @@ export default function Leads() {
                 {deleteBulk.isPending ? "Deleting..." : `Delete ${selectedIds.length} Leads`}
               </Button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {campaignAssignmentLead && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md rounded-xl border border-border bg-card p-6 shadow-xl">
+            <h3 className="text-lg font-semibold">Add lead to campaign</h3>
+            <p className="mt-1 text-sm text-muted-foreground">Choose a real campaign for {campaignAssignmentLead.firstName} {campaignAssignmentLead.lastName}. The original lead record remains unchanged.</p>
+            <div className="mt-4 space-y-2">
+              {campaigns.length === 0 ? <p className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">Create a campaign first, then return here to add this lead.</p> : campaigns.map((campaign: any) => <button key={campaign.id} disabled={campaignAssignment.isPending} onClick={() => campaignAssignment.mutate({ campaignId: Number(campaign.id), leadId: Number(campaignAssignmentLead.id), source: "existing_leads" })} className="w-full rounded-lg border p-3 text-left transition-colors hover:border-primary hover:bg-primary/5 disabled:opacity-60"><p className="text-sm font-medium">{campaign.name}</p><p className="mt-0.5 text-xs text-muted-foreground">{campaign.clientName || "No client yet"} · Target {campaign.targetLeadCount || 0}</p></button>)}</div>
+            <div className="mt-4 flex justify-end"><Button variant="outline" onClick={() => setCampaignAssignmentLead(null)}>Cancel</Button></div>
           </div>
         </div>
       )}
@@ -672,6 +695,9 @@ export default function Leads() {
                             updateLead.mutate({ id: lead.id, status: "converted" });
                           }}>
                             <ArrowUpDown className="w-4 h-4 mr-2" /> Mark Converted
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={(e: any) => { e.stopPropagation(); setCampaignAssignmentLead(lead); }}>
+                            <ArrowUpDown className="w-4 h-4 mr-2" /> Add to Campaign
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
                           <DropdownMenuItem
