@@ -763,3 +763,89 @@ export const outreachRuns = mysqlTable("outreachRuns", {
 }));
 
 export type OutreachRun = typeof outreachRuns.$inferSelect;
+
+/**
+ * Agency-scoped AI routing rules. Provider credentials live only in
+ * aiProviderConnections and are encrypted by the server before persistence.
+ */
+export const aiGatewaySettings = mysqlTable("aiGatewaySettings", {
+  id: int("id").autoincrement().primaryKey(),
+  agencyId: int("agencyId").notNull(),
+  routingMode: mysqlEnum("routingMode", ["auto", "fastest", "free_first", "best_quality", "manual"]).default("auto").notNull(),
+  freeModelsOnly: boolean("freeModelsOnly").default(false).notNull(),
+  allowPaidFallback: boolean("allowPaidFallback").default(false).notNull(),
+  monthlyBudgetInr: decimal("monthlyBudgetInr", { precision: 10, scale: 2 }).default("0").notNull(),
+  warningThresholdPercent: int("warningThresholdPercent").default(70).notNull(),
+  criticalThresholdPercent: int("criticalThresholdPercent").default(90).notNull(),
+  providerPriority: json("providerPriority"),
+  featurePolicies: json("featurePolicies"),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (table) => ({
+  agencyUnique: uniqueIndex("aiGatewaySettings_agency_unique").on(table.agencyId),
+}));
+
+/** Provider credentials are encrypted server-side and never returned to browsers. */
+export const aiProviderConnections = mysqlTable("aiProviderConnections", {
+  id: int("id").autoincrement().primaryKey(),
+  agencyId: int("agencyId").notNull(),
+  provider: varchar("provider", { length: 50 }).notNull(),
+  connectionType: mysqlEnum("connectionType", ["api_key", "oauth", "builtin", "custom"]).default("api_key").notNull(),
+  status: mysqlEnum("status", ["not_connected", "configuration_required", "connected", "error", "rate_limited", "unavailable"]).default("not_connected").notNull(),
+  healthStatus: mysqlEnum("healthStatus", ["unknown", "healthy", "slow", "rate_limited", "unavailable", "authentication_error"]).default("unknown").notNull(),
+  encryptedCredential: text("encryptedCredential"),
+  encryptedExtraCredentials: text("encryptedExtraCredentials"),
+  credentialHint: varchar("credentialHint", { length: 80 }),
+  accountId: varchar("accountId", { length: 255 }),
+  baseUrl: varchar("baseUrl", { length: 500 }),
+  defaultModel: varchar("defaultModel", { length: 255 }),
+  isEnabled: boolean("isEnabled").default(false).notNull(),
+  isFreeTier: boolean("isFreeTier").default(false).notNull(),
+  priority: int("priority").default(100).notNull(),
+  lastValidatedAt: timestamp("lastValidatedAt"),
+  lastSuccessfulAt: timestamp("lastSuccessfulAt"),
+  averageLatencyMs: int("averageLatencyMs"),
+  lastErrorCode: varchar("lastErrorCode", { length: 100 }),
+  lastErrorMessage: varchar("lastErrorMessage", { length: 500 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (table) => ({
+  providerUnique: uniqueIndex("aiProviderConnections_agency_provider_unique").on(table.agencyId, table.provider),
+}));
+
+export const aiProviderModels = mysqlTable("aiProviderModels", {
+  id: int("id").autoincrement().primaryKey(),
+  providerConnectionId: int("providerConnectionId").notNull(),
+  modelId: varchar("modelId", { length: 255 }).notNull(),
+  displayName: varchar("displayName", { length: 255 }),
+  categories: json("categories"),
+  capabilities: json("capabilities"),
+  isFree: boolean("isFree").default(false).notNull(),
+  isAvailable: boolean("isAvailable").default(true).notNull(),
+  discoveredAt: timestamp("discoveredAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (table) => ({
+  modelUnique: uniqueIndex("aiProviderModels_connection_model_unique").on(table.providerConnectionId, table.modelId),
+}));
+
+/** Compact observability records; never store prompt text or secret values. */
+export const aiGatewayUsage = mysqlTable("aiGatewayUsage", {
+  id: int("id").autoincrement().primaryKey(),
+  agencyId: int("agencyId").notNull(),
+  providerConnectionId: int("providerConnectionId"),
+  provider: varchar("provider", { length: 50 }).notNull(),
+  modelId: varchar("modelId", { length: 255 }),
+  feature: varchar("feature", { length: 100 }).notNull(),
+  routingMode: varchar("routingMode", { length: 50 }).notNull(),
+  latencyMs: int("latencyMs"),
+  inputTokens: int("inputTokens"),
+  outputTokens: int("outputTokens"),
+  estimatedCostInr: decimal("estimatedCostInr", { precision: 10, scale: 4 }).default("0").notNull(),
+  success: boolean("success").notNull(),
+  usedFallback: boolean("usedFallback").default(false).notNull(),
+  errorCode: varchar("errorCode", { length: 100 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type AiGatewaySettings = typeof aiGatewaySettings.$inferSelect;
+export type AiProviderConnection = typeof aiProviderConnections.$inferSelect;
+export type AiProviderModel = typeof aiProviderModels.$inferSelect;

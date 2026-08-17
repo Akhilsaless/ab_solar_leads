@@ -20,6 +20,7 @@ import { extractEmailFromWebsite } from "./emailExtractor";
 import { automatedOutreachRouter } from "./automatedOutreach";
 import { partnerManagementRouter } from "./partnerManagement";
 import { campaignIntelligenceRouter } from "./campaignIntelligence";
+import { aiGatewayRouter } from "./aiGateway";
 import { storagePut } from "./storage";
 import { calculateBusinessEvidenceScore, calculateEvidenceScore } from "./evidenceScore";
 
@@ -32,6 +33,7 @@ export const appRouter = router({
   partner: partnerRouter,
   partnerManagement: partnerManagementRouter,
   campaignIntelligence: campaignIntelligenceRouter,
+  aiGateway: aiGatewayRouter,
   automatedOutreach: automatedOutreachRouter,
   copilot: copilotRouter,
   referralCoach: referralCoachRouter,

@@ -477,3 +477,12 @@
 - [x] Add server-side Evidence Score previews for manual business-search results and imported contacts
 - [x] Replace browser-only Find Leads sorting, score display, and qualification guidance with central Evidence Score outputs
 - [x] Add focused tests and validate score consistency from search result to lead card
+
+## Multi-Provider AI Gateway (Current Session)
+- [x] Audit the supplied provider, credential, security, routing, quota, and admin-console requirements
+- [x] Research official connection/discovery capabilities for Gemini, Groq, OpenRouter, Cloudflare Workers AI, Mistral, Hugging Face, and OpenAI
+- [x] Add tenant-scoped provider configuration, model metadata, health, usage, routing, and failover data model
+- [x] Build backend provider adapters and a normalized AI Gateway with cost/paid-fallback safeguards
+- [x] Add Settings → AI Providers, provider health/usage cards, and admin-only provider tester
+- [x] Route Klaus through the AI Gateway while preserving existing fallback behavior
+- [x] Add security and routing tests plus provider credential handoff documentation

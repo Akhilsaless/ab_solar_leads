@@ -6,6 +6,7 @@ import { getDb, getAgencyByUserId } from "./db";
 import { sql } from "drizzle-orm";
 import { sendEmail } from "./_core/emailService";
 import { notifyOwner } from "./_core/notification";
+import { invokeAiGateway } from "./aiGateway";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -48,34 +49,25 @@ export function normalizeExternalBaseUrl(value: string) {
 async function invokeKlaus(
   params: { messages: any[]; tools?: any; tool_choice?: any },
   config: KlausProviderConfig,
+  agencyId: number,
 ) {
-  if (config.provider !== "openai_compatible") {
-    return invokeLLM({ ...params, model: "gpt-5-nano" });
-  }
-
-  const apiKey = process.env.KLAUS_EXTERNAL_API_KEY;
-  if (!apiKey) {
-    throw new TRPCError({
-      code: "PRECONDITION_FAILED",
-      message: "External AI is selected but KLAUS_EXTERNAL_API_KEY has not been configured.",
+  try {
+    const gateway = await invokeAiGateway({ agencyId, feature: "klaus", messages: params.messages, tools: params.tools, tool_choice: params.tool_choice });
+    return gateway.result;
+  } catch (gatewayError) {
+    // Preserve the previously configured single-provider connector during migration.
+    if (config.provider !== "openai_compatible") throw gatewayError;
+    const apiKey = process.env.KLAUS_EXTERNAL_API_KEY;
+    if (!apiKey) throw gatewayError;
+    const baseUrl = normalizeExternalBaseUrl(config.externalBaseUrl || "https://api.openai.com/v1");
+    const response = await fetch(`${baseUrl}/chat/completions`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ model: config.externalModel || "gpt-4o-mini", messages: params.messages, ...(params.tools ? { tools: params.tools, tool_choice: params.tool_choice || "auto" } : {}), temperature: 0.2 }),
     });
+    if (!response.ok) throw new TRPCError({ code: "BAD_GATEWAY", message: "The configured AI provider is currently unavailable. Please try again shortly." });
+    return await response.json();
   }
-  const baseUrl = normalizeExternalBaseUrl(config.externalBaseUrl || "https://api.openai.com/v1");
-  const response = await fetch(`${baseUrl}/chat/completions`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model: config.externalModel || "gpt-4o-mini",
-      messages: params.messages,
-      ...(params.tools ? { tools: params.tools, tool_choice: params.tool_choice || "auto" } : {}),
-      temperature: 0.2,
-    }),
-  });
-  if (!response.ok) {
-    const detail = (await response.text()).slice(0, 300);
-    throw new TRPCError({ code: "BAD_GATEWAY", message: `External AI request failed: ${detail || response.statusText}` });
-  }
-  return await response.json();
 }
 
 // ─── Agent Tool Definitions ──────────────────────────────────────────────────
@@ -677,7 +669,7 @@ STRICT RULES:
           messages,
           tools: AGENT_TOOLS as any,
           tool_choice: "auto",
-        }, providerConfig);
+        }, providerConfig, agency.id);
 
         const msg = response?.choices?.[0]?.message;
         if (!msg) break;
@@ -714,7 +706,7 @@ STRICT RULES:
             ...messages,
             { role: "user", content: "Answer in 1-3 lines max using the tool data above. Show real numbers. No filler." }
           ],
-        }, providerConfig);
+        }, providerConfig, agency.id);
         const rawContent = summaryResp?.choices?.[0]?.message?.content;
         finalAnswer = (typeof rawContent === "string" ? rawContent : rawContent ? JSON.stringify(rawContent) : "") || "I completed the task. Let me know if you need anything else.";
       }
