@@ -464,3 +464,10 @@
 - [x] Identify the highest-value page-by-page improvements that work with existing data and no new API
 - [x] Compare optional communication, enrichment, property, and automation APIs with clear product impact and prerequisites
 - [x] Deliver a phased platform roadmap that separates no-API improvements from optional integrations
+
+## Central Evidence Score (Current Session)
+- [x] Audit lead fields, score formulas, stored evidence, and lead-card views
+- [x] Build a shared server-side Evidence Score engine with transparent dimensions, confidence, risks, and next action
+- [x] Persist evidence score snapshots and reason codes without replacing legacy lead records
+- [x] Add Evidence Score cards to existing lead and campaign workflows
+- [x] Add focused tests and validate the score against real stored lead data

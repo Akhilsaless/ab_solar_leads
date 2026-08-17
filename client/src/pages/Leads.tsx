@@ -37,6 +37,18 @@ const STATUS_COLORS: Record<string, string> = {
   lost: "bg-red-500/10 text-red-500",
 };
 
+const EVIDENCE_TIER_STYLES: Record<string, string> = {
+  sales_ready: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
+  research_first: "bg-amber-500/10 text-amber-600 dark:text-amber-400",
+  nurture: "bg-sky-500/10 text-sky-600 dark:text-sky-400",
+  insufficient_evidence: "bg-muted text-muted-foreground",
+  blocked: "bg-red-500/10 text-red-600 dark:text-red-400",
+};
+
+function evidenceTierLabel(tier?: string) {
+  return (tier || "insufficient_evidence").replace(/_/g, " ");
+}
+
 const ACTIVITY_ICONS: Record<string, any> = {
   created: Users,
   status_changed: ArrowUpDown,
@@ -49,6 +61,7 @@ const ACTIVITY_ICONS: Record<string, any> = {
 
 function LeadDetailSheet({ lead, onClose }: { lead: any; onClose: () => void }) {
   const activity = trpc.leads.activity.useQuery({ leadId: lead.id });
+  const detail = trpc.leads.getById.useQuery({ id: lead.id });
   const [noteText, setNoteText] = useState("");
   const [aiSummary, setAiSummary] = useState<string | null>(null);
   const [summaryLoading, setSummaryLoading] = useState(false);
@@ -60,6 +73,13 @@ function LeadDetailSheet({ lead, onClose }: { lead: any; onClose: () => void }) 
       toast.success("Note added");
     },
   });
+  const refreshEvidence = trpc.leads.refreshEvidence.useMutation({
+    onSuccess: () => {
+      detail.refetch();
+      toast.success("Evidence Score refreshed");
+    },
+  });
+  const evidenceScore = (detail.data as any)?.evidenceScore || lead.evidenceScore;
 
   const generateSummary = async () => {
     setSummaryLoading(true);
@@ -109,7 +129,10 @@ function LeadDetailSheet({ lead, onClose }: { lead: any; onClose: () => void }) 
                 <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_COLORS[lead.status] || "bg-muted text-muted-foreground"}`}>
                   {lead.status}
                 </span>
-                {lead.leadScore > 0 && (
+                {evidenceScore && (
+                  <span className="text-xs text-muted-foreground">Evidence: {evidenceScore.score}/100</span>
+                )}
+                {!evidenceScore && lead.leadScore > 0 && (
                   <span className="text-xs text-muted-foreground">Score: {lead.leadScore}/100</span>
                 )}
               </div>
@@ -186,6 +209,56 @@ function LeadDetailSheet({ lead, onClose }: { lead: any; onClose: () => void }) 
                         <div className="h-full rounded-full bg-primary" style={{ width: `${lead.leadScore}%` }} />
                       </div>
                       <span className="font-medium">{lead.leadScore}/100</span>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {evidenceScore && (
+            <Card className="border-primary/20 bg-primary/[0.03]">
+              <CardHeader className="pb-2 pt-4 px-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <CardTitle className="text-sm font-semibold uppercase tracking-wide flex items-center gap-1.5">
+                      <Activity className="w-3.5 h-3.5 text-primary" /> Evidence Score
+                    </CardTitle>
+                    <p className="text-xs text-muted-foreground mt-1">Calculated from recorded facts, not assumed solar savings.</p>
+                  </div>
+                  <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => refreshEvidence.mutate({ id: lead.id })} disabled={refreshEvidence.isPending}>
+                    {refreshEvidence.isPending ? "Refreshing..." : "Refresh"}
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent className="px-4 pb-4 space-y-3">
+                <div className="flex items-center gap-3">
+                  <div className="text-3xl font-bold text-primary tabular-nums">{evidenceScore.score}</div>
+                  <div className="min-w-0">
+                    <Badge className={EVIDENCE_TIER_STYLES[evidenceScore.tier] || EVIDENCE_TIER_STYLES.insufficient_evidence}>{evidenceTierLabel(evidenceScore.tier)}</Badge>
+                    <p className="text-xs text-muted-foreground mt-1">Confidence: {evidenceScore.confidence}%</p>
+                  </div>
+                  <div className="ml-auto w-20 h-2 bg-muted rounded-full overflow-hidden">
+                    <div className="h-full solar-gradient" style={{ width: `${evidenceScore.score}%` }} />
+                  </div>
+                </div>
+                <div className="rounded-md bg-background/70 border border-border/50 p-3">
+                  <p className="text-xs font-medium mb-1">Recommended next action</p>
+                  <p className="text-xs text-muted-foreground leading-relaxed">{evidenceScore.nextAction}</p>
+                </div>
+                {evidenceScore.missingEvidence?.length > 0 && (
+                  <div>
+                    <p className="text-xs font-medium mb-1.5">Still needed</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {evidenceScore.missingEvidence.map((item: string) => <Badge key={item} variant="outline" className="text-[10px] font-normal">{item}</Badge>)}
+                    </div>
+                  </div>
+                )}
+                {evidenceScore.riskFlags?.length > 0 && (
+                  <div>
+                    <p className="text-xs font-medium text-red-500 mb-1.5">Risk flags</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {evidenceScore.riskFlags.map((item: string) => <Badge key={item} className="bg-red-500/10 text-red-600 dark:text-red-400 text-[10px] font-normal">{item}</Badge>)}
                     </div>
                   </div>
                 )}
@@ -631,12 +704,21 @@ export default function Leads() {
                       </span>
                     </td>
                     <td className="px-4 py-3 hidden lg:table-cell">
-                      <div className="flex items-center gap-2">
-                        <div className="w-12 h-1.5 bg-muted rounded-full overflow-hidden">
-                          <div className="h-full rounded-full solar-gradient" style={{ width: `${lead.leadScore || 0}%` }} />
-                        </div>
-                        <span className="text-xs text-muted-foreground">{lead.leadScore}</span>
-                      </div>
+                      {(() => {
+                        const evidence = lead.evidenceScore;
+                        const score = evidence?.score ?? lead.leadScore ?? 0;
+                        return (
+                          <div className="flex items-center gap-2">
+                            <div className="w-12 h-1.5 bg-muted rounded-full overflow-hidden">
+                              <div className="h-full rounded-full solar-gradient" style={{ width: `${score}%` }} />
+                            </div>
+                            <div>
+                              <span className="text-xs text-muted-foreground">{score}</span>
+                              {evidence && <span className={`block text-[10px] capitalize ${EVIDENCE_TIER_STYLES[evidence.tier] || "text-muted-foreground"}`}>{evidenceTierLabel(evidence.tier)}</span>}
+                            </div>
+                          </div>
+                        );
+                      })()}
                     </td>
                     <td className="px-4 py-3 hidden lg:table-cell">
                       <span className="text-xs text-muted-foreground capitalize">{lead.state || "—"}</span>

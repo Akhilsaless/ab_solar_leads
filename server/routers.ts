@@ -21,6 +21,7 @@ import { automatedOutreachRouter } from "./automatedOutreach";
 import { partnerManagementRouter } from "./partnerManagement";
 import { campaignIntelligenceRouter } from "./campaignIntelligence";
 import { storagePut } from "./storage";
+import { calculateEvidenceScore } from "./evidenceScore";
 
 // In-memory OTP store (session → { otp, expiresAt, phone })
 const otpStore = new Map<string, { otp: string; expiresAt: Date; phone: string }>();
@@ -766,9 +767,12 @@ export const appRouter = router({
         if (agency) {
           // Only chatbot leads (exclude scraper imports)
           const all = await db.getLeadsByAgency(agency.id);
-          return (all as any[]).filter((l: any) => l.source !== 'scraper');
+          return (all as any[])
+            .filter((l: any) => l.source !== 'scraper')
+            .map((lead: any) => ({ ...lead, evidenceScore: calculateEvidenceScore(lead) }));
         }
-        return await db.getLeads({ ...(input || {}) });
+        const all = await db.getLeads({ ...(input || {}) });
+        return (all as any[]).map((lead: any) => ({ ...lead, evidenceScore: calculateEvidenceScore(lead) }));
       }),
     scrapedContacts: protectedProcedure
       .input(z.object({
@@ -782,8 +786,39 @@ export const appRouter = router({
 
     getById: protectedProcedure
       .input(z.object({ id: z.number() }))
-      .query(async ({ input }) => {
-        return await db.getLeadById(input.id);
+      .query(async ({ input, ctx }) => {
+        const lead = await db.getLeadById(input.id);
+        if (!lead || !ctx.user) return lead;
+        const agency = await db.getAgencyByUserId(ctx.user.id);
+        const evidenceScore = calculateEvidenceScore(lead as any);
+        if (agency) {
+          const database = await db.getDb();
+          if (!database) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+          await database.execute(sql`
+            INSERT INTO leadEvidenceScores (agencyId, leadId, score, tier, confidence, dimensions, missingEvidence, riskFlags, nextAction, scoringVersion)
+            VALUES (${agency.id}, ${lead.id}, ${evidenceScore.score}, ${evidenceScore.tier}, ${evidenceScore.confidence}, ${JSON.stringify(evidenceScore.dimensions)}, ${JSON.stringify(evidenceScore.missingEvidence)}, ${JSON.stringify(evidenceScore.riskFlags)}, ${evidenceScore.nextAction}, ${evidenceScore.scoringVersion})
+            ON DUPLICATE KEY UPDATE score = VALUES(score), tier = VALUES(tier), confidence = VALUES(confidence), dimensions = VALUES(dimensions), missingEvidence = VALUES(missingEvidence), riskFlags = VALUES(riskFlags), nextAction = VALUES(nextAction), scoringVersion = VALUES(scoringVersion)
+          `);
+        }
+        return { ...(lead as any), evidenceScore };
+      }),
+
+    refreshEvidence: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input, ctx }) => {
+        const lead = await db.getLeadById(input.id);
+        if (!lead || !ctx.user) throw new TRPCError({ code: "NOT_FOUND", message: "Lead not found" });
+        const agency = await db.getAgencyByUserId(ctx.user.id);
+        if (!agency) throw new TRPCError({ code: "UNAUTHORIZED", message: "Agency not found" });
+        const evidenceScore = calculateEvidenceScore(lead as any);
+        const database = await db.getDb();
+        if (!database) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+        await database.execute(sql`
+          INSERT INTO leadEvidenceScores (agencyId, leadId, score, tier, confidence, dimensions, missingEvidence, riskFlags, nextAction, scoringVersion)
+          VALUES (${agency.id}, ${lead.id}, ${evidenceScore.score}, ${evidenceScore.tier}, ${evidenceScore.confidence}, ${JSON.stringify(evidenceScore.dimensions)}, ${JSON.stringify(evidenceScore.missingEvidence)}, ${JSON.stringify(evidenceScore.riskFlags)}, ${evidenceScore.nextAction}, ${evidenceScore.scoringVersion})
+          ON DUPLICATE KEY UPDATE score = VALUES(score), tier = VALUES(tier), confidence = VALUES(confidence), dimensions = VALUES(dimensions), missingEvidence = VALUES(missingEvidence), riskFlags = VALUES(riskFlags), nextAction = VALUES(nextAction), scoringVersion = VALUES(scoringVersion)
+        `);
+        return evidenceScore;
       }),
 
     update: protectedProcedure

@@ -376,6 +376,23 @@ export const campaignLeadRecords = mysqlTable("campaignLeadRecords", {
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
 
+// Central explainable qualification snapshot for legacy lead cards. It deliberately
+// extends rather than replaces leads2 so current lead workflows remain compatible.
+export const leadEvidenceScores = mysqlTable("leadEvidenceScores", {
+  id: int("id").autoincrement().primaryKey(),
+  agencyId: int("agencyId").notNull(),
+  leadId: int("leadId").notNull().unique(),
+  score: int("score").notNull(),
+  tier: varchar("tier", { length: 40 }).notNull(),
+  confidence: int("confidence").notNull(),
+  dimensions: json("dimensions").notNull(),
+  missingEvidence: json("missingEvidence").notNull(),
+  riskFlags: json("riskFlags").notNull(),
+  nextAction: text("nextAction").notNull(),
+  scoringVersion: varchar("scoringVersion", { length: 40 }).notNull(),
+  computedAt: timestamp("computedAt").defaultNow().onUpdateNow().notNull(),
+});
+
 export const campaignLeadEvents = mysqlTable("campaignLeadEvents", {
   id: int("id").autoincrement().primaryKey(),
   campaignId: int("campaignId").notNull(),
