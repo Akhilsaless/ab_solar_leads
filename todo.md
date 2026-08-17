@@ -471,3 +471,9 @@
 - [x] Persist evidence score snapshots and reason codes without replacing legacy lead records
 - [x] Add Evidence Score cards to existing lead and campaign workflows
 - [x] Add focused tests and validate the score against real stored lead data
+
+## Find Leads Evidence Score Centralization (Current Session)
+- [x] Audit the browser-only Find Leads score and result/import data flow
+- [x] Add server-side Evidence Score previews for manual business-search results and imported contacts
+- [x] Replace browser-only Find Leads sorting, score display, and qualification guidance with central Evidence Score outputs
+- [x] Add focused tests and validate score consistency from search result to lead card

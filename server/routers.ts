@@ -21,7 +21,7 @@ import { automatedOutreachRouter } from "./automatedOutreach";
 import { partnerManagementRouter } from "./partnerManagement";
 import { campaignIntelligenceRouter } from "./campaignIntelligence";
 import { storagePut } from "./storage";
-import { calculateEvidenceScore } from "./evidenceScore";
+import { calculateBusinessEvidenceScore, calculateEvidenceScore } from "./evidenceScore";
 
 // In-memory OTP store (session → { otp, expiresAt, phone })
 const otpStore = new Map<string, { otp: string; expiresAt: Date; phone: string }>();
@@ -1093,7 +1093,7 @@ export const appRouter = router({
             });
           }
 
-          return { businesses, total: businesses.length, jobId };
+          return { businesses: businesses.map(business => ({ ...business, evidenceScore: calculateBusinessEvidenceScore(business) })), total: businesses.length, jobId };
         } catch (err: any) {
           if (jobId) {
             await db.updateScrapeJob(jobId, {
@@ -1117,7 +1117,8 @@ export const appRouter = router({
         if (!ctx.user) return [];
         const agency = await db.getAgencyByUserId(ctx.user.id);
         if (!agency) return [];
-        return await db.getScrapedBusinessesByAgency(agency.id, input || {});
+        const businesses = await db.getScrapedBusinessesByAgency(agency.id, input || {});
+        return (businesses as any[]).map(business => ({ ...business, evidenceScore: calculateBusinessEvidenceScore(business) }));
       }),
 
     allBusinesses: protectedProcedure
@@ -1129,7 +1130,8 @@ export const appRouter = router({
         if (!ctx.user) return [];
         const agency = await db.getAgencyByUserId(ctx.user.id);
         if (!agency) return [];
-        return await db.searchScrapedBusinesses(agency.id, input || {});
+        const businesses = await db.searchScrapedBusinesses(agency.id, input || {});
+        return (businesses as any[]).map(business => ({ ...business, evidenceScore: calculateBusinessEvidenceScore(business) }));
       }),
 
     importAsLead: protectedProcedure
@@ -1139,21 +1141,26 @@ export const appRouter = router({
         const biz = await db.getScrapedBusinessById(input.businessId);
         if (!biz) throw new Error("Business not found");
 
-        // Create a lead from the scraped business
+        // Create a lead from the scraped business using the same central Evidence Score
+        // shown in Find Leads; no browser-only formula controls the import priority.
+        const evidenceScore = calculateBusinessEvidenceScore(biz as any);
         const leadId = await db.createLeadFromConversation({
           firstName: biz.ownerName?.split(" ")[0] || biz.businessName,
           lastName: biz.ownerName?.split(" ").slice(1).join(" ") || "",
+          company: biz.businessName,
           phone: biz.phone || undefined,
           email: biz.email || undefined,
           city: biz.city || undefined,
           state: biz.state || undefined,
           propertyAddress: biz.address || undefined,
           source: "scraper",
+          leadScore: evidenceScore.score,
+          priority: evidenceScore.tier === "sales_ready" ? "high" : evidenceScore.tier === "research_first" ? "medium" : "low",
           notes: `Scraped from Google Maps. Business: ${biz.businessName} (${biz.businessType}). Size: ${biz.businessSize}. Rating: ${biz.rating}/5 (${biz.reviewCount} reviews).`,
         });
 
         await db.markBusinessImported(input.businessId);
-        return { success: true, leadId };
+        return { success: true, leadId, evidenceScore };
       }),
 
     jobs: protectedProcedure.query(async ({ ctx }) => {
@@ -1169,15 +1176,19 @@ export const appRouter = router({
         for (const businessId of input.businessIds) {
           const biz = await db.getScrapedBusinessById(businessId);
           if (!biz || biz.isImported) continue;
+          const evidenceScore = calculateBusinessEvidenceScore(biz as any);
           const leadId = await db.createLeadFromConversation({
             firstName: biz.ownerName?.split(" ")[0] || biz.businessName,
             lastName: biz.ownerName?.split(" ").slice(1).join(" ") || "",
+            company: biz.businessName,
             phone: biz.phone || undefined,
             email: biz.email || undefined,
             city: biz.city || undefined,
             state: biz.state || undefined,
             propertyAddress: biz.address || undefined,
             source: "scraper",
+            leadScore: evidenceScore.score,
+            priority: evidenceScore.tier === "sales_ready" ? "high" : evidenceScore.tier === "research_first" ? "medium" : "low",
             notes: `Scraped from Google Maps. Business: ${biz.businessName} (${biz.businessType}). Size: ${biz.businessSize}. Rating: ${biz.rating}/5 (${biz.reviewCount} reviews).`,
           });
           await db.markBusinessImported(businessId);

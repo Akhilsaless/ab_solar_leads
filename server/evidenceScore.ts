@@ -6,6 +6,9 @@ export type EvidenceLeadInput = {
   phone?: string | null;
   whatsapp?: string | null;
   company?: string | null;
+  businessType?: string | null;
+  businessSize?: string | null;
+  website?: string | null;
   propertyAddress?: string | null;
   city?: string | null;
   state?: string | null;
@@ -82,8 +85,15 @@ export function calculateEvidenceScore(lead: EvidenceLeadInput): LeadEvidenceSco
 
   const fitEvidence: string[] = [];
   let fitScore = 0;
-  if (truthy(lead.company)) { fitScore += 8; fitEvidence.push("Company or facility name captured"); }
-  if (ownership.includes("commercial")) { fitScore += 7; fitEvidence.push("Commercial use indicated"); }
+  if (truthy(lead.company)) { fitScore += 5; fitEvidence.push("Company or facility name captured"); }
+  const type = String(lead.businessType || "").toLowerCase();
+  const highEnergyTypes = ["factory", "manufactur", "textile", "cold storage", "warehouse", "hospital", "hotel", "dairy", "mill", "processing", "pharma", "food"];
+  if (highEnergyTypes.some(value => type.includes(value))) { fitScore += 7; fitEvidence.push("Energy-relevant facility type captured"); }
+  else if (truthy(lead.businessType)) { fitScore += 3; fitEvidence.push("Facility type captured"); }
+  if (String(lead.businessSize || "").toLowerCase() === "large") { fitScore += 3; fitEvidence.push("Large facility proxy captured"); }
+  else if (String(lead.businessSize || "").toLowerCase() === "medium") { fitScore += 2; fitEvidence.push("Medium facility proxy captured"); }
+  if (ownership.includes("commercial")) { fitScore += 3; fitEvidence.push("Commercial use indicated"); }
+  fitScore = Math.min(15, fitScore);
   if (!truthy(lead.company)) missingEvidence.push("Company or facility name");
   dimensions.push({ id: "facility_fit", label: "Facility fit", score: fitScore, max: 15, evidence: fitEvidence });
 
@@ -116,4 +126,21 @@ export function calculateEvidenceScore(lead: EvidenceLeadInput): LeadEvidenceSco
           : "Do not automate. Complete basic contact, location, and facility evidence first.";
 
   return { score, tier, confidence, dimensions, missingEvidence: Array.from(new Set(missingEvidence)), riskFlags: Array.from(new Set(riskFlags)), nextAction, scoringVersion: "evidence_v1" };
+}
+
+export function calculateBusinessEvidenceScore(business: Record<string, unknown>): LeadEvidenceScore {
+  return calculateEvidenceScore({
+    id: Number(business.id || 0),
+    firstName: typeof business.ownerName === "string" ? business.ownerName : null,
+    email: typeof business.email === "string" ? business.email : null,
+    phone: typeof business.phone === "string" ? business.phone : null,
+    company: typeof business.businessName === "string" ? business.businessName : null,
+    businessType: typeof business.businessType === "string" ? business.businessType : null,
+    businessSize: typeof business.businessSize === "string" ? business.businessSize : null,
+    website: typeof business.website === "string" ? business.website : null,
+    propertyAddress: typeof business.address === "string" ? business.address : null,
+    city: typeof business.city === "string" ? business.city : null,
+    state: typeof business.state === "string" ? business.state : null,
+    source: typeof business.source === "string" ? business.source : "google_maps",
+  });
 }

@@ -289,6 +289,7 @@ export async function getSubsidyByState(stateName: string) {
 
 export async function createLeadFromConversation(data: {
   firstName: string; lastName: string; email?: string; phone?: string;
+  company?: string;
   propertyAddress?: string; city?: string; state?: string;
   monthlyEnergyBill?: string; estimatedSavings?: string;
   source?: string; leadScore?: number; priority?: "low" | "medium" | "high" | "urgent";

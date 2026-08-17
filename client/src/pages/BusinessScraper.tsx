@@ -46,26 +46,14 @@ const CONTACT_STATUS_OPTIONS = [
   { value: "converted", label: "Converted", color: "text-green-400 border-green-500/30 bg-green-500/10" },
 ];
 
-function solarScore(biz: any): number {
-  let score = 0;
-  if (biz.businessSize === "large") score += 40;
-  else if (biz.businessSize === "medium") score += 25;
-  else score += 10;
-  const highTypes = ["factor","textile","cold storage","warehouse","hospital","hotel"];
-  if (highTypes.some(t => (biz.businessType || "").toLowerCase().includes(t))) score += 30;
-  else score += 15;
-  if (biz.rating && biz.rating >= 4) score += 15;
-  else if (biz.rating && biz.rating >= 3) score += 8;
-  if (biz.phone) score += 10;
-  if (biz.website) score += 5;
-  return Math.min(score, 100);
-}
-
-function SolarScoreBadge({ score }: { score: number }) {
-  const color = score >= 70 ? "text-green-400 border-green-500/30 bg-green-500/10"
-    : score >= 45 ? "text-yellow-400 border-yellow-500/30 bg-yellow-500/10"
+function EvidenceScoreBadge({ evidence }: { evidence?: any }) {
+  const score = evidence?.score ?? 0;
+  const tier = evidence?.tier || "insufficient_evidence";
+  const color = tier === "sales_ready" ? "text-green-400 border-green-500/30 bg-green-500/10"
+    : tier === "research_first" ? "text-yellow-400 border-yellow-500/30 bg-yellow-500/10"
+    : tier === "blocked" ? "text-red-400 border-red-500/30 bg-red-500/10"
     : "text-gray-400 border-gray-500/30 bg-gray-500/10";
-  const label = score >= 70 ? "High" : score >= 45 ? "Medium" : "Low";
+  const label = tier.replace(/_/g, " ");
   return (
     <Badge variant="outline" className={`text-xs ${color} flex items-center gap-1`}>
       <TrendingUp className="w-3 h-3" />
@@ -116,7 +104,7 @@ export default function BusinessScraper() {
 
   const businesses: any[] = resultsQuery.data || [];
 
-  const sortedBusinesses = useMemo(() => [...businesses].sort((a, b) => solarScore(b) - solarScore(a)), [businesses]);
+  const sortedBusinesses = useMemo(() => [...businesses].sort((a, b) => (b.evidenceScore?.score || 0) - (a.evidenceScore?.score || 0)), [businesses]);
 
   const toggleSelect = (id: number) => {
     setSelectedIds(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
@@ -131,9 +119,9 @@ export default function BusinessScraper() {
     const rows = sortedBusinesses.map(b => [
       b.businessName, b.businessType, b.businessSize, b.phone || "", b.email || "",
       b.address || "", b.city || "", b.state || "", b.rating || "", b.reviewCount || "",
-      b.website || "", solarScore(b), b.contactStatus || "not_contacted", b.isImported ? "Yes" : "No"
+      b.website || "", b.evidenceScore?.score || 0, b.evidenceScore?.tier || "insufficient_evidence", b.contactStatus || "not_contacted", b.isImported ? "Yes" : "No"
     ]);
-    const headers = ["Name","Type","Size","Phone","Email","Address","City","State","Rating","Reviews","Website","SolarScore","Status","Imported"];
+    const headers = ["Name","Type","Size","Phone","Email","Address","City","State","Rating","Reviews","Website","EvidenceScore","EvidenceTier","Status","Imported"];
     const csv = [headers.join(","), ...rows.map(r => r.map(v => `"${v}"`).join(","))].join("\n");
     const a = document.createElement("a");
     a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
@@ -142,7 +130,7 @@ export default function BusinessScraper() {
   };
 
   const openWhatsApp = (biz: any, pitch?: string) => {
-    const msg = pitch || `Hi, I'm from Sales Squad. We help ${biz.businessType} like ${biz.businessName} cut electricity bills by up to 80% with solar. Govt subsidy up to Rs 78,000 available. Can we discuss?`;
+    const msg = pitch || `Hi, I'm from Sales Squad. We help businesses review whether solar could reduce daytime electricity costs. Any benefit is preliminary and depends on the electricity bill and site assessment. Would a short conversation be useful?`;
     const phone = biz.phone?.replace(/[^0-9]/g, "");
     if (phone) window.open(`https://wa.me/91${phone}?text=${encodeURIComponent(msg)}`, "_blank");
     else { navigator.clipboard.writeText(msg); toast.success("No phone — pitch copied to clipboard!"); }
@@ -154,7 +142,7 @@ export default function BusinessScraper() {
   };
 
   const stats = useMemo(() => ({
-    highPotential: businesses.filter(b => solarScore(b) >= 70).length,
+    highPotential: businesses.filter(b => b.evidenceScore?.tier === "sales_ready").length,
     large: businesses.filter(b => b.businessSize === "large").length,
     medium: businesses.filter(b => b.businessSize === "medium").length,
     small: businesses.filter(b => b.businessSize === "small").length,
@@ -165,7 +153,7 @@ export default function BusinessScraper() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-foreground">Business Lead Finder</h1>
-        <p className="text-muted-foreground text-sm mt-1">Find high-potential solar customers from Google Maps. AI-scored and ready to outreach.</p>
+        <p className="text-muted-foreground text-sm mt-1">Find commercial prospects from Google Maps, then rank them using recorded evidence before outreach.</p>
       </div>
 
       <Card className="border-border/30 bg-card/60">
@@ -222,7 +210,7 @@ export default function BusinessScraper() {
       {businesses.length > 0 && (
         <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
           {[
-            { label: "High Potential", value: stats.highPotential, color: "text-green-400" },
+            { label: "Sales-ready evidence", value: stats.highPotential, color: "text-green-400" },
             { label: "Large", value: stats.large, color: "text-orange-400" },
             { label: "Medium", value: stats.medium, color: "text-yellow-400" },
             { label: "Small", value: stats.small, color: "text-gray-400" },
@@ -256,7 +244,7 @@ export default function BusinessScraper() {
           <Button variant="outline" size="sm" onClick={exportCSV} className="border-border/50 text-sm">
             <Download className="w-4 h-4 mr-1.5" />Export CSV
           </Button>
-          <span className="text-xs text-muted-foreground ml-auto">{businesses.length} found · sorted by solar potential</span>
+          <span className="text-xs text-muted-foreground ml-auto">{businesses.length} found · sorted by Evidence Score</span>
         </div>
       )}
 
@@ -265,7 +253,6 @@ export default function BusinessScraper() {
       ) : sortedBusinesses.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {sortedBusinesses.map((biz: any) => {
-            const score = solarScore(biz);
             const statusInfo = CONTACT_STATUS_OPTIONS.find(s => s.value === (biz.contactStatus || "not_contacted")) || CONTACT_STATUS_OPTIONS[0];
             const isSelected = selectedIds.has(biz.id);
             return (
@@ -283,7 +270,7 @@ export default function BusinessScraper() {
                         <Badge variant="outline" className="text-xs text-orange-400 border-orange-500/30 bg-orange-500/10">
                           {(biz.businessSize?.charAt(0).toUpperCase() + biz.businessSize?.slice(1)) || "Unknown"}
                         </Badge>
-                        <SolarScoreBadge score={score} />
+                        <EvidenceScoreBadge evidence={biz.evidenceScore} />
                         <Badge variant="outline" className={`text-xs ${statusInfo.color}`}>{statusInfo.label}</Badge>
                       </div>
                     </div>
@@ -353,7 +340,7 @@ export default function BusinessScraper() {
                     </Button>
                     {biz.email && (
                       <Button size="sm" variant="outline" className="text-xs h-7 border-border/50" asChild>
-                        <a href={`mailto:${biz.email}?subject=Solar%20Energy%20for%20${encodeURIComponent(biz.businessName)}&body=${encodeURIComponent(`Hi,\n\nI'm from Sales Squad. We help ${biz.businessType} like ${biz.businessName} cut electricity bills by up to 80% with solar. Govt subsidy up to Rs 78,000 available.\n\nWould love to discuss how we can help you save on energy costs.\n\nBest regards,\nSales Squad Team`)}`} target="_blank" rel="noopener noreferrer">
+                        <a href={`mailto:${biz.email}?subject=Preliminary%20solar%20review%20for%20${encodeURIComponent(biz.businessName)}&body=${encodeURIComponent(`Hi,\n\nI'm from Sales Squad. We help businesses review whether solar may reduce daytime electricity costs. Any benefit is preliminary and depends on a recent bill and site assessment.\n\nWould a short discussion be useful?\n\nBest regards,\nSales Squad Team`)}`} target="_blank" rel="noopener noreferrer">
                           <Mail className="w-3.5 h-3.5 mr-1 text-blue-400" />Email
                         </a>
                       </Button>

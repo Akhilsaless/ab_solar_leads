@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { calculateEvidenceScore } from "./evidenceScore";
+import { calculateBusinessEvidenceScore, calculateEvidenceScore } from "./evidenceScore";
 
 describe("Central Evidence Score", () => {
   it("marks a well-evidenced commercial owner lead as sales ready", () => {
@@ -25,5 +25,23 @@ describe("Central Evidence Score", () => {
     const score = calculateEvidenceScore({ id: 3, firstName: "Ria", email: "ria@example.com", city: "Hyderabad", state: "Telangana", homeownershipType: "tenant" });
     expect(score.riskFlags.some(flag => flag.includes("Tenant"))).toBe(true);
     expect(score.missingEvidence.some(item => item.includes("permission"))).toBe(true);
+  });
+
+  it("uses the same evidence engine for Find Leads business previews", () => {
+    const score = calculateBusinessEvidenceScore({
+      id: 44,
+      businessName: "Medchal Cold Storage",
+      businessType: "cold storage",
+      businessSize: "large",
+      phone: "919999999999",
+      email: "operations@example.com",
+      address: "Industrial Estate",
+      city: "Hyderabad",
+      state: "Telangana",
+      source: "google_maps",
+    });
+    expect(score.dimensions.find(item => item.id === "facility_fit")?.score).toBeGreaterThan(0);
+    expect(score.tier).not.toBe("sales_ready");
+    expect(score.missingEvidence).toContain("Recent electricity bill or bill range");
   });
 });
