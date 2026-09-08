@@ -11,10 +11,13 @@ import { sdk } from "./_core/sdk";
 import { sendEmail } from "./_core/emailService";
 import { getReferrersForOnboarding, markOnboardingEmailSent } from "./db";
 
-const APP_URL = "https://salessquadleads-xxxqwsn9.manus.space";
+import { ENV } from "./_core/env";
+
+const APP_URL = ENV.publicAppUrl;
+const AGENCY_SLUG = ENV.defaultAgencySlug;
 
 function buildDay1Html(ref: { name: string; uniqueCode: string }): string {
-  const referralLink = `${APP_URL}/chat/demo?ref=${ref.uniqueCode}`;
+  const referralLink = `${APP_URL}/chat/${AGENCY_SLUG}?ref=${ref.uniqueCode}`;
   return `<!DOCTYPE html>
 <html><head><meta charset="utf-8"><title>3 Tips to Get Your First Lead</title></head>
 <body style="margin:0;padding:0;background:#0f172a;font-family:Arial,sans-serif;">
@@ -34,7 +37,7 @@ function buildDay1Html(ref: { name: string; uniqueCode: string }): string {
 
       <div style="background:#0f172a;border-radius:12px;padding:20px;margin-bottom:16px;border-left:4px solid #22c55e;">
         <p style="margin:0;color:#22c55e;font-weight:700;font-size:14px;">Tip 2 — Post in local WhatsApp groups</p>
-        <p style="margin:8px 0 0;color:#94a3b8;font-size:13px;line-height:1.6;">Apartment groups, business groups, colony groups — share your link with a short message about saving up to 80% on electricity bills.</p>
+        <p style="margin:8px 0 0;color:#94a3b8;font-size:13px;line-height:1.6;">Apartment groups, business groups, colony groups — share your link with a short message offering a preliminary solar assessment.</p>
       </div>
 
       <div style="background:#0f172a;border-radius:12px;padding:20px;margin-bottom:24px;border-left:4px solid #3b82f6;">
@@ -59,7 +62,7 @@ function buildDay1Html(ref: { name: string; uniqueCode: string }): string {
 }
 
 function buildDay3Html(ref: { name: string; uniqueCode: string }): string {
-  const referralLink = `${APP_URL}/chat/demo?ref=${ref.uniqueCode}`;
+  const referralLink = `${APP_URL}/chat/${AGENCY_SLUG}?ref=${ref.uniqueCode}`;
   return `<!DOCTYPE html>
 <html><head><meta charset="utf-8"><title>Find Your First Lead Today</title></head>
 <body style="margin:0;padding:0;background:#0f172a;font-family:Arial,sans-serif;">
@@ -84,7 +87,7 @@ function buildDay3Html(ref: { name: string; uniqueCode: string }): string {
       </div>
 
       <div style="background:#0f172a;border-radius:12px;padding:16px 20px;margin-bottom:24px;border:1px solid #f97316;">
-        <p style="margin:0;color:#f97316;font-weight:600;font-size:13px;">💰 Remember: You earn ₹20 per verified lead + ₹2,000 when solar is installed!</p>
+        <p style="margin:0;color:#f97316;font-weight:600;font-size:13px;">💰 Remember: eligible commissions are ₹500 at the subsidy milestone + ₹1,500 after confirmed installation.</p>
       </div>
 
       <div style="text-align:center;">
@@ -115,12 +118,12 @@ function buildDay7Html(ref: { name: string; uniqueCode: string }): string {
         <p style="margin:0 0 12px;color:#f1f5f9;font-weight:600;font-size:14px;">Your Earning Potential:</p>
         <table width="100%" cellpadding="0" cellspacing="0">
           <tr>
-            <td style="padding:8px 0;color:#94a3b8;font-size:13px;">Per verified lead shared</td>
-            <td style="padding:8px 0;color:#22c55e;font-weight:700;font-size:14px;text-align:right;">₹20</td>
+            <td style="padding:8px 0;color:#94a3b8;font-size:13px;">Verified subsidy milestone</td>
+            <td style="padding:8px 0;color:#22c55e;font-weight:700;font-size:14px;text-align:right;">₹500</td>
           </tr>
           <tr>
             <td style="padding:8px 0;color:#94a3b8;font-size:13px;">When solar is installed</td>
-            <td style="padding:8px 0;color:#22c55e;font-weight:700;font-size:14px;text-align:right;">₹2,000</td>
+            <td style="padding:8px 0;color:#22c55e;font-weight:700;font-size:14px;text-align:right;">₹1,500</td>
           </tr>
           <tr>
             <td style="padding:8px 0;color:#94a3b8;font-size:13px;">5 leads in a week (milestone bonus)</td>

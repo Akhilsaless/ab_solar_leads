@@ -14,6 +14,9 @@ const SKIP_PATTERNS = [
   /^info@example/i,
   /^user@example/i,
   /^email@example/i,
+  /^john@email\.com$/i,
+  /^john@doe\.com$/i,
+  /^name@email\.com$/i,
   /^support@example/i,
   /@sentry\./i,
   /@example\./i,
@@ -29,7 +32,7 @@ const SKIP_PATTERNS = [
   /\.js$/i,
 ];
 
-function isValidEmail(email: string): boolean {
+export function isUsableContactEmail(email: string): boolean {
   if (SKIP_PATTERNS.some((p) => p.test(email))) return false;
   // Must have a real TLD (2-6 chars)
   const parts = email.split("@");
@@ -42,7 +45,7 @@ function isValidEmail(email: string): boolean {
 
 function extractEmailsFromText(text: string): string[] {
   const matches = text.match(EMAIL_REGEX) || [];
-  return matches.filter(isValidEmail);
+  return matches.filter(isUsableContactEmail);
 }
 
 async function fetchPage(url: string, timeoutMs: number): Promise<string | null> {
@@ -106,7 +109,7 @@ export async function extractEmailFromWebsite(
     $("a[href^='mailto:']").each((_, el) => {
       const href = $(el).attr("href") || "";
       const email = href.replace(/^mailto:/i, "").split("?")[0].trim();
-      if (email && isValidEmail(email)) mailtoEmails.push(email);
+      if (email && isUsableContactEmail(email)) mailtoEmails.push(email);
     });
     if (mailtoEmails.length > 0) return mailtoEmails[0];
 

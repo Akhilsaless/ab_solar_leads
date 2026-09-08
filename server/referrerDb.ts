@@ -1,5 +1,6 @@
 import { getDb } from "./db";
 import { sql } from "drizzle-orm";
+import { ENV } from "./_core/env";
 
 export async function getAllReferrers(agencyId?: number) {
   const db = await getDb();
@@ -123,11 +124,7 @@ export async function recordReferralSignup(referrerId: number, conversationId: n
     // Send verification email to customer — no commission until they confirm
     if (customerData.email) {
       const { sendEmail } = await import("./_core/emailService");
-      // Use the app origin from env or fallback to the known production domain
-      const appOrigin = process.env.APP_ORIGIN || process.env.VITE_APP_ID
-        ? `https://${process.env.VITE_APP_ID}.manus.space`
-        : 'https://salessquad.manus.space';
-      const verifyUrl = `${appOrigin}/verify-referral?token=${verificationToken}`;
+      const verifyUrl = `${ENV.publicAppUrl}/verify-referral?token=${verificationToken}`;
       sendEmail({
         to: customerData.email,
         subject: `${referrerName} referred you to Sales Squad — Please Confirm`,

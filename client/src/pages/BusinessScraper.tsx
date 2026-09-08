@@ -70,6 +70,7 @@ export default function BusinessScraper() {
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [generatingPitch, setGeneratingPitch] = useState<number | null>(null);
   const [expandedPitch, setExpandedPitch] = useState<number | null>(null);
+  const [visibleCount, setVisibleCount] = useState(50);
 
   const searchMutation = trpc.scraper.search.useMutation({
     onSuccess: (data) => { toast.success(`Found ${data.total} businesses!`); resultsQuery.refetch(); setSelectedIds(new Set()); },
@@ -245,6 +246,11 @@ export default function BusinessScraper() {
             <Download className="w-4 h-4 mr-1.5" />Export CSV
           </Button>
           <span className="text-xs text-muted-foreground ml-auto">{businesses.length} found · sorted by Evidence Score</span>
+          {visibleCount < sortedBusinesses.length && (
+            <Button variant="outline" size="sm" onClick={() => setVisibleCount(count => count + 50)}>
+              Show 50 more
+            </Button>
+          )}
         </div>
       )}
 
@@ -252,7 +258,7 @@ export default function BusinessScraper() {
         <div className="flex items-center justify-center py-12"><Loader2 className="w-8 h-8 animate-spin text-orange-400" /></div>
       ) : sortedBusinesses.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {sortedBusinesses.map((biz: any) => {
+          {sortedBusinesses.slice(0, visibleCount).map((biz: any) => {
             const statusInfo = CONTACT_STATUS_OPTIONS.find(s => s.value === (biz.contactStatus || "not_contacted")) || CONTACT_STATUS_OPTIONS[0];
             const isSelected = selectedIds.has(biz.id);
             return (

@@ -288,6 +288,7 @@ export async function getSubsidyByState(stateName: string) {
 // ==================== LEADS (from conversations) ====================
 
 export async function createLeadFromConversation(data: {
+  agencyId?: number;
   firstName: string; lastName: string; email?: string; phone?: string;
   company?: string;
   propertyAddress?: string; city?: string; state?: string;
@@ -309,15 +310,39 @@ export async function createLeadFromConversation(data: {
 export async function getLeadsByAgency(agencyId: number) {
   const db = await getDb();
   if (!db) return [];
-  // Get leads that have a conversationId linked to this agency
+  // Scope both chatbot and scraper-created leads to the current agency.
   const result = await db.execute(sql`
     SELECT l.*, COALESCE(l.referrerCode, c.referrerCode) as referrerCode FROM leads2 l
-    INNER JOIN conversations3 c ON l.conversationId = c.id
-    WHERE c.agencyId = ${agencyId}
+    LEFT JOIN conversations3 c ON l.conversationId = c.id
+    WHERE COALESCE(l.agencyId, c.agencyId) = ${agencyId}
     ORDER BY l.createdAt DESC
     LIMIT 200
   `);
   return (result as any)[0] || [];
+}
+
+export async function getLeadByIdForAgency(id: number, agencyId: number) {
+  const db = await getDb();
+  if (!db) return null;
+  const result = await db.execute(sql`
+    SELECT l.* FROM leads2 l
+    LEFT JOIN conversations3 c ON l.conversationId = c.id
+    WHERE l.id = ${id} AND COALESCE(l.agencyId, c.agencyId) = ${agencyId}
+    LIMIT 1
+  `);
+  return (result as any)?.[0]?.[0] || null;
+}
+
+export async function getLeadByPhoneForAgency(phone: string, agencyId: number) {
+  const db = await getDb();
+  if (!db) return null;
+  const result = await db.execute(sql`
+    SELECT l.* FROM leads2 l
+    LEFT JOIN conversations3 c ON l.conversationId = c.id
+    WHERE l.phone = ${phone} AND COALESCE(l.agencyId, c.agencyId) = ${agencyId}
+    LIMIT 1
+  `);
+  return (result as any)?.[0]?.[0] || null;
 }
 
 export async function getLeads(filters?: { status?: string; search?: string; source?: string; }) {
@@ -471,6 +496,26 @@ export async function getScrapedBusinessById(id: number) {
   const db = await getDb();
   if (!db) return null;
   const result = await db.select().from(scrapedBusinesses).where(eq(scrapedBusinesses.id, id)).limit(1);
+  return result[0] || null;
+}
+
+export async function getScrapedBusinessByIdForAgency(id: number, agencyId: number) {
+  const db = await getDb();
+  if (!db) return null;
+  const result = await db.select().from(scrapedBusinesses).where(and(
+    eq(scrapedBusinesses.id, id),
+    eq(scrapedBusinesses.agencyId, agencyId),
+  )).limit(1);
+  return result[0] || null;
+}
+
+export async function getScrapedBusinessByPlaceId(agencyId: number, placeId: string) {
+  const db = await getDb();
+  if (!db) return null;
+  const result = await db.select().from(scrapedBusinesses).where(and(
+    eq(scrapedBusinesses.agencyId, agencyId),
+    eq(scrapedBusinesses.placeId, placeId),
+  )).limit(1);
   return result[0] || null;
 }
 

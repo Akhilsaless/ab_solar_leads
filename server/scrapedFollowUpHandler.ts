@@ -11,9 +11,10 @@ import { sdk } from "./_core/sdk";
 import { sendEmail } from "./_core/emailService";
 import { sql } from "drizzle-orm";
 import { getDb } from "./db";
+import { ENV } from "./_core/env";
 
-const APP_URL = "https://salessquadleads-xxxqwsn9.manus.space";
-const AGENCY_SLUG = "sales-squad";
+const APP_URL = ENV.publicAppUrl;
+const AGENCY_SLUG = ENV.defaultAgencySlug;
 const BOT_LINK = APP_URL + "/chat/" + AGENCY_SLUG;
 
 const THREE_DAYS_MS = 3 * 24 * 60 * 60 * 1000;

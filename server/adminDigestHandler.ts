@@ -7,6 +7,7 @@ import { Request, Response } from "express";
 import { sdk } from "./_core/sdk";
 import { sendEmail } from "./_core/emailService";
 import { getAdminDigestStats } from "./db";
+import { ENV } from "./_core/env";
 
 function buildDigestHtml(stats: {
   newLeads: number;
@@ -79,7 +80,7 @@ function buildDigestHtml(stats: {
 
       <!-- CTA -->
       <div style="text-align:center;margin:32px 0 8px;">
-        <a href="https://salessquadleads-xxxqwsn9.manus.space"
+        <a href="${ENV.publicAppUrl}"
            style="background:linear-gradient(135deg,#f97316,#fb923c);color:#fff;padding:14px 32px;border-radius:8px;text-decoration:none;font-weight:700;display:inline-block;font-size:14px;">
           Open Dashboard →
         </a>

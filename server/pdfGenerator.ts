@@ -148,7 +148,7 @@ export function generateEstimateHTML(data: {
         <span class="value">Approx ₹${data.totalCost.toLocaleString('en-IN')}</span>
       </div>
       <div class="row">
-        <span class="label">Government Subsidy (40%):</span>
+        <span class="label">Estimated Government Subsidy (verify eligibility):</span>
         <span class="value">Approx ₹${data.subsidyAmount.toLocaleString('en-IN')}</span>
       </div>
       <div class="row">

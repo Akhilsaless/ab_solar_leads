@@ -67,7 +67,7 @@ export default function ProductGuide() {
   const [, navigate] = useLocation();
   const [copied, setCopied] = useState(false);
   const agencyQuery = trpc.agency.getFirst.useQuery();
-  const agencySlug = agencyQuery.data || "demo";
+  const agencySlug = agencyQuery.data || "sales-squad";
   const chatLink = `${window.location.origin}/chat/${agencySlug}`;
   const referralLink = `${window.location.origin}/referral-landing`;
   const partnerLink = `${window.location.origin}/for-partners`;
@@ -115,7 +115,7 @@ export default function ProductGuide() {
           <div className="fade-up">
             <Badge text="🌞 SOLAR LEAD PLATFORM" color={C.green} />
             <h1 style={{ fontSize: "clamp(32px, 6vw, 60px)", fontWeight: 900, margin: "20px 0 16px", lineHeight: 1.1, letterSpacing: -1 }}>
-              India's First AI-Powered<br />
+              AI-Powered<br />
               <span style={{ background: `linear-gradient(90deg, ${C.green}, #34d399, ${C.green})`, backgroundSize: "200% auto", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", animation: "shimmer 3s linear infinite" }}>
                 Solar Lead Platform
               </span>
@@ -177,7 +177,7 @@ export default function ProductGuide() {
             <div style={{ alignSelf: "center", color: C.subtle, fontSize: 20, paddingBottom: 30 }}>→</div>
             <StepBubble n="2" title="AI Qualifies Lead" desc="Agent Klaus chats with the customer, calculates savings & explains subsidies" color={C.blue} />
             <div style={{ alignSelf: "center", color: C.subtle, fontSize: 20, paddingBottom: 30 }}>→</div>
-            <StepBubble n="3" title="Lead Captured" desc="Customer details saved automatically. Referrer earns ₹20 per verified lead" color={C.purple} />
+            <StepBubble n="3" title="Lead Verified" desc="Customer details and consent are verified before the referral progresses" color={C.purple} />
             <div style={{ alignSelf: "center", color: C.subtle, fontSize: 20, paddingBottom: 30 }}>→</div>
             <StepBubble n="4" title="Subsidy Applied" desc="Partner helps customer apply for PM Surya Ghar subsidy. Referrer earns ₹500" color={C.orange} />
             <div style={{ alignSelf: "center", color: C.subtle, fontSize: 20, paddingBottom: 30 }}>→</div>
@@ -265,7 +265,7 @@ export default function ProductGuide() {
               </button>
             </div>
             <p style={{ textAlign: "center", marginTop: 12, fontSize: 12, color: C.subtle }}>
-              salessquadleads.manus.space/product-guide · ₹50 bonus on signup
+              {window.location.host}/product-guide · ₹50 bonus on signup
             </p>
           </div>
         </Section>
@@ -285,7 +285,7 @@ export default function ProductGuide() {
           {/* Earn Cards */}
           <div style={{ display: "flex", gap: 16, flexWrap: "wrap", justifyContent: "center", marginBottom: 40 }}>
             <EarnCard icon="🎁" amount="₹50" label="Signup Bonus" desc="Credited instantly on joining" color={C.purple} />
-            <EarnCard icon="✅" amount="₹20" label="Per Verified Lead" desc="Customer fills the form" color={C.blue} />
+            <EarnCard icon="✅" amount="Tracked" label="Verified Lead" desc="Customer confirms the referral" color={C.blue} />
             <EarnCard icon="📋" amount="₹500" label="Subsidy Applied" desc="Customer applies for govt subsidy" color={C.orange} />
             <EarnCard icon="🏠" amount="₹1,500" label="Solar Installed" desc="Installation confirmed" color={C.green} />
             <EarnCard icon="🎯" amount="₹100-500" label="Task Bonuses" desc="Hit milestones for extra rewards" color={C.yellow} />
@@ -297,7 +297,7 @@ export default function ProductGuide() {
             <p style={{ color: C.muted, fontSize: 14, marginBottom: 20 }}>If you share your link with 50 people in a month (WhatsApp groups, Instagram, Facebook):</p>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 16 }}>
               {[
-                { scenario: "10 people chat with AI", earn: "₹200", detail: "10 verified leads × ₹20", color: C.blue },
+                { scenario: "10 people chat with AI", earn: "10 leads", detail: "Verification and consent tracked", color: C.blue },
                 { scenario: "3 people apply for subsidy", earn: "₹1,500", detail: "3 × ₹500", color: C.orange },
                 { scenario: "1 person gets solar installed", earn: "₹1,500", detail: "1 × ₹1,500", color: C.green },
                 { scenario: "Task bonuses", earn: "₹200", detail: "Milestone rewards", color: C.yellow },
@@ -325,7 +325,7 @@ export default function ProductGuide() {
               {[
                 { n: "1", title: "Sign Up Free", desc: "Create your referrer account in 2 minutes. Get ₹50 signup bonus instantly.", icon: "📝", color: C.green },
                 { n: "2", title: "Get Your Link", desc: "Receive your unique referral link. Share it anywhere — WhatsApp, Instagram, Facebook.", icon: "🔗", color: C.blue },
-                { n: "3", title: "Earn & Withdraw", desc: "Track earnings in your dashboard. Withdraw to UPI/Bank anytime (min ₹70).", icon: "💰", color: C.orange },
+                { n: "3", title: "Earn & Withdraw", desc: "Track eligible earnings in your dashboard. Withdraw to UPI or bank after reaching ₹500.", icon: "💰", color: C.orange },
               ].map((step, i) => (
                 <div key={i} style={{ display: "flex", gap: 14, alignItems: "flex-start" }}>
                   <div style={{ width: 40, height: 40, borderRadius: "50%", background: `${step.color}20`, border: `2px solid ${step.color}`, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, color: step.color, flexShrink: 0, fontSize: 16 }}>
@@ -401,7 +401,7 @@ export default function ProductGuide() {
             {[
               { icon: "🏛️", stat: "₹75,000 Cr", label: "PM Surya Ghar Budget", desc: "Government committed ₹75,000 crore to solar subsidies for 1 crore homes", color: C.green },
               { icon: "⚡", stat: "₹78,000", label: "Max Subsidy Per Home", desc: "Up to ₹78,000 subsidy for a 3kW system under PM Surya Ghar scheme", color: C.orange },
-              { icon: "📈", stat: "40%", label: "Annual Growth", desc: "India's solar market growing at 40% annually — fastest in the world", color: C.blue },
+              { icon: "📈", stat: "Growing", label: "Solar Adoption", desc: "Rooftop solar adoption continues to expand across Indian homes and businesses", color: C.blue },
               { icon: "🏠", stat: "1 Crore", label: "Target Homes", desc: "Government target to install solar in 1 crore homes by 2027", color: C.purple },
             ].map((item, i) => (
               <div key={i} style={{ background: C.surface, border: `1px solid ${item.color}20`, borderRadius: 16, padding: 24, textAlign: "center" }}>

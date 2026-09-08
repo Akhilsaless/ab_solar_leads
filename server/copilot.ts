@@ -1,4 +1,4 @@
-import { protectedProcedure, router } from "./_core/trpc";
+import { adminProcedure, protectedProcedure, router } from "./_core/trpc";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { invokeLLM } from "./_core/llm";
@@ -7,6 +7,7 @@ import { sql } from "drizzle-orm";
 import { sendEmail } from "./_core/emailService";
 import { notifyOwner } from "./_core/notification";
 import { invokeAiGateway } from "./aiGateway";
+import { ENV } from "./_core/env";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -24,12 +25,6 @@ function safeCount(result: any): number {
   const val = row.cnt ?? row["COUNT(*)"] ?? 0;
   return Number(val) || 0;
 }
-
-// Admin guard — any authenticated user is the owner in this single-owner app
-const adminProcedure = protectedProcedure.use(({ ctx, next }) => {
-  if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED" });
-  return next({ ctx });
-});
 
 type KlausProviderConfig = {
   provider: "builtin" | "openai_compatible";
@@ -313,7 +308,7 @@ async function executeTool(toolName: string, args: any, agencyId: number): Promi
         // Build a personalised pitch email
         const location = [city, state].filter(Boolean).join(", ") || "your area";
         const bType = businessType || "business";
-        const subject = `Solar Energy Opportunity for ${businessName} — Reduce Bills by 60%`;
+        const subject = `Preliminary solar assessment for ${businessName}`;
         const body = `
           <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;background:#000;color:#fff;padding:20px;">
             <div style="background:#F97316;padding:20px;border-radius:8px 8px 0 0;">
@@ -322,10 +317,10 @@ async function executeTool(toolName: string, args: any, agencyId: number): Promi
             </div>
             <div style="padding:24px;background:#111;border-radius:0 0 8px 8px;">
               <p>Dear ${businessName} Team,</p>
-              <p>I'm Agent Klaus from Sales Squad. Your ${bType} in ${location} has strong solar potential — we estimate you could cut electricity bills by <strong>60-70%</strong>.</p>
-              <p>With the <strong>PM Surya Ghar Yojana subsidy of ₹78,000</strong> available right now, the payback period is just 3-5 years — after which you get 20+ years of near-free electricity.</p>
+              <p>I'm Agent Klaus from Sales Squad. We can prepare a preliminary solar assessment for your ${bType} in ${location} after reviewing the electricity bill and site details.</p>
+              <p>Savings, payback, tax treatment, and subsidy eligibility depend on the customer category, location, system design, current rules, and installer verification. We do not promise a fixed result before that review.</p>
               <p><strong>Get your free solar estimate in 2 minutes:</strong></p>
-              <a href="https://salessquadleads-xxxqwsn9.manus.space/chat" style="display:inline-block;background:#F97316;color:#fff;padding:12px 24px;border-radius:6px;text-decoration:none;font-weight:bold;">Get Free Solar Estimate →</a>
+              <a href="${ENV.publicAppUrl}/chat/${ENV.defaultAgencySlug}" style="display:inline-block;background:#F97316;color:#fff;padding:12px 24px;border-radius:6px;text-decoration:none;font-weight:bold;">Start Preliminary Assessment →</a>
               <p style="margin-top:24px;color:#aaa;font-size:13px;">Warm regards,<br><strong>Agent Klaus</strong><br>Sales Squad — Solar Lead Generation</p>
             </div>
           </div>

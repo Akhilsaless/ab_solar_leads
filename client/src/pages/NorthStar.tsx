@@ -11,6 +11,10 @@ export default function NorthStar() {
   const dashboard = trpc.campaignIntelligence.getNorthStarDashboard.useQuery(undefined, { staleTime: 10_000 });
   const guidance = trpc.campaignIntelligence.getCampaignGuidance.useQuery(undefined, { staleTime: 10_000 });
   if (dashboard.isLoading) return <div className="space-y-4"><div className="h-20 animate-pulse rounded-xl bg-muted" />{Array.from({ length: 3 }).map((_, i) => <div key={i} className="h-40 animate-pulse rounded-xl bg-muted" />)}</div>;
+  if (dashboard.isError) {
+    const migrationRequired = /doesn't exist|unknown table|campaignProfiles|campaignLeadRecords/i.test(dashboard.error.message);
+    return <Card className="border-destructive/40"><CardContent className="p-8 text-center"><AlertTriangle className="mx-auto mb-3 h-9 w-9 text-destructive" /><p className="font-semibold">North Star is not available</p><p className="mx-auto mt-2 max-w-xl text-sm text-muted-foreground">{migrationRequired ? "The campaign-intelligence database migration has not been applied to this environment. Apply migrations 0007–0012, then retry." : "The dashboard could not load. Check the server logs and database connection, then retry."}</p><button className="mt-4 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground" onClick={() => { dashboard.refetch(); guidance.refetch(); }}>Retry</button></CardContent></Card>;
+  }
   const data = dashboard.data;
   const totals = data?.totals || {};
   const funnel = [

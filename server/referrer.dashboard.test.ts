@@ -20,8 +20,9 @@ function insertId(result: any): number {
 
 const TEST_CODE = "TEST_DASH_VITEST";
 const TEST_EMAIL = "vitest_dashboard@test.com";
+const describeWithDatabase = process.env.DATABASE_URL ? describe : describe.skip;
 
-describe("Referrer Dashboard Backend", () => {
+describeWithDatabase("Referrer Dashboard Backend", () => {
   let db: Awaited<ReturnType<typeof getDb>>;
   let referrerId: number;
 
