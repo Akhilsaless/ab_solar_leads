@@ -512,3 +512,9 @@
 - [x] Set `leads2.agencyId = 1` for lead IDs `30003` and `330020` only
 - [x] Verify the two-row assignment, successful production-readiness script output, health response, and disabled outreach controls (verifier passed; health returned ready; both outreach controls remain disabled)
 - [x] Keep migration 0012, verifier, SMTP, publishing, email outreach, OTP, and WhatsApp automation unchanged; report exact results
+
+## Production Candidate Chatbot Smoke Test (Current Session)
+- [x] Establish the testable current-candidate runtime and identify safe internal test data without publishing (unpublished candidate preview tested; no safe internal electricity-bill fixture was available)
+- [x] Test new residential estimate, commercial, subsidy, price-objection, human-handoff, returning-session, bill-upload, and persistent handoff journeys without contacting customers (bill OCR remains unverified because no safe fixture existed; no contact details were submitted)
+- [x] Test chatbot mobile responsiveness and review runtime side effects, safety controls, schedules, and messaging states (initial mobile state passed; full estimate-card state remains unverified; both outreach controls remain disabled)
+- [x] Report PASS/FAIL, observed behavior, defects and severity, remaining blockers, and publish-safety without fixing defects
