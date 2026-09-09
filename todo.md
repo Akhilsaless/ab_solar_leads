@@ -506,3 +506,9 @@
 - [x] Collect read-only ownership evidence for leads `30003` and `330020` only
 - [x] Cross-check each lead’s phone, email, source, campaign, referrer, and relationship metadata against agency-scoped records (each has an exact name match to an agency 1 Google Maps scraper record created immediately before the lead)
 - [x] Report an evidence-based recommendation for each lead without assigning, deleting, archiving, publishing, or enabling automation (both are supported by source evidence; await approval before any data action)
+
+## Approved Legacy Lead Agency Assignment (Current Session)
+- [ ] Create a recoverable checkpoint before the approved two-row data correction
+- [ ] Set `leads2.agencyId = 1` for lead IDs `30003` and `330020` only
+- [ ] Verify the two-row assignment, successful production-readiness script output, health response, and disabled outreach controls
+- [ ] Keep migration 0012, verifier, SMTP, publishing, email outreach, OTP, and WhatsApp automation unchanged; report exact results
