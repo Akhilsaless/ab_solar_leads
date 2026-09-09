@@ -1,4 +1,5 @@
 import { ENV } from "./env";
+import { buildSolarConversationGuidance } from "../solarConversationGuidance";
 
 export type Role = "system" | "user" | "assistant" | "tool" | "function";
 
@@ -276,6 +277,20 @@ const normalizeResponseFormat = ({
   };
 };
 
+function applySolarGuidance(messages: Message[]): Message[] {
+  const guidance = buildSolarConversationGuidance(messages);
+  if (!guidance) return messages;
+
+  let applied = false;
+  const enhanced = messages.map(message => {
+    if (applied || message.role !== "system" || typeof message.content !== "string") return message;
+    applied = true;
+    return { ...message, content: `${message.content}${guidance}` };
+  });
+
+  return applied ? enhanced : messages;
+}
+
 export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
   assertApiKey();
 
@@ -291,9 +306,10 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
     model: modelOverride,
   } = params;
 
+  const enhancedMessages = applySolarGuidance(messages);
   const payload: Record<string, unknown> = {
     model: modelOverride || "gpt-5-mini",
-    messages: messages.map(normalizeMessage),
+    messages: enhancedMessages.map(normalizeMessage),
   };
 
   if (tools && tools.length > 0) {
@@ -308,7 +324,7 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
     payload.tool_choice = normalizedToolChoice;
   }
 
-  payload.max_tokens = 4096
+  payload.max_tokens = 4096;
 
   const normalizedResponseFormat = normalizeResponseFormat({
     responseFormat,
