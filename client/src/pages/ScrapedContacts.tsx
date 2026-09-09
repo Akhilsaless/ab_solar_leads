@@ -63,6 +63,7 @@ export default function ScrapedContacts() {
   const [sendingEmail, setSendingEmail] = useState<number | null>(null);
   const [extractingEmail, setExtractingEmail] = useState<number | null>(null);
   const [bulkGenerating, setBulkGenerating] = useState(false);
+  const [visibleCount, setVisibleCount] = useState(50);
 
   const { data: businesses = [], isLoading, refetch } = trpc.scraper.allBusinesses.useQuery({
     search: search || undefined,
@@ -116,7 +117,7 @@ export default function ScrapedContacts() {
   });
 
   const openWhatsApp = (biz: any, pitch?: string) => {
-    const msg = pitch || `Hi, I'm from Sales Squad. We help ${biz.businessType || "businesses"} like ${biz.businessName} cut electricity bills by up to 80% with solar. Govt subsidy up to Rs 78,000 available. Can we discuss?`;
+    const msg = pitch || `Hi, I'm from Sales Squad. We help ${biz.businessType || "businesses"} like ${biz.businessName} assess whether solar could reduce daytime electricity costs. Any benefit depends on a recent electricity bill and site assessment. Would a short conversation be useful?`;
     const phone = (biz.phone || "").replace(/[^0-9]/g, "");
     if (phone) {
       window.open(`https://wa.me/${phone.startsWith("91") ? phone : "91" + phone}?text=${encodeURIComponent(msg)}`, "_blank");
@@ -128,7 +129,7 @@ export default function ScrapedContacts() {
 
   const sendOutreachEmail = (biz: any) => {
     if (!biz.email) { toast.error("No email address for this business"); return; }
-    const pitch = biz.aiPitch || `Hi,\n\nI'm from Sales Squad. We help ${biz.businessType || "businesses"} like ${biz.businessName} cut electricity bills by up to 80% with solar.\n\nThe Government of India's PM Surya Ghar scheme offers subsidies up to ₹78,000. For a ${biz.businessSize || "medium"} business like yours, the payback period is typically 3-5 years.\n\nWould you like a free solar assessment?\n\nBest regards,\nSales Squad Team`;
+    const pitch = biz.aiPitch || `Hi,\n\nI'm from Sales Squad. We help ${biz.businessType || "businesses"} like ${biz.businessName} assess whether solar could reduce daytime electricity costs. Any savings, eligibility, and payback period depend on the latest electricity bill, property type, and a site assessment.\n\nWould you like a preliminary solar assessment?\n\nBest regards,\nSales Squad Team`;
     setSendingEmail(biz.id);
     sendEmailMutation.mutate({
       businessId: biz.id,
@@ -170,10 +171,8 @@ export default function ScrapedContacts() {
             variant="outline" size="sm"
             disabled={bulkGenerating || bizList.length === 0}
             onClick={() => {
-              const agencyId = bizList[0]?.agencyId;
-              if (!agencyId) { toast.error("No contacts to process"); return; }
               setBulkGenerating(true);
-              bulkGeneratePitchesMutation.mutate({ agencyId });
+              bulkGeneratePitchesMutation.mutate({});
             }}
             className="border-purple-500/40 text-purple-400 hover:bg-purple-500/10"
           >
@@ -228,7 +227,8 @@ export default function ScrapedContacts() {
 
       {/* Stats */}
       {bizList.length > 0 && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="space-y-3">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {[
             { label: "Total", value: bizList.length, color: "text-foreground" },
             { label: "Not Contacted", value: bizList.filter(b => !b.contactStatus || b.contactStatus === "not_contacted").length, color: "text-gray-400" },
@@ -242,6 +242,12 @@ export default function ScrapedContacts() {
               </CardContent>
             </Card>
           ))}
+          </div>
+          {visibleCount < bizList.length && (
+            <div className="flex justify-end">
+              <Button variant="outline" size="sm" onClick={() => setVisibleCount(count => count + 50)}>Show 50 more</Button>
+            </div>
+          )}
         </div>
       )}
 
@@ -262,7 +268,7 @@ export default function ScrapedContacts() {
         </Card>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {bizList.map((biz: any) => {
+          {bizList.slice(0, visibleCount).map((biz: any) => {
             const score = solarScore(biz);
             const statusInfo = CONTACT_STATUS_OPTIONS.find(s => s.value === (biz.contactStatus || "not_contacted")) || CONTACT_STATUS_OPTIONS[1];
             return (

@@ -35,6 +35,7 @@ const OTP_RESEND_COOLDOWN_MS = 60 * 1000;
 const OTP_MAX_ATTEMPTS = 5;
 const REFERRER_SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const PASSWORD_SETUP_TTL_MS = 15 * 60 * 1000;
+export const MIN_WITHDRAWAL_INR = 500;
 
 function hashSecret(value: string) {
   return createHash("sha256").update(value).digest("hex");
@@ -88,7 +89,7 @@ async function updateQualityScore(db: any, referrerId: number) {
   );
   const total = Number(firstRow(totalResult)?.total || 0);
   const verified = Number(firstRow(verifiedResult)?.verified || 0);
-  const score = total === 0 ? 100 : Math.round((verified / total) * 100);
+  const score = total === 0 ? 0 : Math.round((verified / total) * 100);
   await db.execute(
     sql`UPDATE referrers SET qualityScore = ${score} WHERE id = ${referrerId}`
   );
@@ -204,7 +205,7 @@ export const referrerRouter = router({
 
       const insertResult = await db.execute(
         sql`INSERT INTO referrers (uniqueCode, name, email, totalEarnings, totalReferrals, status, qualityScore, dailyStreak, acceptedTnC, signupBonusPaid) 
-            VALUES (${uniqueCode}, ${name}, ${email}, 50, 0, 'active', 100, 0, 1, 1)`
+            VALUES (${uniqueCode}, ${name}, ${email}, 50, 0, 'active', 0, 0, 1, 1)`
       );
       const newId = insertId(insertResult);
 
@@ -279,10 +280,10 @@ export const referrerRouter = router({
       if (!db) throw new Error("Database not available");
       const result = await db.execute(sql`SELECT id, uniqueCode, passwordHash FROM referrers WHERE email = ${input.email}`);
       const ref = firstRow(result);
-      if (!ref) throw new Error("No account found with this email. Please sign up first.");
-      if (!ref.passwordHash) throw new Error("Password not set. Please sign up again to set your password.");
+      if (!ref) throw new TRPCError({ code: "UNAUTHORIZED", message: "Invalid email or password" });
+      if (!ref.passwordHash) throw new TRPCError({ code: "UNAUTHORIZED", message: "Invalid email or password" });
       const valid = await bcrypt.compare(input.password, ref.passwordHash);
-      if (!valid) throw new Error("Incorrect password. Please try again.");
+      if (!valid) throw new TRPCError({ code: "UNAUTHORIZED", message: "Invalid email or password" });
       const session = await issueReferrerSession(db, ref.id);
       return { success: true, uniqueCode: ref.uniqueCode, token: session.token, expiresAt: session.expiresAt };
     }),
@@ -363,17 +364,26 @@ export const referrerRouter = router({
   requestWithdrawal: publicProcedure
     .input(z.object({
       token: z.string().min(20),
-      amount: z.number().positive(),
-      upiId: z.string().optional(),
-      bankAccount: z.string().optional(),
-      bankIfsc: z.string().optional(),
+      amount: z.number().min(MIN_WITHDRAWAL_INR),
+      upiId: z.string().trim().max(100).optional(),
+      bankAccount: z.string().trim().max(50).optional(),
+      bankIfsc: z.string().trim().max(20).optional(),
+    }).superRefine((value, ctx) => {
+      if (!value.upiId && !(value.bankAccount && value.bankIfsc)) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Provide a UPI ID or complete bank details." });
+      }
     }))
     .mutation(async ({ input }) => {
       const db = await getDb();
       if (!db) throw new Error("Database not available");
 
       const ref = await requireReferrerSession(db, input.token);
-      if (Number(ref.totalEarnings) < input.amount) throw new Error("Insufficient balance");
+      const pendingResult = await db.execute(
+        sql`SELECT COALESCE(SUM(amount), 0) AS pending FROM withdrawals WHERE referrerId = ${ref.id} AND status = 'pending'`
+      );
+      const pending = Number(firstRow(pendingResult)?.pending || 0);
+      const available = Math.max(0, Number(ref.totalEarnings) - pending);
+      if (available < input.amount) throw new Error(`Insufficient available balance. ₹${pending} is already pending.`);
 
       await db.execute(
         sql`INSERT INTO withdrawals (referrerId, amount, upiId, bankAccount, bankIfsc) 

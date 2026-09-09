@@ -138,7 +138,7 @@ export function QRCodeGenerator() {
             <li>Print multiple copies (5-10 per hostel)</li>
             <li>Use color printing for better visibility</li>
             <li>Place near WiFi areas</li>
-            <li>Add a sign: "Earn ₹20k-50k/month - Scan here!"</li>
+            <li>Add a sign: "Join the solar referral program — scan here"</li>
             <li>Update your referrers about the QR code placement</li>
           </ul>
         </CardContent>

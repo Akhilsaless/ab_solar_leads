@@ -4,6 +4,8 @@ import { z } from "zod";
 import { invokeLLM } from "./_core/llm";
 import { getDb } from "./db";
 import { sql } from "drizzle-orm";
+import { createHash } from "crypto";
+import { ENV } from "./_core/env";
 
 // Helper: extract rows from mysql2 execute result (returns [rows, fields] tuple)
 function rows(result: any): any[] {
@@ -18,22 +20,31 @@ function firstRow(result: any): any {
   return rows(result)[0] || null;
 }
 
-// All procedures take uniqueCode to identify the associate
-// Associates can only see their own data
+function hashSessionToken(token: string) {
+  return createHash("sha256").update(token).digest("hex");
+}
+
+async function requireCoachSession(db: any, token: string) {
+  const ref = firstRow(await db.execute(sql`
+    SELECT id, uniqueCode, name, email, totalEarnings, totalReferrals, status, qualityScore, dailyStreak, lastActiveDate, createdAt
+    FROM referrers
+    WHERE sessionTokenHash = ${hashSessionToken(token)} AND sessionExpiresAt > ${Date.now()}
+    LIMIT 1
+  `));
+  if (!ref) throw new TRPCError({ code: "UNAUTHORIZED", message: "Your session has expired. Please sign in again." });
+  return ref;
+}
 
 export const referralCoachRouter = router({
   // ── Today's Mission ────────────────────────────────────────────────────────
   getTodaysMission: publicProcedure
-    .input(z.object({ uniqueCode: z.string() }))
+    .input(z.object({ token: z.string().min(20) }))
     .query(async ({ input }) => {
       const db = await getDb();
       if (!db) return null;
 
       try {
-        const ref = firstRow(await db.execute(
-          sql`SELECT id, name, totalReferrals, dailyStreak, lastActiveDate, qualityScore FROM referrers WHERE uniqueCode = ${input.uniqueCode} LIMIT 1`
-        ));
-        if (!ref) return null;
+        const ref = await requireCoachSession(db, input.token);
 
         const totalReferrals = Number(ref.totalReferrals || ref.total_referrals || 0);
         const streak = Number(ref.dailyStreak || ref.daily_streak || 0);
@@ -72,7 +83,7 @@ export const referralCoachRouter = router({
   // ── Screen-Aware Coaching Card ─────────────────────────────────────────────
   getCoachCard: publicProcedure
     .input(z.object({
-      uniqueCode: z.string(),
+      token: z.string().min(20),
       screen: z.enum(["dashboard", "findleads", "referrallink", "status", "submit"]),
     }))
     .query(async ({ input }) => {
@@ -80,10 +91,7 @@ export const referralCoachRouter = router({
       if (!db) return null;
 
       try {
-        const ref = firstRow(await db.execute(
-          sql`SELECT id, name, totalReferrals, qualityScore FROM referrers WHERE uniqueCode = ${input.uniqueCode} LIMIT 1`
-        ));
-        if (!ref) return null;
+        const ref = await requireCoachSession(db, input.token);
 
         const totalReferrals = Number(ref.totalReferrals || ref.total_referrals || 0);
 
@@ -103,7 +111,7 @@ export const referralCoachRouter = router({
           referrallink: {
             title: "Sharing your link",
             body: "Copy your referral link and share it on WhatsApp, SMS, or social media. When someone opens it, Agent Klaus will guide them through a free solar savings estimate. Your commission is tracked automatically.",
-            reminder: "Every link click is tracked. You earn ₹500 when a customer verifies their interest, and ₹1,500 when they install.",
+            reminder: "Every link click is tracked. Eligible commissions are credited at the subsidy and confirmed-installation milestones.",
           },
           status: {
             title: "Understanding referral statuses",
@@ -127,7 +135,7 @@ export const referralCoachRouter = router({
   // ── Ask Referral Coach ─────────────────────────────────────────────────────
   askCoach: publicProcedure
     .input(z.object({
-      uniqueCode: z.string(),
+      token: z.string().min(20),
       question: z.string().min(1).max(500),
     }))
     .mutation(async ({ input }) => {
@@ -140,21 +148,18 @@ export const referralCoachRouter = router({
       let chatLink = "[your referral link]";
 
       try {
-        ref = firstRow(await db.execute(
-          sql`SELECT id, name, email, totalEarnings, totalReferrals, status, qualityScore, dailyStreak, lastActiveDate, createdAt FROM referrers WHERE uniqueCode = ${input.uniqueCode} LIMIT 1`
-        ));
-        if (!ref) throw new TRPCError({ code: "NOT_FOUND", message: "Associate not found" });
+        ref = await requireCoachSession(db, input.token);
 
         myReferrals = rows(await db.execute(
           sql`SELECT id, customerName, status, createdAt, monthlyBill, state FROM referrals WHERE referrerId = ${ref.id} ORDER BY createdAt DESC LIMIT 20`
         ).catch(() => [[]]));
 
         const agencySlug = firstRow(await db.execute(
-          sql`SELECT slug FROM agencyConfig3 LIMIT 1`
+          sql`SELECT agencySlug FROM agencyConfig3 WHERE isActive = 1 LIMIT 1`
         ).catch(() => [[]]));
 
-        if (agencySlug?.slug) {
-          chatLink = `/chat/${agencySlug.slug}?ref=${input.uniqueCode}`;
+        if (agencySlug?.agencySlug) {
+          chatLink = `${ENV.publicAppUrl}/chat/${agencySlug.agencySlug}?ref=${ref.uniqueCode}`;
         }
       } catch (err) {
         if (err instanceof TRPCError) throw err;
@@ -200,7 +205,7 @@ STRICT RULES:
 - Only use the data above. Never invent data or reveal other associates' information.
 - The associate's role is ONLY to share their referral link. They do NOT explain solar, calculate savings, quote prices, or promise subsidies.
 - Agent Klaus (the chatbot) handles all product explanation and lead capture.
-- Commission: ₹20 per verified lead, ₹500 when subsidy is applied, ₹1,500 when installation is confirmed.
+- Commission: ₹500 when an eligible subsidy application is verified, and ₹1,500 when installation is confirmed. Verification alone does not create a cash commission.
 - If asked to generate a WhatsApp message, SMS, or social post — generate it and include their referral link.
 - If asked about the business search tool — explain the specific filters (Business Type, City, Size, Solar Score) step by step.
 - Keep responses concise and practical.

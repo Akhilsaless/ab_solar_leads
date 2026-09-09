@@ -16,13 +16,61 @@ import { copilotRouter } from "./copilot";
 import { referralCoachRouter } from "./referralCoach";
 import { partnerRouter } from "./partner";
 import { sendEmail } from "./_core/emailService";
-import { extractEmailFromWebsite } from "./emailExtractor";
+import { extractEmailFromWebsite, isUsableContactEmail } from "./emailExtractor";
 import { automatedOutreachRouter } from "./automatedOutreach";
 import { partnerManagementRouter } from "./partnerManagement";
 import { campaignIntelligenceRouter } from "./campaignIntelligence";
 import { aiGatewayRouter } from "./aiGateway";
 import { storagePut } from "./storage";
+import { ENV } from "./_core/env";
 import { calculateBusinessEvidenceScore, calculateEvidenceScore } from "./evidenceScore";
+
+async function requireUserAgency(userId: number) {
+  const agency = await db.getAgencyByUserId(userId);
+  if (!agency) throw new TRPCError({ code: "UNAUTHORIZED", message: "Agency not found" });
+  return agency;
+}
+
+async function requireOwnedConversation(userId: number, conversationId: number) {
+  const agency = await requireUserAgency(userId);
+  const conversation = await db.getConversationById(conversationId);
+  if (!conversation || conversation.agencyId !== agency.id) {
+    throw new TRPCError({ code: "NOT_FOUND", message: "Conversation not found" });
+  }
+  return conversation;
+}
+
+async function requireOwnedLead(userId: number, leadId: number) {
+  const agency = await requireUserAgency(userId);
+  const lead = await db.getLeadByIdForAgency(leadId, agency.id);
+  if (!lead) throw new TRPCError({ code: "NOT_FOUND", message: "Lead not found" });
+  return { agency, lead };
+}
+
+async function requireOwnedScrapedBusiness(userId: number, businessId: number) {
+  const agency = await requireUserAgency(userId);
+  const business = await db.getScrapedBusinessByIdForAgency(businessId, agency.id);
+  if (!business) throw new TRPCError({ code: "NOT_FOUND", message: "Business not found" });
+  return {
+    agency,
+    business: {
+      ...business,
+      email: business.email && isUsableContactEmail(business.email) ? business.email : null,
+    },
+  };
+}
+
+function publicBusinessRecord(business: any) {
+  return {
+    ...business,
+    email: business.email && isUsableContactEmail(String(business.email)) ? business.email : null,
+  };
+}
+
+function escapeHtml(value: string) {
+  const entities: Record<string, string> = { "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#039;" };
+  return value.replace(/[&<>"']/g, character => entities[character]);
+}
 
 // In-memory OTP store (session → { otp, expiresAt, phone })
 const otpStore = new Map<string, { otp: string; expiresAt: Date; phone: string }>();
@@ -498,11 +546,12 @@ export const appRouter = router({
             // Server-side duplicate prevention: skip if phone already exists
             const phoneForCheck = extractedData.phone || conversation.customerPhone;
             const emailForCheck = extractedData.email || conversation.customerEmail;
-            const existingLead = phoneForCheck ? await db.getLeadByPhone(phoneForCheck) : null;
+            const existingLead = phoneForCheck ? await db.getLeadByPhoneForAgency(phoneForCheck, agency.id) : null;
             if (!existingLead) {
             // Create a lead record
             const nameParts = (extractedData.name || conversation.customerName || "").split(" ");
             await db.createLeadFromConversation({
+              agencyId: agency.id,
               firstName: nameParts[0] || "Unknown",
               lastName: nameParts.slice(1).join(" ") || "",
               email: extractedData.email || conversation.customerEmail || undefined,
@@ -729,9 +778,8 @@ export const appRouter = router({
 
     getById: protectedProcedure
       .input(z.object({ id: z.number() }))
-      .query(async ({ input }) => {
-        const conv = await db.getConversationById(input.id);
-        if (!conv) return null;
+      .query(async ({ input, ctx }) => {
+        const conv = await requireOwnedConversation(ctx.user!.id, input.id);
         const messages = await db.getChatMessages(conv.id);
         return { conversation: conv, messages };
       }),
@@ -746,11 +794,10 @@ export const appRouter = router({
     updateStatus: protectedProcedure
       .input(z.object({
         id: z.number(),
-        status: z.string(),
+        status: z.enum(["active", "lead_captured", "estimate_given", "completed", "abandoned"]),
       }))
-      .mutation(async ({ input }) => {
-        const conv = await db.getConversationById(input.id);
-        if (!conv) throw new Error("Conversation not found");
+      .mutation(async ({ input, ctx }) => {
+        const conv = await requireOwnedConversation(ctx.user!.id, input.id);
         await db.updateConversation(conv.sessionId, { status: input.status } as any);
         return { success: true };
       }),
@@ -766,15 +813,13 @@ export const appRouter = router({
       .query(async ({ input, ctx }) => {
         if (!ctx.user) return [];
         const agency = await db.getAgencyByUserId(ctx.user.id);
-        if (agency) {
-          // Only chatbot leads (exclude scraper imports)
-          const all = await db.getLeadsByAgency(agency.id);
-          return (all as any[])
-            .filter((l: any) => l.source !== 'scraper')
-            .map((lead: any) => ({ ...lead, evidenceScore: calculateEvidenceScore(lead) }));
-        }
-        const all = await db.getLeads({ ...(input || {}) });
-        return (all as any[]).map((lead: any) => ({ ...lead, evidenceScore: calculateEvidenceScore(lead) }));
+        if (!agency) return [];
+        const all = await db.getLeadsByAgency(agency.id);
+        return (all as any[])
+          .filter((l: any) => l.source !== 'scraper')
+          .filter((l: any) => !input?.status || input.status === "all" || l.status === input.status)
+          .filter((l: any) => !input?.search || [l.firstName, l.lastName, l.email, l.phone, l.company].some(value => String(value || "").toLowerCase().includes(input.search!.toLowerCase())))
+          .map((lead: any) => ({ ...lead, evidenceScore: calculateEvidenceScore(lead) }));
       }),
     scrapedContacts: protectedProcedure
       .input(z.object({
@@ -783,35 +828,36 @@ export const appRouter = router({
       }).optional())
       .query(async ({ input, ctx }) => {
         if (!ctx.user) return [];
-        return await db.getLeads({ ...(input || {}), source: 'scraper' });
+        const agency = await db.getAgencyByUserId(ctx.user.id);
+        if (!agency) return [];
+        const all = await db.getLeadsByAgency(agency.id);
+        return (all as any[])
+          .filter((l: any) => l.source === 'scraper')
+          .filter((l: any) => !input?.status || input.status === "all" || l.status === input.status)
+          .filter((l: any) => !input?.search || [l.firstName, l.lastName, l.email, l.phone, l.company].some(value => String(value || "").toLowerCase().includes(input.search!.toLowerCase())));
       }),
 
     getById: protectedProcedure
       .input(z.object({ id: z.number() }))
       .query(async ({ input, ctx }) => {
-        const lead = await db.getLeadById(input.id);
-        if (!lead || !ctx.user) return lead;
-        const agency = await db.getAgencyByUserId(ctx.user.id);
+        if (!ctx.user) return null;
+        const { lead, agency } = await requireOwnedLead(ctx.user.id, input.id);
         const evidenceScore = calculateEvidenceScore(lead as any);
-        if (agency) {
-          const database = await db.getDb();
-          if (!database) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
-          await database.execute(sql`
-            INSERT INTO leadEvidenceScores (agencyId, leadId, score, tier, confidence, dimensions, missingEvidence, riskFlags, nextAction, scoringVersion)
-            VALUES (${agency.id}, ${lead.id}, ${evidenceScore.score}, ${evidenceScore.tier}, ${evidenceScore.confidence}, ${JSON.stringify(evidenceScore.dimensions)}, ${JSON.stringify(evidenceScore.missingEvidence)}, ${JSON.stringify(evidenceScore.riskFlags)}, ${evidenceScore.nextAction}, ${evidenceScore.scoringVersion})
-            ON DUPLICATE KEY UPDATE score = VALUES(score), tier = VALUES(tier), confidence = VALUES(confidence), dimensions = VALUES(dimensions), missingEvidence = VALUES(missingEvidence), riskFlags = VALUES(riskFlags), nextAction = VALUES(nextAction), scoringVersion = VALUES(scoringVersion)
-          `);
-        }
+        const database = await db.getDb();
+        if (!database) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+        await database.execute(sql`
+          INSERT INTO leadEvidenceScores (agencyId, leadId, score, tier, confidence, dimensions, missingEvidence, riskFlags, nextAction, scoringVersion)
+          VALUES (${agency.id}, ${lead.id}, ${evidenceScore.score}, ${evidenceScore.tier}, ${evidenceScore.confidence}, ${JSON.stringify(evidenceScore.dimensions)}, ${JSON.stringify(evidenceScore.missingEvidence)}, ${JSON.stringify(evidenceScore.riskFlags)}, ${evidenceScore.nextAction}, ${evidenceScore.scoringVersion})
+          ON DUPLICATE KEY UPDATE score = VALUES(score), tier = VALUES(tier), confidence = VALUES(confidence), dimensions = VALUES(dimensions), missingEvidence = VALUES(missingEvidence), riskFlags = VALUES(riskFlags), nextAction = VALUES(nextAction), scoringVersion = VALUES(scoringVersion)
+        `);
         return { ...(lead as any), evidenceScore };
       }),
 
     refreshEvidence: protectedProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ input, ctx }) => {
-        const lead = await db.getLeadById(input.id);
-        if (!lead || !ctx.user) throw new TRPCError({ code: "NOT_FOUND", message: "Lead not found" });
-        const agency = await db.getAgencyByUserId(ctx.user.id);
-        if (!agency) throw new TRPCError({ code: "UNAUTHORIZED", message: "Agency not found" });
+        if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED" });
+        const { lead, agency } = await requireOwnedLead(ctx.user.id, input.id);
         const evidenceScore = calculateEvidenceScore(lead as any);
         const database = await db.getDb();
         if (!database) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
@@ -832,6 +878,7 @@ export const appRouter = router({
       }))
       .mutation(async ({ input, ctx }) => {
         const { id, ...data } = input;
+        await requireOwnedLead(ctx.user!.id, id);
         await db.updateLead(id, data as any);
         if (input.status) {
           await db.addLeadActivity({
@@ -846,22 +893,29 @@ export const appRouter = router({
 
     activity: protectedProcedure
       .input(z.object({ leadId: z.number() }))
-      .query(async ({ input }) => {
+      .query(async ({ input, ctx }) => {
+        await requireOwnedLead(ctx.user!.id, input.leadId);
         return await db.getLeadActivity(input.leadId);
       }),
 
     delete: protectedProcedure
       .input(z.object({ id: z.number() }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
+        await requireOwnedLead(ctx.user!.id, input.id);
         await db.deleteLead(input.id);
         return { success: true };
       }),
 
     deleteBulk: protectedProcedure
       .input(z.object({ ids: z.array(z.number()) }))
-      .mutation(async ({ input }) => {
-        await db.deleteLeadsBulk(input.ids);
-        return { success: true, deleted: input.ids.length };
+      .mutation(async ({ input, ctx }) => {
+        const ownedIds: number[] = [];
+        for (const id of input.ids) {
+          await requireOwnedLead(ctx.user!.id, id);
+          ownedIds.push(id);
+        }
+        await db.deleteLeadsBulk(ownedIds);
+        return { success: true, deleted: ownedIds.length };
       }),
 
     checkDuplicate: publicProcedure
@@ -1081,21 +1135,29 @@ export const appRouter = router({
             }
           }
 
-          // Bulk insert
-          if (businesses.length > 0) {
-            await db.createScrapedBusinessesBulk(businesses as any);
+          // Do not create duplicate rows when a search returns a Place we already store.
+          const uniqueByPlace = Array.from(new Map(businesses.map(business => [business.placeId, business])).values());
+          const newBusinesses: any[] = [];
+          for (const business of uniqueByPlace) {
+            const existing = business.placeId
+              ? await db.getScrapedBusinessByPlaceId(agency.id, business.placeId)
+              : null;
+            if (!existing) newBusinesses.push(business);
+          }
+          if (newBusinesses.length > 0) {
+            await db.createScrapedBusinessesBulk(newBusinesses as any);
           }
 
           if (jobId) {
             await db.updateScrapeJob(jobId, {
               status: "completed" as any,
-              totalFound: businesses.length,
-              totalImported: businesses.length,
+              totalFound: uniqueByPlace.length,
+              totalImported: newBusinesses.length,
               completedAt: new Date(),
             });
           }
 
-          return { businesses: businesses.map(business => ({ ...business, evidenceScore: calculateBusinessEvidenceScore(business) })), total: businesses.length, jobId };
+          return { businesses: newBusinesses.map(business => ({ ...business, evidenceScore: calculateBusinessEvidenceScore(business) })), total: newBusinesses.length, jobId };
         } catch (err: any) {
           if (jobId) {
             await db.updateScrapeJob(jobId, {
@@ -1120,7 +1182,10 @@ export const appRouter = router({
         const agency = await db.getAgencyByUserId(ctx.user.id);
         if (!agency) return [];
         const businesses = await db.getScrapedBusinessesByAgency(agency.id, input || {});
-        return (businesses as any[]).map(business => ({ ...business, evidenceScore: calculateBusinessEvidenceScore(business) }));
+        return (businesses as any[]).map(business => {
+          const safeBusiness = publicBusinessRecord(business);
+          return { ...safeBusiness, evidenceScore: calculateBusinessEvidenceScore(safeBusiness) };
+        });
       }),
 
     allBusinesses: protectedProcedure
@@ -1133,20 +1198,23 @@ export const appRouter = router({
         const agency = await db.getAgencyByUserId(ctx.user.id);
         if (!agency) return [];
         const businesses = await db.searchScrapedBusinesses(agency.id, input || {});
-        return (businesses as any[]).map(business => ({ ...business, evidenceScore: calculateBusinessEvidenceScore(business) }));
+        return (businesses as any[]).map(business => {
+          const safeBusiness = publicBusinessRecord(business);
+          return { ...safeBusiness, evidenceScore: calculateBusinessEvidenceScore(safeBusiness) };
+        });
       }),
 
     importAsLead: protectedProcedure
       .input(z.object({ businessId: z.number() }))
       .mutation(async ({ input, ctx }) => {
         if (!ctx.user) throw new Error("Not authenticated");
-        const biz = await db.getScrapedBusinessById(input.businessId);
-        if (!biz) throw new Error("Business not found");
+        const { agency, business: biz } = await requireOwnedScrapedBusiness(ctx.user.id, input.businessId);
 
         // Create a lead from the scraped business using the same central Evidence Score
         // shown in Find Leads; no browser-only formula controls the import priority.
         const evidenceScore = calculateBusinessEvidenceScore(biz as any);
         const leadId = await db.createLeadFromConversation({
+          agencyId: agency.id,
           firstName: biz.ownerName?.split(" ")[0] || biz.businessName,
           lastName: biz.ownerName?.split(" ").slice(1).join(" ") || "",
           company: biz.businessName,
@@ -1174,12 +1242,14 @@ export const appRouter = router({
       .input(z.object({ businessIds: z.array(z.number()) }))
       .mutation(async ({ input, ctx }) => {
         if (!ctx.user) throw new Error("Not authenticated");
+        const agency = await requireUserAgency(ctx.user.id);
         const results = [];
         for (const businessId of input.businessIds) {
-          const biz = await db.getScrapedBusinessById(businessId);
+          const biz = await db.getScrapedBusinessByIdForAgency(businessId, agency.id);
           if (!biz || biz.isImported) continue;
           const evidenceScore = calculateBusinessEvidenceScore(biz as any);
           const leadId = await db.createLeadFromConversation({
+            agencyId: agency.id,
             firstName: biz.ownerName?.split(" ")[0] || biz.businessName,
             lastName: biz.ownerName?.split(" ").slice(1).join(" ") || "",
             company: biz.businessName,
@@ -1204,16 +1274,16 @@ export const appRouter = router({
         businessId: z.number(),
         contactStatus: z.enum(["not_contacted", "contacted", "interested", "converted"]),
       }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
+        await requireOwnedScrapedBusiness(ctx.user!.id, input.businessId);
         await db.updateScrapedBusiness(input.businessId, { contactStatus: input.contactStatus });
         return { success: true };
       }),
 
     generateAIPitch: protectedProcedure
       .input(z.object({ businessId: z.number() }))
-      .mutation(async ({ input }) => {
-        const biz = await db.getScrapedBusinessById(input.businessId);
-        if (!biz) throw new Error("Business not found");
+      .mutation(async ({ input, ctx }) => {
+        const { business: biz } = await requireOwnedScrapedBusiness(ctx.user!.id, input.businessId);
         // Detect if this is a solar/renewable energy company — pitch Sales Squad to them
         const solarKeywords = ["solar", "renewable", "photovoltaic", "pv", "wind energy", "green energy", "electrical contractor"];
         const isSolarBusiness = solarKeywords.some(kw =>
@@ -1225,12 +1295,12 @@ export const appRouter = router({
         if (isSolarBusiness) {
           // Pitch Sales Squad's lead generation platform to solar companies
           systemPrompt = `You are a B2B sales expert writing a WhatsApp outreach message to a solar company. Write a short, persuasive message (max 4 sentences) pitching Sales Squad — an AI-powered lead generation platform for solar companies. Key points to include: (1) Sales Squad's AI chatbot captures homeowners and businesses interested in solar 24/7, (2) every lead comes pre-qualified with name, phone, email, monthly electricity bill, and location, (3) the solar company just receives ready-to-close leads — no marketing spend needed, (4) sign up free as a partner. Do NOT mention solar panels, subsidies, or electricity savings. Be conversational and direct.`;
-          const partnerSignupUrl = process.env.VITE_APP_ID ? ('https://' + process.env.VITE_APP_ID + '.manus.space/for-partners') : 'https://salessquad.in/for-partners';
+          const partnerSignupUrl = `${ENV.publicAppUrl}/for-partners`;
           userPrompt = `Solar company: ${biz.businessName}, Location: ${biz.city}, ${biz.state}. Partner signup link: ${partnerSignupUrl}`;
         } else {
           // Pitch solar energy savings to non-solar businesses
-          systemPrompt = `You are a solar sales expert writing a WhatsApp message to a business owner. Write a short, punchy message (max 3 sentences) pitching solar energy to reduce their electricity bills. Be specific to their business type. Mention PM Surya Ghar subsidy and ROI. No emojis. Professional tone.`;
-          userPrompt = `Business: ${biz.businessName}, Type: ${biz.businessType}, Size: ${biz.businessSize}, Location: ${biz.city}, ${biz.state}. Monthly electricity bill estimate: ${biz.businessSize === 'large' ? '₹80,000-1,20,000' : biz.businessSize === 'medium' ? '₹20,000-50,000' : '₹5,000-15,000'}/month.`;
+          systemPrompt = `You are a solar sales expert writing a WhatsApp message to a business owner. Write a short, professional message (max 3 sentences) offering a preliminary solar assessment. Be specific to their business type. Do not promise savings, ROI, subsidies, eligibility, or bill amounts; say that benefits depend on a recent electricity bill and site assessment. No emojis.`;
+          userPrompt = `Business: ${biz.businessName}, Type: ${biz.businessType}, Size proxy: ${biz.businessSize}, Location: ${biz.city}, ${biz.state}.`;
         }
         const response = await invokeLLM({
           messages: [
@@ -1250,13 +1320,15 @@ export const appRouter = router({
         subject: z.string(),
         body: z.string(),
       }))
-      .mutation(async ({ input }) => {
-        const biz = await db.getScrapedBusinessById(input.businessId);
-        if (!biz) throw new Error("Business not found");
+      .mutation(async ({ input, ctx }) => {
+        const { business: biz } = await requireOwnedScrapedBusiness(ctx.user!.id, input.businessId);
+        if (!biz.email || biz.email.toLowerCase() !== input.toEmail.toLowerCase()) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Send only to the verified email stored for this business." });
+        }
         const emailHtml = `
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; background: #f9f9f9; border-radius: 8px;">
-            <h2 style="color: #f97316;">Sales Squad — Solar Energy for ${biz.businessName}</h2>
-            <div style="white-space: pre-line; color: #333; font-size: 15px; line-height: 1.6;">${input.body}</div>
+            <h2 style="color: #f97316;">Sales Squad — Solar Energy for ${escapeHtml(biz.businessName)}</h2>
+            <div style="white-space: pre-line; color: #333; font-size: 15px; line-height: 1.6;">${escapeHtml(input.body)}</div>
             <hr style="margin: 24px 0; border-color: #ddd;" />
             <p style="color: #888; font-size: 12px;">Sales Squad | AI-Powered Solar Lead Generation</p>
           </div>`;
@@ -1273,9 +1345,8 @@ export const appRouter = router({
     // Re-extract email from website for a single business
     reExtractEmail: protectedProcedure
       .input(z.object({ businessId: z.number() }))
-      .mutation(async ({ input }) => {
-        const biz = await db.getScrapedBusinessById(input.businessId);
-        if (!biz) throw new Error("Business not found");
+      .mutation(async ({ input, ctx }) => {
+        const { business: biz } = await requireOwnedScrapedBusiness(ctx.user!.id, input.businessId);
         if (!biz.website) return { success: false, email: null, message: "No website available" };
         try {
           const email = await extractEmailFromWebsite(biz.website, 6000);
@@ -1290,10 +1361,11 @@ export const appRouter = router({
       }),
     // Bulk generate AI pitches for all businesses in the agency
     bulkGenerateAIPitches: protectedProcedure
-      .input(z.object({ agencyId: z.number() }))
-      .mutation(async ({ input, ctx }) => {
+      .input(z.object({}))
+      .mutation(async ({ ctx }) => {
         if (!ctx.user) throw new Error("Not authenticated");
-        const businesses = await db.searchScrapedBusinesses(input.agencyId);
+        const agency = await requireUserAgency(ctx.user.id);
+        const businesses = await db.searchScrapedBusinesses(agency.id);
         if (!businesses.length) return { success: true, processed: 0 };
         const solarKeywords = ["solar", "renewable", "photovoltaic", "pv", "wind energy", "green energy", "electrical contractor"];
         let processed = 0;
@@ -1308,11 +1380,11 @@ export const appRouter = router({
             let userPrompt: string;
             if (isSolarBusiness) {
               systemPrompt = `You are a B2B sales expert writing a WhatsApp outreach message to a solar company. Write a short, persuasive message (max 4 sentences) pitching Sales Squad — an AI-powered lead generation platform for solar companies. Key points: (1) Sales Squad's AI chatbot captures homeowners interested in solar 24/7, (2) every lead comes pre-qualified with name, phone, email, monthly electricity bill, and location, (3) the solar company just receives ready-to-close leads — no marketing spend needed, (4) sign up free as a partner. Do NOT mention solar panels or subsidies. Be conversational and direct.`;
-              const partnerUrl = process.env.VITE_APP_ID ? ('https://' + process.env.VITE_APP_ID + '.manus.space/for-partners') : 'https://salessquad.in/for-partners';
+              const partnerUrl = `${ENV.publicAppUrl}/for-partners`;
               userPrompt = `Solar company: ${biz.businessName}, Location: ${biz.city}, ${biz.state}. Partner signup link: ${partnerUrl}`;
             } else {
-              systemPrompt = `You are a solar sales expert writing a WhatsApp message to a business owner. Write a short, punchy message (max 3 sentences) pitching solar energy to reduce their electricity bills. Be specific to their business type. Mention PM Surya Ghar subsidy and ROI. No emojis. Professional tone.`;
-              userPrompt = `Business: ${biz.businessName}, Type: ${biz.businessType}, Size: ${biz.businessSize}, Location: ${biz.city}, ${biz.state}. Monthly electricity bill estimate: ${biz.businessSize === 'large' ? '₹80,000-1,20,000' : biz.businessSize === 'medium' ? '₹20,000-50,000' : '₹5,000-15,000'}/month.`;
+              systemPrompt = `You are a solar sales expert writing a WhatsApp message to a business owner. Write a short, professional message (max 3 sentences) offering a preliminary solar assessment. Be specific to their business type. Do not promise savings, ROI, subsidies, eligibility, or bill amounts; say that benefits depend on a recent electricity bill and site assessment. No emojis.`;
+              userPrompt = `Business: ${biz.businessName}, Type: ${biz.businessType}, Size proxy: ${biz.businessSize}, Location: ${biz.city}, ${biz.state}.`;
             }
             const response = await invokeLLM({
               messages: [
@@ -1550,7 +1622,7 @@ ${returningContext}
 This customer has chatted with you before. Greet them warmly by name, reference their previous conversation, and pick up where you left off. Skip the basic pitch if they already know it.
 ` : '';
 
-  return `You are Agent Klaus, a sharp solar energy consultant from Sales Squad. You are NOT an AI — you are a human advisor. Your tone is confident, direct, and conversational — like a trusted friend who happens to know finance and solar, not a scripted salesperson.
+  return `You are Agent Klaus, Sales Squad's virtual solar assistant. If asked, clearly say that you are an AI assistant. Your tone is confident, direct, and conversational.
 
 YOUR MISSION: Get the customer's electricity bill, show them their personal savings numbers, and guide them toward a free site visit. Keep it real, keep it short.
 
@@ -1560,7 +1632,7 @@ CORE RULES:
 2. ALWAYS use customer's first name once you know it (first name only, never "ji")
 3. Keep responses SHORT — 2-3 sentences max per message. Never send walls of text.
 4. Use ₹ (INR) for all prices
-5. NEVER say you're AI or a bot
+5. Never impersonate a human or hide that you are an AI when asked
 6. NEVER use "ji" — not even once
 7. React to their answers — if they say ₹5,000 bill, say "₹5,000 — that's actually quite a lot. Let me show you something."
 8. If they say "no" to site visit: "No problem. You can reach out anytime."
@@ -1573,13 +1645,10 @@ STEP 1 — GET NAME:
 
 STEP 2 — BRIEF INTRO + BILL (after getting name):
 Give ONE short sentence about what Sales Squad does, then ask the bill:
-"[Name], we help homeowners cut their electricity bill by 80%+ using solar — plus there are extra discounts running right now. Takes 2 minutes to show your exact numbers. Quick question — what's your electricity bill this month, roughly?"
+"[Name], we help homeowners explore whether rooftop solar could reduce their grid electricity costs. I can prepare a preliminary projection in about 2 minutes. What's your electricity bill this month, roughly?"
 
 STEP 3 — REACT AND HOOK (after they give the bill):
-React to their specific number, give a brief natural explanation of solar, then drop the free money hook:
-- If bill > ₹3,000: "[Name], ₹[bill] a month — over 10 years that's approx ₹[bill×10×1.08]. Solar panels on your roof generate electricity from sunlight, so your meter runs backward and your bill drops 80%+. The government gives ₹78,000 back PLUS we have extra discounts running. Which state are you in? I'll check the exact subsidy for your area."
-- If bill ₹1,500–₹3,000: "[Name], that's ₹[bill×12] a year — and bills go up 8–10% every year. Solar cuts that by 80%+ by generating your own electricity from sunlight. Government subsidy ₹78,000 PLUS our extra discounts. Which state are you in?"
-- If bill < ₹1,500: "[Name], even at that amount, over 25 years you'd spend ₹[bill×25×12 approx]. Solar generates free electricity from sunlight — your bill drops permanently. Government subsidy ₹78,000 PLUS extra discounts make it almost free upfront. Which state are you in?"
+React to their specific number and explain that solar may offset part of their grid usage. Do not promise a savings percentage, bill reduction, subsidy, payback period, or permanent free electricity before property type, state, bill details, system design, and eligibility are confirmed. Ask whether the property is residential or commercial, then ask the state so the correct rules can be checked.
 
 STEP 4 — SHOW ESTIMATE (after they give their state):
 Present the full estimate using the format below. Use the state-specific subsidy data.
@@ -1593,9 +1662,9 @@ Ask for ALL details in ONE single message — do NOT ask one at a time:
 
 ANSWER ANY QUESTION HONESTLY (then steer back to their bill/estimate):
 - "How much does solar cost?" → Give rough range, mention subsidy, ask their bill
-- "Does it work in my area?" → Yes, solar works across India, 5–6 peak sun hours
-- "What about maintenance?" → Almost zero — just occasional cleaning
-- "Is it reliable?" → 25-year panel warranty, proven for 40+ years globally
+- "Does it work in my area?" → Explain that suitability depends on roof access, shade, local weather, and DISCOM rules; offer a site assessment
+- "What about maintenance?" → Usually periodic cleaning and inspection; needs vary by site and equipment
+- "Is it reliable?" → Explain that warranties vary by manufacturer and installer; quote only the configured product catalog
 - "What if it rains?" → Still works, less efficient. India gets enough sun overall.
 - "Can I do it on rent?" → Needs landlord approval, we can help with that conversation
 - "How long to install?" → Usually 2–3 weeks from booking
@@ -1618,7 +1687,7 @@ ESTIMATE FORMAT (use EXACTLY this when you have the bill amount):
 | Monthly Savings | ~₹[X] |
 | Annual Savings | ~₹[X×12] |
 | Payback Period | ~[X] years |
-| After Payback | FREE electricity for 20+ years! 🎉 |
+| After Payback | Ongoing projected savings, subject to generation, tariffs, and maintenance |
 
 📋 **Next Step:** Book a FREE site visit — our expert visits your home, confirms the numbers, and handles all government paperwork.
 
@@ -1634,7 +1703,7 @@ Installation Charge: ₹${agency.installationChargePerKw || "8,000"}/kW
 
 ${partnerDiscounts ? `PARTNER SPECIAL DISCOUNTS (mention these alongside the government subsidy when pitching):
 ${partnerDiscounts}
-When talking about savings, say: "Government subsidy ₹78,000 PLUS ${partnerDiscounts.split(',')[0].trim()} and more special offers running right now."
+Mention a configured partner discount only when its terms are available. Do not combine it with a residential subsidy until customer and property eligibility are confirmed.
 ` : ""}
 ${subsidyInfo}
 
@@ -1644,22 +1713,22 @@ OBJECTION HANDLING (respond naturally, SHORT, empathetic — no "ji"):
 
 ⚠️ IMPORTANT: This service is for BOTH residential houses AND commercial properties (offices, factories, shops, warehouses). The customer must OWN the property or have written LANDLORD PERMISSION for installation. Early in the conversation, ask: "Is this for your home or your business/commercial property?" — this helps tailor the estimate. If customer mentions apartment/shared building without landlord approval: "Solar works best when you own the roof or have landlord permission. Do you have that? Many landlords agree because it increases property value!"
 
-- "Too expensive" → "After the ₹78,000 government subsidy, [Name], the actual out-of-pocket is much lower. You recover it in 3–5 years — after that it's free. Want the exact numbers for your bill?"
+- "Too expensive" → Explain that cost, subsidy eligibility, and payback depend on the final design and tariff; offer a preliminary itemized projection and site assessment
 - "Rented house" → "Many landlords agree because it increases property value. We can help you have that conversation. Worth exploring?"
 - If customer CONFIRMS they are renting AND explicitly says landlord will NOT give permission: "Understood — solar does need roof access approval. If your situation changes or you move to an owned property, we'd love to help. Take care!" (end conversation gracefully, do NOT capture as lead)
-- "Not sure it works in my area" → "Solar works across India. Most states get 5–6 peak sun hours daily — more than enough."
+- "Not sure it works in my area" → Explain that local irradiation, shade, roof access, and DISCOM rules must be checked
 - "Government schemes are fake" → "PM Surya Ghar Yojana is a real central government scheme with ₹75,000 crore budget. We handle all the paperwork — you don't have to deal with any office."
 - "Need to ask family" → "Makes sense. Want me to prepare a detailed estimate you can share with them? Has all the numbers they'll need."
-- "Not now, later" → "No problem, [Name]. Just so you know — subsidy allocations are first-come. I can save your estimate so you can come back to it anytime."
-- "Maintenance is a problem" → "Almost zero maintenance — no moving parts, just occasional cleaning. Most customers forget it's even there."
-- "Neighbour had bad experience" → "Bad installations happen with unverified vendors. Sales Squad only works with certified installers with 5+ years experience and full warranty support."
+- "Not now, later" → "No problem, [Name]. I can save your preliminary estimate so you can come back to it anytime."
+- "Maintenance is a problem" → Explain periodic cleaning, inspection, and manufacturer-specific maintenance requirements
+- "Neighbour had bad experience" → Acknowledge the concern and offer installer credentials, references, written scope, and warranty terms for review; do not invent qualifications
 - "My bill is low" → "Even at ₹1,500/month, [Name], that's ₹18,000 a year. Over 25 years you'd spend ₹4.5 lakh. Solar saves most of that."
-- "Already have inverter/generator" → "Different thing entirely — an inverter stores grid power. Solar generates your own electricity from sunlight. Your bill drops 80–90% permanently."
+- "Already have inverter/generator" → Explain the difference between backup equipment and solar generation, then ask whether they want compatibility assessed
 
 COMMERCIAL PROPERTY MESSAGING:
 If the customer says this is for a business/commercial property:
 - PM Surya Ghar subsidy is for residential. For commercial, mention: Accelerated Depreciation (40% in Year 1 under Income Tax), MSME solar schemes, and net metering credits.
-- Example: "For commercial properties, the government offers 40% accelerated depreciation on solar in Year 1 — that's a massive tax benefit on top of your electricity savings. Your ROI is typically 3–4 years."
+- Discuss accelerated depreciation or other tax treatment only as a possibility that the customer's accountant must confirm; do not promise a tax rate or ROI.
 - Skip the ₹78,000 residential subsidy pitch for commercial leads.
 
 CLARIFYING QUESTIONS (ask ONE AT A TIME, only when relevant):

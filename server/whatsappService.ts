@@ -219,8 +219,8 @@ class WhatsAppService {
 
 Welcome to Sales Squad! 
 
-Earn ₹20k-50k/month by sharing solar leads:
-✅ ₹20 per lead
+Earn milestone commissions by sharing eligible solar leads:
+✅ Lead verification and consent tracked
 ✅ ₹500 subsidy verification
 ✅ ₹1,500 installation commission
 

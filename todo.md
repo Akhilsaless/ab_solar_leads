@@ -486,3 +486,10 @@
 - [x] Add Settings → AI Providers, provider health/usage cards, and admin-only provider tester
 - [x] Route Klaus through the AI Gateway while preserving existing fallback behavior
 - [x] Add security and routing tests plus provider credential handoff documentation
+
+## GitHub Main Synchronization and Production Verification (Current Session)
+- [x] Verify and synchronize the active workspace against GitHub main commit bc867eb95f726b52c4651002d21e12aade5c9c10 (file content synchronized from a clean clone at the required commit)
+- [x] Verify all 35 production-readiness changes are present in the synchronized codebase (35 of 35 files byte-for-byte matched)
+- [x] Report application status for database migrations 0007 through 0012 (0007–0011 objects verified; 0012 `leads2.agencyId` and `idx_leads2_agency_created` are missing)
+- [x] Identify missing production environment variables and required third-party credentials (canonical URL, sender identity, event-webhook secret, optional external AI/WhatsApp credentials; SMTP credentials are present but rejected by the provider)
+- [x] Validate test/build health and determine whether a clean checkpoint can be created safely without publishing (type-check, 170 tests, build, and `/api/health` pass; release remains blocked by migration 0012 and configuration gaps)

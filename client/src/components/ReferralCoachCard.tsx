@@ -19,23 +19,23 @@ const C = {
 type CoachScreen = "dashboard" | "findleads";
 
 interface ReferralCoachCardProps {
-  uniqueCode: string;
+  token: string;
   screen: CoachScreen;
 }
 
-export function ReferralCoachCard({ uniqueCode, screen }: ReferralCoachCardProps) {
+export function ReferralCoachCard({ token, screen }: ReferralCoachCardProps) {
   const [question, setQuestion] = useState("");
   const [answer, setAnswer] = useState("");
   const [showAsk, setShowAsk] = useState(false);
 
   const { data: card, isLoading } = trpc.referralCoach.getCoachCard.useQuery(
-    { uniqueCode, screen },
-    { enabled: !!uniqueCode, staleTime: 60000 }
+    { token, screen },
+    { enabled: !!token, staleTime: 60000 }
   );
 
   const { data: mission } = trpc.referralCoach.getTodaysMission.useQuery(
-    { uniqueCode },
-    { enabled: !!uniqueCode, staleTime: 60000 }
+    { token },
+    { enabled: !!token, staleTime: 60000 }
   );
 
   const askMutation = trpc.referralCoach.askCoach.useMutation({
@@ -114,14 +114,14 @@ export function ReferralCoachCard({ uniqueCode, screen }: ReferralCoachCardProps
               onChange={e => setQuestion(e.target.value)}
               onKeyDown={e => {
                 if (e.key === "Enter" && question.trim()) {
-                  askMutation.mutate({ uniqueCode, question });
+                  askMutation.mutate({ token, question });
                 }
               }}
               placeholder="e.g. How do I convince someone to switch to solar?"
               style={{ flex: 1, background: C.surface2, border: `1px solid ${C.border}`, borderRadius: 8, padding: "8px 12px", color: C.text, fontSize: 12, outline: "none" }}
             />
             <button
-              onClick={() => { if (question.trim()) askMutation.mutate({ uniqueCode, question }); }}
+              onClick={() => { if (question.trim()) askMutation.mutate({ token, question }); }}
               disabled={!question.trim() || askMutation.isPending}
               style={{ background: C.green, color: "#000", border: "none", borderRadius: 8, padding: "8px 14px", cursor: "pointer", fontWeight: 700, fontSize: 12, opacity: (!question.trim() || askMutation.isPending) ? 0.5 : 1 }}
             >

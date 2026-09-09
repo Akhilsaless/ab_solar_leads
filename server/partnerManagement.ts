@@ -4,6 +4,7 @@ import { eq, desc, sql } from "drizzle-orm";
 import { partnerSignups } from "../drizzle/schema";
 import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure } from "./_core/trpc";
+import { ENV } from "./_core/env";
 
 // drizzle-mysql2: execute() returns [rows, fields] tuple — always extract rows[0]
 function rows(result: any): any[] {
@@ -107,10 +108,9 @@ export const partnerManagementRouter = router({
   generatePartnerLink: protectedProcedure
     .input(z.object({ partnerId: z.string() }))
     .query(({ input: inp }: any) => {
-      const origin = process.env.VITE_FRONTEND_URL || "https://salessquad.manus.space";
       const partnerSlug = inp.partnerId.toLowerCase().replace(/\s+/g, "-");
       return {
-        link: `${origin}/partner/${partnerSlug}`,
+        link: `${ENV.publicAppUrl}/partner/${partnerSlug}`,
       };
     }),
 
