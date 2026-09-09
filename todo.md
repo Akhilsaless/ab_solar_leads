@@ -508,7 +508,7 @@
 - [x] Report an evidence-based recommendation for each lead without assigning, deleting, archiving, publishing, or enabling automation (both are supported by source evidence; await approval before any data action)
 
 ## Approved Legacy Lead Agency Assignment (Current Session)
-- [ ] Create a recoverable checkpoint before the approved two-row data correction
-- [ ] Set `leads2.agencyId = 1` for lead IDs `30003` and `330020` only
-- [ ] Verify the two-row assignment, successful production-readiness script output, health response, and disabled outreach controls
-- [ ] Keep migration 0012, verifier, SMTP, publishing, email outreach, OTP, and WhatsApp automation unchanged; report exact results
+- [x] Create a recoverable checkpoint before the approved two-row data correction (checkpoint `9c4f1e44`)
+- [x] Set `leads2.agencyId = 1` for lead IDs `30003` and `330020` only
+- [x] Verify the two-row assignment, successful production-readiness script output, health response, and disabled outreach controls (verifier passed; health returned ready; both outreach controls remain disabled)
+- [x] Keep migration 0012, verifier, SMTP, publishing, email outreach, OTP, and WhatsApp automation unchanged; report exact results
