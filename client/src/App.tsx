@@ -9,7 +9,7 @@ import Products from "@/pages/Products";
 import Analytics from "@/pages/Analytics";
 import Subsidies from "@/pages/Subsidies";
 import Settings from "@/pages/Settings";
-import ChatBot from "@/pages/ChatBot";
+import SmartChatBot from "@/pages/SmartChatBot";
 import BusinessScraper from "@/pages/BusinessScraper";
 import Pricing from "@/pages/Pricing";
 import ReferrerSignup from "@/pages/ReferrerSignup";
@@ -85,8 +85,8 @@ function Router() {
 
   return (
     <Switch>
-      {/* Public chat route - accessible without login */}
-      <Route path="/chat/:slug" component={ChatBot} />
+      {/* Public smart chat route - accessible without login */}
+      <Route path="/chat/:slug" component={SmartChatBot} />
       <Route path="/client/review/:token" component={ClientDeliveryReview} />
 
       {/* Referrer signup and dashboard */}
@@ -94,7 +94,7 @@ function Router() {
       <Route path="/referrer/dashboard" component={ReferrerDashboard} />
       <Route path="/referral-landing/:code" component={ReferralLanding} />
       <Route path="/referral-landing" component={ReferralLanding} />
-      <Route path="/refer/:code" component={ChatBot} />
+      <Route path="/refer/:code" component={SmartChatBot} />
       <Route path="/terms-referral" component={ReferralTerms} />
       <Route path="/verify-referral" component={VerifyReferral} />
 
