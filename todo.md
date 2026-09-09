@@ -518,3 +518,14 @@
 - [x] Test new residential estimate, commercial, subsidy, price-objection, human-handoff, returning-session, bill-upload, and persistent handoff journeys without contacting customers (bill OCR remains unverified because no safe fixture existed; no contact details were submitted)
 - [x] Test chatbot mobile responsiveness and review runtime side effects, safety controls, schedules, and messaging states (initial mobile state passed; full estimate-card state remains unverified; both outreach controls remain disabled)
 - [x] Report PASS/FAIL, observed behavior, defects and severity, remaining blockers, and publish-safety without fixing defects
+
+## Chatbot Release Blocker Repairs (Current Session)
+- [x] Repair the residential estimate path to retain Hyderabad/Telangana context, produce a preliminary estimate without duplicate questions, and retain facts on provider delay (returns immediate configured-state sizing; cost/savings/subsidy are withheld because the active agency catalog is empty)
+- [x] Add a customer-safe deterministic fallback for provider timeout or error without fabricating solar, subsidy, pricing, savings, tariff, warranty, or eligibility values
+- [x] Require explicit consent before natural-language callback contact collection or action, without adding OTP or implying a message/call was sent
+- [x] Repair returning-session rendering to prevent duplicate greetings, raw quick-reply markup, and repeat questions for known facts
+- [x] Suppress redundant bill-entry controls after sufficient bill, property, and location context is known while keeping upload optional when it is relevant
+- [x] Inspect and remove unnecessary chatbot-path waits or sequential calls without weakening model behavior or correctness (deterministic fact extraction and complete-input estimate paths bypass provider calls; provider fallback is bounded at 15 seconds)
+- [x] Add automated regression tests for residential context, commercial subsidy safety, callback consent, returning sessions, quick-reply parsing, and timeout fallback
+- [x] Run type-check, full test suite, production build, and repeat the failed controlled smoke-test scenarios (183 tests pass; production build succeeds; residential, commercial, consent, and returning-session retests completed)
+- [x] Keep outreach, email, OTP, automated WhatsApp, SMTP configuration, production lead ownership, production-readiness verifier, and publishing unchanged (controls remain disabled; no new AI-chat leads, outreach messages, or outreach runs recorded)

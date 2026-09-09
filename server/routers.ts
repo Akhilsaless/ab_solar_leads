@@ -24,6 +24,20 @@ import { aiGatewayRouter } from "./aiGateway";
 import { storagePut } from "./storage";
 import { ENV } from "./_core/env";
 import { calculateBusinessEvidenceScore, calculateEvidenceScore } from "./evidenceScore";
+import {
+  buildCallbackConsentPrompt,
+  buildCommercialEstimateResponse,
+  buildLimitedResidentialEstimateResponse,
+  buildSafeProviderFallback,
+  deriveDeterministicChatFacts,
+  estimateCommercialCapacityKw,
+  hasEstimateInputs,
+  hasExplicitContactConsent,
+  isCallbackRequest,
+  estimateResidentialCapacityKw,
+  withProviderTimeout,
+} from "./chatFlow";
+import { parseQuickReplyMarkup } from "@shared/chatControls";
 
 async function requireUserAgency(userId: number) {
   const agency = await db.getAgencyByUserId(userId);
@@ -70,6 +84,25 @@ function publicBusinessRecord(business: any) {
 function escapeHtml(value: string) {
   const entities: Record<string, string> = { "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#039;" };
   return value.replace(/[&<>"']/g, character => entities[character]);
+}
+
+function preliminaryEstimateMessage(params: {
+  propertyType: "residential" | "commercial";
+  monthlyBill: number;
+  estimate: ReturnType<typeof calculateSolarEstimate>;
+  subsidyConfigured: boolean;
+}) {
+  const { propertyType, monthlyBill, estimate, subsidyConfigured } = params;
+  const bill = `₹${Math.round(monthlyBill).toLocaleString("en-IN")}`;
+  const cost = `₹${Math.round(estimate.totalCost).toLocaleString("en-IN")}`;
+  const savings = `₹${Math.round(estimate.monthlySavings).toLocaleString("en-IN")}`;
+  const subsidyLabel = propertyType === "commercial"
+    ? "Not assumed for commercial property"
+    : subsidyConfigured
+      ? `Approx ₹${Math.round(estimate.totalSubsidy).toLocaleString("en-IN")} — eligibility to confirm`
+      : "Eligibility to confirm";
+
+  return `📊 **Preliminary solar estimate**\n\n| | |\n|---|---|\n| Monthly bill | ${bill} |\n| Suggested system size | ~${estimate.systemSizeKw} kW |\n| Configured-catalog estimate | Approx ${cost} |\n| Possible subsidy | ${subsidyLabel} |\n| Projected monthly savings | Approx ${savings}, subject to tariff and generation |\n\nThis is a preliminary estimate based on the details you shared. Final pricing, savings, subsidy eligibility, and system design require a site assessment.`;
 }
 
 // In-memory OTP store (session → { otp, expiresAt, phone })
@@ -422,14 +455,145 @@ export const appRouter = router({
         // Get conversation history
         const history = await db.getChatMessages(conversation.id);
 
+        const deterministicText = history
+          .filter(message => message.role === "customer")
+          .map(message => message.content)
+          .join("\n");
+        const deterministicFacts = deriveDeterministicChatFacts(deterministicText, conversation);
+        const deterministicUpdate: Record<string, any> = {};
+        if (deterministicFacts.name && !conversation.customerName) deterministicUpdate.customerName = deterministicFacts.name;
+        if (deterministicFacts.phone && !conversation.customerPhone) deterministicUpdate.customerPhone = deterministicFacts.phone;
+        if (deterministicFacts.email && !conversation.customerEmail) deterministicUpdate.customerEmail = deterministicFacts.email;
+        if (deterministicFacts.city && !conversation.customerCity) deterministicUpdate.customerCity = deterministicFacts.city;
+        if (deterministicFacts.state && !conversation.customerState) deterministicUpdate.customerState = deterministicFacts.state;
+        if (deterministicFacts.monthlyBill && !conversation.monthlyBill) deterministicUpdate.monthlyBill = deterministicFacts.monthlyBill.toString();
+        if (Object.keys(deterministicUpdate).length > 0) {
+          await db.updateConversation(input.sessionId, deterministicUpdate);
+        }
+        const conversationWithFacts = { ...conversation, ...deterministicUpdate };
+
+        if (isCallbackRequest(input.message) && !hasExplicitContactConsent(input.message)) {
+          const consentPrompt = buildCallbackConsentPrompt();
+          await db.addChatMessage({ conversationId: conversation.id, role: "bot", content: consentPrompt });
+          return {
+            response: consentPrompt,
+            quickReplies: ["I agree to be contacted", "Not now"],
+            stage: "request_contact_consent",
+            requiresContactConsent: true,
+            estimate: null,
+          };
+        }
+
         // Get agency products
         const panels = await db.getPanelsByAgency(agency.id);
         const inverters = await db.getInvertersByAgency(agency.id);
 
         // Get subsidy data if state is known
         let subsidyData = null;
-        if (conversation.customerState) {
-          subsidyData = await db.getSubsidyByState(conversation.customerState);
+        if (deterministicFacts.state || conversation.customerState) {
+          subsidyData = await db.getSubsidyByState(deterministicFacts.state || conversation.customerState!);
+        }
+
+        if (hasEstimateInputs(deterministicFacts) && conversation.status !== "estimate_given") {
+          if (deterministicFacts.propertyType === "commercial") {
+            const commercialKw = estimateCommercialCapacityKw(
+              deterministicFacts.monthlyBill,
+              Number(subsidyData?.avgElectricityRate),
+              Number(subsidyData?.avgSunHours),
+            );
+            const commercialResponse = buildCommercialEstimateResponse(deterministicFacts, commercialKw);
+            await db.updateConversation(input.sessionId, {
+              ...(commercialKw ? { recommendedKw: commercialKw.toString(), status: "estimate_given" as const } : {}),
+            });
+            await db.addChatMessage({ conversationId: conversation.id, role: "bot", content: commercialResponse });
+            return {
+              response: commercialResponse,
+              quickReplies: ["Show financing options", "Book Free Site Visit", "Not now"],
+              stage: "commercial_estimate",
+              estimate: null,
+            };
+          }
+
+          if (panels.length > 0 && inverters.length > 0 && subsidyData) {
+            const configuredEstimate = calculateSolarEstimate(
+              deterministicFacts.monthlyBill,
+              deterministicFacts.state,
+              panels,
+              inverters,
+              agency,
+              subsidyData,
+            );
+            const estimateResponse = preliminaryEstimateMessage({
+              propertyType: deterministicFacts.propertyType,
+              monthlyBill: deterministicFacts.monthlyBill,
+              estimate: configuredEstimate,
+              subsidyConfigured: true,
+            });
+            await db.updateConversation(input.sessionId, {
+              recommendedKw: configuredEstimate.systemSizeKw.toString(),
+              recommendedPanels: configuredEstimate.panelCount,
+              estimatedCost: configuredEstimate.totalCost.toString(),
+              subsidyAmount: configuredEstimate.totalSubsidy.toString(),
+              netCost: configuredEstimate.netCost.toString(),
+              estimatedSavingsMonthly: configuredEstimate.monthlySavings.toString(),
+              paybackYears: configuredEstimate.paybackYears.toString(),
+              status: "estimate_given",
+            });
+            await db.addChatMessage({ conversationId: conversation.id, role: "bot", content: estimateResponse });
+            return {
+              response: estimateResponse,
+              quickReplies: ["Book Free Site Visit", "Talk to a person", "Ask another question"],
+              stage: "show_estimate",
+              estimate: {
+                customerName: conversationWithFacts.customerName,
+                customerEmail: conversationWithFacts.customerEmail,
+                customerPhone: conversationWithFacts.customerPhone,
+                customerCity: conversationWithFacts.customerCity,
+                customerState: conversationWithFacts.customerState,
+                monthlyBill: deterministicFacts.monthlyBill,
+                systemSizeKw: configuredEstimate.systemSizeKw,
+                panelCount: configuredEstimate.panelCount,
+                estimatedCost: configuredEstimate.totalCost,
+                subsidyAmount: configuredEstimate.totalSubsidy,
+                netCost: configuredEstimate.netCost,
+                estimatedSavingsMonthly: configuredEstimate.monthlySavings,
+                paybackYears: configuredEstimate.paybackYears,
+                estimatedSavings25Year: configuredEstimate.lifetimeSavings,
+              },
+            };
+          }
+
+          const residentialKw = estimateResidentialCapacityKw(
+            deterministicFacts.monthlyBill,
+            Number(subsidyData?.avgElectricityRate),
+            Number(subsidyData?.avgSunHours),
+          );
+          const limitedEstimateResponse = buildLimitedResidentialEstimateResponse(deterministicFacts, residentialKw);
+          await db.updateConversation(input.sessionId, {
+            ...(residentialKw ? { recommendedKw: residentialKw.toString(), status: "estimate_given" as const } : {}),
+          });
+          await db.addChatMessage({ conversationId: conversation.id, role: "bot", content: limitedEstimateResponse });
+          return {
+            response: limitedEstimateResponse,
+            quickReplies: ["Book Free Site Visit", "Talk to a person", "Ask another question"],
+            stage: "show_estimate",
+            estimate: {
+              customerName: conversationWithFacts.customerName,
+              customerEmail: conversationWithFacts.customerEmail,
+              customerPhone: conversationWithFacts.customerPhone,
+              customerCity: conversationWithFacts.customerCity,
+              customerState: conversationWithFacts.customerState,
+              monthlyBill: deterministicFacts.monthlyBill,
+              systemSizeKw: residentialKw,
+              panelCount: null,
+              estimatedCost: null,
+              subsidyAmount: null,
+              netCost: null,
+              estimatedSavingsMonthly: null,
+              paybackYears: null,
+              estimatedSavings25Year: null,
+            },
+          };
         }
 
         // Check for returning customer by phone or email (Level 2: returning customer memory)
@@ -465,7 +629,7 @@ export const appRouter = router({
         } catch { /* ignore */ }
 
         // Build the system prompt
-        const systemPrompt = buildSalesAgentPrompt(agency, panels, inverters, subsidyData, conversation, returningContext, partnerDiscounts);
+        const systemPrompt = buildSalesAgentPrompt(agency, panels, inverters, subsidyData, conversationWithFacts, returningContext, partnerDiscounts);
 
         // Build message history for LLM
         const llmMessages: Array<{ role: string; content: string }> = [
@@ -479,14 +643,18 @@ export const appRouter = router({
           });
         }
 
-        // Get AI response
-        const response = await invokeLLM({
-          messages: llmMessages as any,
-        });
-
-        const aiContent = typeof response.choices[0]?.message?.content === "string"
-          ? response.choices[0].message.content
-          : "I apologize, I'm having trouble responding right now. Please try again.";
+        // Get AI response with a bounded wait. The structured facts above have
+        // already been persisted, so a slow provider cannot discard customer context.
+        let aiContent: string;
+        try {
+          const response = await withProviderTimeout(invokeLLM({ messages: llmMessages as any }), 15_000);
+          aiContent = typeof response.choices[0]?.message?.content === "string"
+            ? response.choices[0].message.content
+            : buildSafeProviderFallback(deterministicFacts);
+        } catch (error) {
+          console.warn("[Chat] Provider response unavailable; returning safe fallback", error);
+          aiContent = buildSafeProviderFallback(deterministicFacts);
+        }
 
         // Save bot response
         await db.addChatMessage({
@@ -495,8 +663,20 @@ export const appRouter = router({
           content: aiContent,
         });
 
-        // Extract data from conversation using LLM
-        const extractedData = await extractCustomerData(history, input.message);
+        // Deterministic extraction runs before the provider request. Avoiding a
+        // second provider call removes sequential latency and preserves known facts.
+        const extractedData = {
+          name: deterministicFacts.name || null,
+          phone: deterministicFacts.phone || null,
+          email: deterministicFacts.email || null,
+          city: deterministicFacts.city || null,
+          state: deterministicFacts.state || null,
+          monthlyBill: deterministicFacts.monthlyBill || null,
+          monthlyUnits: null,
+          propertyType: deterministicFacts.propertyType || null,
+          installationTimeline: null,
+          propertyAddress: null,
+        };
 
         // Update conversation with extracted data
         if (extractedData) {
@@ -675,22 +855,9 @@ export const appRouter = router({
           }
         }
 
-        // Parse quick replies from AI response
-        const qrRegex = new RegExp('\\[QUICK_REPLIES\\][\\s\\S]*?\\[/QUICK_REPLIES\\]');
-        const qrContentRegex = new RegExp('\\[QUICK_REPLIES\\]\\s*\\n?([\\s\\S]+?)\\n?\\s*\\[/QUICK_REPLIES\\]');
-        const quickReplyMatch = aiContent.match(qrContentRegex);
-        let quickReplies: string[] = [];
-        let cleanContent = aiContent;
-        
-        if (quickReplyMatch) {
-          try {
-            quickReplies = JSON.parse(quickReplyMatch[1].trim());
-          } catch {
-            quickReplies = [];
-          }
-          // Remove the quick replies block from the displayed message
-          cleanContent = aiContent.replace(qrRegex, '').trim();
-        }
+        // The shared parser removes valid and malformed internal control markup
+        // before any response becomes customer-visible.
+        const { content: cleanContent, quickReplies } = parseQuickReplyMarkup(aiContent);
 
         // Get updated conversation with all estimate data
         const updatedConv = await db.getConversation(input.sessionId);

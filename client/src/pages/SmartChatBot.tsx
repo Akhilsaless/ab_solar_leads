@@ -6,6 +6,7 @@ import { nanoid } from "nanoid";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "wouter";
 import { Streamdown } from "streamdown";
+import { parseQuickReplyMarkup, shouldUseLocalWelcome } from "@shared/chatControls";
 
 type ChatMessage = {
   role: "bot" | "customer";
@@ -127,8 +128,11 @@ export default function SmartChatBot() {
 
   const startConversation = trpc.chat.startConversation.useMutation({
     onSuccess: data => {
-      const incoming = (data.messages || []).map((m: any) => ({ role: m.role, content: m.content, createdAt: m.createdAt })) as ChatMessage[];
-      if (incoming.length <= 1) {
+      const incoming = (data.messages || []).map((m: any) => {
+        const parsed = parseQuickReplyMarkup(String(m.content || ""));
+        return { role: m.role, content: parsed.content, quickReplies: parsed.quickReplies, createdAt: m.createdAt };
+      }) as ChatMessage[];
+      if (shouldUseLocalWelcome(incoming.length)) {
         setMessages([{ role: "bot", content: SMART_WELCOME, createdAt: new Date(), quickReplies: START_ACTIONS }]);
       } else {
         setMessages(incoming);
@@ -141,23 +145,30 @@ export default function SmartChatBot() {
 
   const sendMessage = trpc.chat.sendMessage.useMutation({
     onSuccess: data => {
+      const parsed = parseQuickReplyMarkup(String(data.response || ""));
       const next: ChatMessage = {
         role: "bot",
-        content: data.response,
-        quickReplies: Array.isArray(data.quickReplies) ? data.quickReplies : [],
+        content: parsed.content,
+        quickReplies: data.stage === "request_contact_consent"
+          ? []
+          : Array.isArray(data.quickReplies) ? data.quickReplies : parsed.quickReplies,
         metadata: data.estimate || undefined,
         createdAt: new Date(),
       };
       setMessages(prev => [...prev, next]);
       setIsLoading(false);
 
-      if (data.estimate?.estimatedCost) {
+      if (data.estimate?.estimatedCost || data.stage === "show_estimate" || data.stage === "commercial_estimate") {
         setEstimate(data.estimate as Estimate);
         setShowBillTools(false);
       } else {
         const text = String(data.response || "").toLowerCase();
         const asksForBill = /electricity bill|monthly bill|bill amount|units|kwh/.test(text);
         setShowBillTools(asksForBill);
+      }
+      if (data.stage === "request_contact_consent") {
+        setContactIntent("Please arrange a callback about my solar request");
+        setContactConsent(false);
       }
     },
     onError: error => {
@@ -279,7 +290,7 @@ export default function SmartChatBot() {
                   className={`rounded-2xl px-4 py-3 text-sm leading-relaxed ${message.role === "bot" ? "rounded-bl-md border border-white/10 bg-white/[0.06] text-gray-100" : "rounded-br-md text-white"}`}
                   style={message.role === "customer" ? { background: `linear-gradient(135deg, ${brandColor}, ${brandColor}cc)` } : undefined}
                 >
-                  {message.role === "bot" ? <Streamdown>{message.content}</Streamdown> : <span className="whitespace-pre-wrap">{message.content}</span>}
+                  {message.role === "bot" ? <Streamdown>{parseQuickReplyMarkup(message.content).content}</Streamdown> : <span className="whitespace-pre-wrap">{message.content}</span>}
                 </div>
                 {index === messages.length - 1 && message.role === "bot" && (
                   <QuickReplies replies={showStartActions ? START_ACTIONS : quickReplies} brandColor={brandColor} onPick={send} />
