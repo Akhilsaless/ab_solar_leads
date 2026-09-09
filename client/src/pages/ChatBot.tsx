@@ -139,7 +139,7 @@ function SolarPitchCard({ brandColor }: { brandColor: string }) {
   const [visible, setVisible] = useState(false);
   useEffect(() => { const t = setTimeout(() => setVisible(true), 100); return () => clearTimeout(t); }, []);
   const points = [
-    { icon: "⚡", title: "Bills rise 8–10% every year", desc: "Solar cuts your bill by up to 80% permanently." },
+    { icon: "⚡", title: "Review your electricity costs", desc: "Estimated solar benefits depend on your bill, roof, tariff, and site assessment." },
     { icon: "🏛️", title: "₹78,000 Govt Subsidy", desc: "PM Surya Ghar Yojana — real money, limited allocation." },
     { icon: "💰", title: "3–5 year payback", desc: "After that, 20+ years of near-free electricity." },
   ];

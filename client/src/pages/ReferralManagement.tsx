@@ -14,6 +14,8 @@ export default function ReferralManagement() {
   const referrers = trpc.referrer.getAllReferrers.useQuery();
   const referrals = trpc.referrer.getAllReferrals.useQuery();
   const withdrawals = trpc.referrer.getPendingWithdrawals.useQuery();
+  const agencySlugQuery = trpc.agency.getFirst.useQuery();
+  const chatbotUrl = `${window.location.origin}/chat/${agencySlugQuery.data || "sales-squad"}`;
 
   // Mutations
   const markSubsidy = trpc.referrer.markSubsidyApplied.useMutation({
@@ -156,9 +158,9 @@ export default function ReferralManagement() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium">Chatbot Link</p>
-                    <p className="text-xs text-muted-foreground mt-0.5 truncate font-mono">{window.location.origin}/chat/demo</p>
+                    <p className="text-xs text-muted-foreground mt-0.5 truncate font-mono">{chatbotUrl}</p>
                   </div>
-                  <Button size="sm" variant="ghost" onClick={() => copyToClipboard(`${window.location.origin}/chat/demo`)}>
+                  <Button size="sm" variant="ghost" onClick={() => copyToClipboard(chatbotUrl)}>
                     <Copy className="w-4 h-4" />
                   </Button>
                 </div>
@@ -202,8 +204,8 @@ export default function ReferralManagement() {
               <div>
                 <label className="block text-sm text-gray-300 mb-2">Customer Chatbot Link</label>
                 <div className="flex gap-2">
-                  <Input value={`${window.location.origin}/chat/demo`} readOnly className="bg-white/5 border-white/20 text-white" />
-                  <Button onClick={() => copyToClipboard(`${window.location.origin}/chat/demo`)} className="bg-emerald-600 hover:bg-emerald-700">
+                  <Input value={chatbotUrl} readOnly className="bg-white/5 border-white/20 text-white" />
+                  <Button onClick={() => copyToClipboard(chatbotUrl)} className="bg-emerald-600 hover:bg-emerald-700">
                     <Copy className="w-4 h-4" />
                   </Button>
                 </div>

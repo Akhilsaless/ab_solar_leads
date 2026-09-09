@@ -55,14 +55,14 @@ function QualityGauge({ score }: { score: number }) {
 }
 
 // ── AI Copilot Card ────────────────────────────────────────────────────────────
-function AICopilotCard({ uniqueCode, referrals, referrer }: { uniqueCode: string; referrals: any[]; referrer: any }) {
+function AICopilotCard({ token, referrals, referrer }: { token: string; referrals: any[]; referrer: any }) {
   const [question, setQuestion] = useState("");
   const [answer, setAnswer] = useState("");
   const [showAsk, setShowAsk] = useState(false);
 
   const { data: mission } = trpc.referralCoach.getTodaysMission.useQuery(
-    { uniqueCode },
-    { enabled: !!uniqueCode, staleTime: 60000 }
+    { token },
+    { enabled: !!token, staleTime: 60000 }
   );
 
   const askMutation = trpc.referralCoach.askCoach.useMutation({
@@ -84,7 +84,7 @@ function AICopilotCard({ uniqueCode, referrals, referrer }: { uniqueCode: string
     copilotTip = "You haven't shared your link yet. The fastest way to get your first lead is to send it to 3 people right now — family, neighbours, or a local shop owner with a high electricity bill.";
     copilotAction = "Share your link below. Agent Klaus handles all the explaining — you just share.";
   } else if (pendingVerify > 0) {
-    copilotTip = `You have ${pendingVerify} lead${pendingVerify > 1 ? "s" : ""} waiting for customer verification. A quick WhatsApp follow-up asking them to check their email can unlock your ₹20 per verified lead.`;
+    copilotTip = `You have ${pendingVerify} lead${pendingVerify > 1 ? "s" : ""} waiting for customer verification. A quick WhatsApp follow-up asking them to check their email can help the referral progress to an eligible commission milestone.`;
     copilotAction = "Message them: \"Hi! Did you get the solar estimate link I shared? Just click the verify button in the email 😊\"";
   } else if (subsidyPending > 0) {
     copilotTip = `${subsidyPending} of your referrals are verified but haven't applied for subsidy yet. Once they do, you earn ₹500 per referral. Our team will follow up, but a nudge from you helps.`;
@@ -142,14 +142,14 @@ function AICopilotCard({ uniqueCode, referrals, referrer }: { uniqueCode: string
               onChange={e => setQuestion(e.target.value)}
               onKeyDown={e => {
                 if (e.key === "Enter" && question.trim()) {
-                  askMutation.mutate({ uniqueCode, question });
+                  askMutation.mutate({ token, question });
                 }
               }}
               placeholder="e.g. How do I find businesses near me? What should I say on WhatsApp?"
               style={{ flex: 1, background: C.surface2, border: `1px solid ${C.border}`, borderRadius: 8, padding: "8px 12px", color: C.text, fontSize: 12, outline: "none" }}
             />
             <button
-              onClick={() => { if (question.trim()) askMutation.mutate({ uniqueCode, question }); }}
+              onClick={() => { if (question.trim()) askMutation.mutate({ token, question }); }}
               disabled={!question.trim() || askMutation.isPending}
               style={{ background: C.green, color: "#000", border: "none", borderRadius: 8, padding: "8px 14px", cursor: "pointer", fontWeight: 700, fontSize: 12, opacity: (!question.trim() || askMutation.isPending) ? 0.5 : 1 }}
             >
@@ -251,10 +251,9 @@ function PotentialEarnings({ referrals, referrer }: { referrals: any[]; referrer
   const installedLeads = referrals?.filter((r: any) => r.status === "completed").length || 0;
 
   // Earned so far
-  const earnedVerified = verifiedLeads * 20;
   const earnedSubsidy = subsidyLeads * 500;
   const earnedInstalled = installedLeads * 1500;
-  const totalEarned = 50 + earnedVerified + earnedSubsidy + earnedInstalled; // ₹50 signup bonus
+  const totalEarned = 50 + earnedSubsidy + earnedInstalled; // ₹50 signup bonus
 
   // Potential if pipeline converts
   const pipelineLeads = referrals?.filter((r: any) => r.customerVerified && r.status !== "completed").length || 0;
@@ -275,7 +274,7 @@ function PotentialEarnings({ referrals, referrer }: { referrals: any[]; referrer
         <p style={{ margin: "0 0 8px", fontSize: 12, fontWeight: 600, color: C.green }}>Earned so far</p>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, fontSize: 12 }}>
           <div><span style={{ color: C.green, fontWeight: 700 }}>₹50</span> <span style={{ color: C.muted }}>signup bonus</span></div>
-          <div><span style={{ color: "#60a5fa", fontWeight: 700 }}>₹{earnedVerified.toLocaleString()}</span> <span style={{ color: C.muted }}>{verifiedLeads} verified</span></div>
+          <div><span style={{ color: "#60a5fa", fontWeight: 700 }}>{verifiedLeads}</span> <span style={{ color: C.muted }}>verified leads</span></div>
           <div><span style={{ color: C.orange, fontWeight: 700 }}>₹{earnedSubsidy.toLocaleString()}</span> <span style={{ color: C.muted }}>{subsidyLeads} subsidy</span></div>
           <div><span style={{ color: "#a78bfa", fontWeight: 700 }}>₹{earnedInstalled.toLocaleString()}</span> <span style={{ color: C.muted }}>{installedLeads} installed</span></div>
         </div>
@@ -305,7 +304,7 @@ function PotentialEarnings({ referrals, referrer }: { referrals: any[]; referrer
           <span style={{ fontSize: 12, color: C.subtle }}>Estimated monthly</span>
           <span style={{ fontSize: 20, fontWeight: 800, color: C.green }}>₹{projMonthly.toLocaleString()}</span>
         </div>
-        <p style={{ margin: "6px 0 0", fontSize: 10, color: C.muted }}>₹200 verified + ₹1,500 subsidy + ₹1,500 install + ₹100 task bonus</p>
+        <p style={{ margin: "6px 0 0", fontSize: 10, color: C.muted }}>₹1,500 subsidy + ₹1,500 install + ₹100 task bonus</p>
       </div>
 
       {/* How to earn */}
@@ -313,7 +312,6 @@ function PotentialEarnings({ referrals, referrer }: { referrals: any[]; referrer
         <p style={{ margin: "0 0 8px", fontSize: 12, fontWeight: 600, color: C.subtle }}>Commission structure</p>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, fontSize: 11 }}>
           {[
-            { earn: "₹20", label: "per verified lead", color: C.green },
             { earn: "₹500", label: "when subsidy applied", color: C.orange },
             { earn: "₹1,500", label: "when installed", color: "#a78bfa" },
             { earn: "₹100–₹500", label: "daily task bonus", color: "#fbbf24" },
@@ -330,7 +328,7 @@ function PotentialEarnings({ referrals, referrer }: { referrals: any[]; referrer
 }
 
 // ── Find Leads AI Coach ────────────────────────────────────────────────────────
-function FindLeadsCoach({ uniqueCode }: { uniqueCode: string }) {
+function FindLeadsCoach({ token }: { token: string }) {
   const [question, setQuestion] = useState("");
   const [answer, setAnswer] = useState("");
   const [showAsk, setShowAsk] = useState(false);
@@ -401,14 +399,14 @@ function FindLeadsCoach({ uniqueCode }: { uniqueCode: string }) {
               onChange={e => setQuestion(e.target.value)}
               onKeyDown={e => {
                 if (e.key === "Enter" && question.trim()) {
-                  askMutation.mutate({ uniqueCode, question });
+                  askMutation.mutate({ token, question });
                 }
               }}
               placeholder="e.g. Which business type should I search first? What size filter works best?"
               style={{ flex: 1, background: C.surface2, border: `1px solid ${C.border}`, borderRadius: 8, padding: "8px 12px", color: C.text, fontSize: 12, outline: "none" }}
             />
             <button
-              onClick={() => { if (question.trim()) askMutation.mutate({ uniqueCode, question }); }}
+              onClick={() => { if (question.trim()) askMutation.mutate({ token, question }); }}
               disabled={!question.trim() || askMutation.isPending}
               style={{ background: C.orange, color: "#000", border: "none", borderRadius: 8, padding: "8px 14px", cursor: "pointer", fontWeight: 700, fontSize: 12, opacity: (!question.trim() || askMutation.isPending) ? 0.5 : 1 }}
             >
@@ -668,7 +666,7 @@ export default function ReferrerDashboard() {
         {activeTab === "dashboard" && (
           <div>
             {/* AI Copilot Card */}
-            <AICopilotCard uniqueCode={uniqueCode} referrals={referrals || []} referrer={referrer} />
+            <AICopilotCard token={sessionToken} referrals={referrals || []} referrer={referrer} />
 
             {/* To-Do List */}
             <TodoList
@@ -811,7 +809,7 @@ export default function ReferrerDashboard() {
         {/* ── FIND LEADS TAB ── */}
         {activeTab === "findleads" && (
           <div>
-            <FindLeadsCoach uniqueCode={uniqueCode} />
+            <FindLeadsCoach token={sessionToken} />
             <ReferrerScraper referralLink={referralLink} referrerName={(referrer as any)?.name || "Sales Squad Referrer"} />
           </div>
         )}
@@ -832,7 +830,7 @@ export default function ReferrerDashboard() {
               <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
                 <div>
                   <label style={{ fontSize: 13, color: C.subtle, display: "block", marginBottom: 6 }}>Amount (₹)</label>
-                  <input type="number" value={withdrawAmount} onChange={e => setWithdrawAmount(e.target.value)} placeholder="Enter amount"
+                  <input type="number" min={500} value={withdrawAmount} onChange={e => setWithdrawAmount(e.target.value)} placeholder="Minimum ₹500"
                     style={{ width: "100%", background: C.bg, border: `1px solid ${C.border}`, borderRadius: 8, padding: "10px 14px", color: C.text, fontSize: 14 }} />
                 </div>
                 <div>
@@ -841,9 +839,9 @@ export default function ReferrerDashboard() {
                     style={{ width: "100%", background: C.bg, border: `1px solid ${C.border}`, borderRadius: 8, padding: "10px 14px", color: C.text, fontSize: 14 }} />
                 </div>
                 <button
-                  disabled={withdrawMutation.isPending || !withdrawAmount || !upiId}
+                  disabled={withdrawMutation.isPending || Number(withdrawAmount) < 500 || !upiId}
                   onClick={() => { setWithdrawMsg(""); withdrawMutation.mutate({ token: sessionToken, amount: Number(withdrawAmount), upiId }); }}
-                  style={{ background: C.green, color: "#000", border: "none", borderRadius: 8, padding: "12px 24px", cursor: "pointer", fontWeight: 700, fontSize: 15, opacity: (withdrawMutation.isPending || !withdrawAmount || !upiId) ? 0.5 : 1, boxShadow: `0 0 15px ${C.green}40` }}>
+                  style={{ background: C.green, color: "#000", border: "none", borderRadius: 8, padding: "12px 24px", cursor: "pointer", fontWeight: 700, fontSize: 15, opacity: (withdrawMutation.isPending || Number(withdrawAmount) < 500 || !upiId) ? 0.5 : 1, boxShadow: `0 0 15px ${C.green}40` }}>
                   {withdrawMutation.isPending ? "Submitting..." : "Request Withdrawal"}
                 </button>
               </div>

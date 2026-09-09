@@ -8,10 +8,10 @@ import { nanoid } from "nanoid";
 import { invokeLLM } from "./_core/llm";
 import { createHash, randomBytes } from "crypto";
 import { storagePut } from "./storage";
+import { ENV } from "./_core/env";
 
 const PARTNER_SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const PARTNER_INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
-const PARTNER_APP_URL = "https://salessquadleads-xxxqwsn9.manus.space";
 
 const ownerProcedure = protectedProcedure.use(async ({ ctx, next }) => {
   if (ctx.user?.role !== "admin") {
@@ -119,7 +119,7 @@ export const partnerRouter = router({
         }
 
         const signupToken = createPartnerToken();
-        const signupLink = `${PARTNER_APP_URL}/partner-signup?token=${signupToken}`;
+        const signupLink = `${ENV.publicAppUrl}/partner-signup?token=${signupToken}`;
 
         const emailHtml = input.customMessage || `
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #f9f9f9; padding: 24px; border-radius: 8px;">
@@ -306,11 +306,11 @@ export const partnerRouter = router({
       const partnerRows = rows(await dbConn.execute(
         sql`SELECT id, companyName, email, passwordHash, status FROM solarPartners WHERE email = ${input.email}`
       ));
-      if (!partnerRows.length) throw new Error("No partner account found with this email");
+      if (!partnerRows.length) throw new TRPCError({ code: "UNAUTHORIZED", message: "Invalid email or password" });
       const partner = partnerRows[0];
-      if (!partner.passwordHash) throw new Error("Password not set. Please contact Sales Squad.");
+      if (!partner.passwordHash) throw new TRPCError({ code: "UNAUTHORIZED", message: "Invalid email or password" });
       const valid = await bcrypt.compare(input.password, partner.passwordHash);
-      if (!valid) throw new Error("Incorrect password");
+      if (!valid) throw new TRPCError({ code: "UNAUTHORIZED", message: "Invalid email or password" });
       const token = createPartnerToken();
       const expiresAt = Date.now() + PARTNER_SESSION_TTL_MS;
       await dbConn.execute(sql`

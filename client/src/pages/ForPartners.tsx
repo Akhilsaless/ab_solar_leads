@@ -4,12 +4,14 @@ import {
   Zap, Users, TrendingUp, CheckCircle, ArrowRight,
   MessageSquare, Star, Phone, Mail, MapPin, FileText, Wrench
 } from "lucide-react";
+import { trpc } from "@/lib/trpc";
 
 // Replace with your actual WhatsApp number
 const SALES_SQUAD_WHATSAPP = "919133731003";
 
 export default function ForPartners() {
   const [, setLocation] = useLocation();
+  const agencySlugQuery = trpc.agency.getFirst.useQuery();
 
   const openWhatsApp = () => {
     const msg = encodeURIComponent("Hi Sales Squad! I'm interested in partnering with you to receive solar leads. Can we discuss the commission rate?");
@@ -42,7 +44,7 @@ export default function ForPartners() {
             </Button>
             <Button
               variant="outline"
-              onClick={() => setLocation("/chat/demo")}
+              onClick={() => setLocation(`/chat/${agencySlugQuery.data || "sales-squad"}`)}
               className="border-white/20 text-white hover:bg-white/10 px-8 py-6 text-lg rounded-xl"
             >
               See the Chatbot Live

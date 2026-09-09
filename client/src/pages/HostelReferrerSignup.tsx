@@ -60,7 +60,7 @@ export function HostelReferrerSignup() {
         {/* Header */}
         <div className="text-center space-y-2">
           <h1 className="text-4xl font-bold text-gray-900">Sales Squad</h1>
-          <p className="text-lg text-gray-600">Earn ₹20k-50k/month from home</p>
+          <p className="text-lg text-gray-600">Earn verified milestone commissions from referrals</p>
           <Badge className="mx-auto bg-green-600">No Experience Needed</Badge>
         </div>
 
@@ -71,8 +71,8 @@ export function HostelReferrerSignup() {
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg">
-              <span className="text-sm font-medium">Per Lead Capture</span>
-              <span className="text-xl font-bold text-green-600">₹20</span>
+              <span className="text-sm font-medium">Lead Verification</span>
+              <span className="text-sm font-bold text-green-600">Tracked</span>
             </div>
             <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
               <span className="text-sm font-medium">Subsidy Verification</span>
@@ -84,7 +84,7 @@ export function HostelReferrerSignup() {
             </div>
             <div className="border-t pt-3 flex items-center justify-between">
               <span className="font-semibold">Per Successful Lead</span>
-              <span className="text-2xl font-bold text-green-600">₹2,020</span>
+              <span className="text-2xl font-bold text-green-600">₹2,000</span>
             </div>
           </CardContent>
         </Card>
@@ -112,7 +112,7 @@ export function HostelReferrerSignup() {
         <Card>
           <CardHeader>
             <CardTitle>Get Started Now</CardTitle>
-            <CardDescription>Join thousands earning with Sales Squad</CardDescription>
+            <CardDescription>Join the Sales Squad referral program</CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">

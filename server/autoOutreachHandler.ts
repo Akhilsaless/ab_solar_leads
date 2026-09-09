@@ -17,9 +17,10 @@ import { isEmailServiceReady, sendEmail } from "./_core/emailService";
 import { makeRequest, PlacesSearchResult, PlaceDetailsResult } from "./_core/map";
 import { sql } from "drizzle-orm";
 import { getDb } from "./db";
+import { ENV } from "./_core/env";
 
-const APP_URL = "https://salessquadleads-xxxqwsn9.manus.space";
-const AGENCY_SLUG = "sales-squad";
+const APP_URL = ENV.publicAppUrl;
+const AGENCY_SLUG = ENV.defaultAgencySlug;
 const BOT_LINK = APP_URL + "/chat/" + AGENCY_SLUG;
 
 const SLOT_CONFIG: Record<number, { businessType: string; label: string }> = {
@@ -114,9 +115,8 @@ async function generateAiPitch(biz: any, slot: number, botLink: string): Promise
 }
 
 function buildEmailHtml(subject: string, body: string, placeId?: string, agencyId?: number): string {
-  const APP_BASE = "https://salessquadleads-xxxqwsn9.manus.space";
   const pixelUrl = placeId
-    ? `${APP_BASE}/api/track/open?pid=${encodeURIComponent(placeId)}&aid=${agencyId || 1}`
+    ? `${APP_URL}/api/track/open?pid=${encodeURIComponent(placeId)}&aid=${agencyId || 1}`
     : null;
   return "<!DOCTYPE html><html><head><meta charset=\"utf-8\"><title>" + subject + "</title></head>"
     + "<body style=\"margin:0;padding:0;background:#f9fafb;font-family:Arial,sans-serif;\">"
@@ -132,7 +132,7 @@ function buildEmailHtml(subject: string, body: string, placeId?: string, agencyI
     + "<a href=\"" + BOT_LINK + "\" style=\"background:linear-gradient(135deg,#f97316,#fb923c);color:#fff;padding:14px 32px;border-radius:8px;text-decoration:none;font-weight:700;display:inline-block;font-size:15px;\">Check My Solar Savings</a>"
     + "<p style=\"margin:12px 0 0;color:#9ca3af;font-size:12px;\">No forms. Just a 2-minute chat with Agent Klaus.</p>"
     + "</div>"
-    + "<p style=\"color:#6b7280;font-size:13px;line-height:1.6;\">Our AI agent will calculate your exact savings based on your electricity bill, roof size, and state subsidies in under 2 minutes. No commitment required.</p>"
+    + "<p style=\"color:#6b7280;font-size:13px;line-height:1.6;\">Our AI agent can prepare a preliminary savings projection from the information you provide. Final savings and subsidy eligibility require bill review, site assessment, and installer confirmation.</p>"
     + "</div>"
     + "<div style=\"background:#f3f4f6;padding:20px 40px;text-align:center;\">"
     + "<p style=\"margin:0;color:#9ca3af;font-size:12px;\">— Agent Klaus, Sales Squad | akhil@salessquadtech.com</p>"

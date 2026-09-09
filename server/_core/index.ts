@@ -4,6 +4,7 @@ import { createServer } from "http";
 import net from "net";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { registerOAuthRoutes } from "./oauth";
+import { sdk } from "./sdk";
 import { registerStorageProxy } from "./storageProxy";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
@@ -16,16 +17,22 @@ import { autoOutreachHandler, triggerNowHandler } from "../autoOutreachHandler";
 import { scrapedFollowUpHandler } from "../scrapedFollowUpHandler";
 import { trackEmailOpenHandler } from "../trackEmailOpenHandler";
 import { emailEventWebhookHandler } from "../emailEventWebhook";
+import { getDb } from "../db";
+import { sql } from "drizzle-orm";
 
 // Owner auth middleware for admin endpoints
-const authenticateOwner = (req: express.Request, res: express.Response, next: express.NextFunction) => {
-  const ownerId = process.env.OWNER_OPEN_ID;
-  const userId = (req as any).user?.openId;
-  
-  if (!userId || userId !== ownerId) {
-    return res.status(403).json({ error: 'Forbidden: Owner access required' });
+const authenticateOwner = async (req: express.Request, res: express.Response, next: express.NextFunction) => {
+  try {
+    const user = await sdk.authenticateRequest(req);
+    const ownerId = process.env.OWNER_OPEN_ID;
+    if (!ownerId) return res.status(503).json({ error: "Owner access is not configured" });
+    if (user.openId !== ownerId || user.role !== "admin") {
+      return res.status(403).json({ error: "Forbidden: Owner access required" });
+    }
+    next();
+  } catch {
+    return res.status(401).json({ error: "Authentication required" });
   }
-  next();
 };
 
 function isPortAvailable(port: number): Promise<boolean> {
@@ -60,6 +67,18 @@ async function startServer() {
   registerStorageProxy(app);
   // OAuth callback under /api/oauth/callback
   registerOAuthRoutes(app);
+  app.get("/api/health", async (_req, res) => {
+    try {
+      const database = await getDb();
+      if (!database) return res.status(503).json({ status: "degraded", database: "unavailable" });
+      await database.execute(sql`SELECT 1 FROM agencyConfig3 LIMIT 1`);
+      await database.execute(sql`SELECT 1 FROM campaignProfiles LIMIT 1`);
+      await database.execute(sql`SELECT 1 FROM aiGatewaySettings LIMIT 1`);
+      return res.json({ status: "ok", database: "ready" });
+    } catch {
+      return res.status(503).json({ status: "degraded", database: "migration_required" });
+    }
+  });
   // Follow-up email scheduler (cron-only endpoint)
   app.post("/api/scheduled/followUpEmails", followUpEmailsHandler);
   // Admin daily digest (cron-only endpoint)

@@ -14,6 +14,7 @@ export default function ReferralLanding() {
   const potInfo = trpc.referrer.getPotInfo.useQuery(undefined, { refetchInterval: 30000 });
   const balance = potInfo.data?.balance ?? 10000;
   const recentPayouts = potInfo.data?.recentPayouts ?? [];
+  const agencySlugQuery = trpc.agency.getFirst.useQuery();
 
   useEffect(() => {
     const pathParts = window.location.pathname.split("/");
@@ -100,7 +101,7 @@ export default function ReferralLanding() {
               Start Earning Now <ArrowRight style={{ width: 18, height: 18 }} />
             </button>
             <button
-              onClick={() => navigate(referrerCode ? `/refer/${referrerCode}` : "/chat/demo")}
+              onClick={() => navigate(referrerCode ? `/refer/${referrerCode}` : `/chat/${agencySlugQuery.data || "sales-squad"}`)}
               style={{ background: "transparent", color: "#fff", border: "1px solid #333", borderRadius: 10, padding: "14px 28px", fontSize: 16, fontWeight: 600, cursor: "pointer" }}>
               Get Solar Estimate
             </button>
@@ -199,7 +200,7 @@ export default function ReferralLanding() {
         {/* CTA */}
         <div style={{ textAlign: "center", padding: "20px 0 80px" }}>
           <h2 style={{ fontSize: 32, fontWeight: 800, margin: "0 0 12px" }}>Ready to Start Earning?</h2>
-          <p style={{ color: "#666", fontSize: 16, margin: "0 0 28px" }}>Join thousands of referrers earning with Sales Squad</p>
+          <p style={{ color: "#666", fontSize: 16, margin: "0 0 28px" }}>Join the Sales Squad referral program and track every eligible commission</p>
           <button
             onClick={() => navigate("/referrer-signup")}
             style={{ background: G, color: "#000", border: "none", borderRadius: 10, padding: "16px 40px", fontSize: 17, fontWeight: 700, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 8, boxShadow: `0 0 30px rgba(16,185,129,0.4)` }}>

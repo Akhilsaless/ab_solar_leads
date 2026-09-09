@@ -10,4 +10,10 @@ export const ENV = {
   stripeSecretKey: process.env.STRIPE_SECRET_KEY ?? "",
   stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET ?? "",
   stripePublishableKey: process.env.VITE_STRIPE_PUBLISHABLE_KEY ?? "",
+  publicAppUrl: (
+    process.env.PUBLIC_APP_URL ??
+    process.env.APP_URL ??
+    (process.env.VITE_APP_ID ? `https://${process.env.VITE_APP_ID}.manus.space` : "http://localhost:3000")
+  ).replace(/\/+$/, ""),
+  defaultAgencySlug: process.env.DEFAULT_AGENCY_SLUG ?? "sales-squad",
 };

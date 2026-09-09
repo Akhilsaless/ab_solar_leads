@@ -192,6 +192,7 @@ export type StateSubsidy = typeof stateSubsidies.$inferSelect;
 // Keep existing tables for backward compatibility
 export const leads = mysqlTable("leads2", {
   id: int("id").autoincrement().primaryKey(),
+  agencyId: int("agencyId"),
   firstName: varchar("firstName", { length: 100 }).notNull(),
   lastName: varchar("lastName", { length: 100 }).notNull(),
   email: varchar("email", { length: 320 }),
@@ -541,7 +542,7 @@ export const scrapedBusinesses = mysqlTable("scrapedBusinesses", {
   rating: decimal("rating", { precision: 3, scale: 1 }),
   reviewCount: int("reviewCount"),
   placeId: varchar("placeId", { length: 200 }),
-    source: varchar("source", { length: 50 }).default("google_maps"),
+  source: varchar("source", { length: 50 }).default("google_maps"),
   isImported: boolean("isImported").default(false),
   solarScore: int("solarScore").default(5),
   contactStatus: mysqlEnum("contactStatus", ["not_contacted", "contacted", "interested", "converted"]).default("not_contacted"),

@@ -3,7 +3,7 @@
 The application now exposes an intentionally inactive endpoint at:
 
 ```text
-POST https://salessquadleads-xxxqwsn9.manus.space/api/webhooks/email-events
+POST ${PUBLIC_APP_URL}/api/webhooks/email-events
 ```
 
 It remains unavailable until the server-side `EMAIL_EVENT_WEBHOOK_SECRET` is configured. This is deliberate: delivery, bounce, complaint, reply, open, and click events must never be accepted from an unsigned public request.
