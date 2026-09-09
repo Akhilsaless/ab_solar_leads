@@ -493,3 +493,11 @@
 - [x] Report application status for database migrations 0007 through 0012 (0007–0011 objects verified; 0012 `leads2.agencyId` and `idx_leads2_agency_created` are missing)
 - [x] Identify missing production environment variables and required third-party credentials (canonical URL, sender identity, event-webhook secret, optional external AI/WhatsApp credentials; SMTP credentials are present but rejected by the provider)
 - [x] Validate test/build health and determine whether a clean checkpoint can be created safely without publishing (type-check, 170 tests, build, and `/api/health` pass; release remains blocked by migration 0012 and configuration gaps)
+
+## Production Migration 0012 Application (Current Session)
+- [ ] Confirm a recoverable checkpoint before any live database change
+- [ ] Inspect whether `drizzle/migrations/0012_production_readiness.sql` has already been applied
+- [ ] Apply the exact migration 0012 only if required, without unrelated schema changes
+- [ ] Verify `leads2.agencyId`, `idx_leads2_agency_created`, lead backfill, and referrer quality-score correction
+- [ ] Run `scripts/verify-production-readiness.ts` using the existing database connection and verify `/api/health`
+- [ ] Keep publishing and all outreach, email schedules, OTP, and WhatsApp automation disabled; report results first
