@@ -495,9 +495,14 @@
 - [x] Validate test/build health and determine whether a clean checkpoint can be created safely without publishing (type-check, 170 tests, build, and `/api/health` pass; release remains blocked by migration 0012 and configuration gaps)
 
 ## Production Migration 0012 Application (Current Session)
-- [ ] Confirm a recoverable checkpoint before any live database change
-- [ ] Inspect whether `drizzle/migrations/0012_production_readiness.sql` has already been applied
-- [ ] Apply the exact migration 0012 only if required, without unrelated schema changes
-- [ ] Verify `leads2.agencyId`, `idx_leads2_agency_created`, lead backfill, and referrer quality-score correction
-- [ ] Run `scripts/verify-production-readiness.ts` using the existing database connection and verify `/api/health`
-- [ ] Keep publishing and all outreach, email schedules, OTP, and WhatsApp automation disabled; report results first
+- [x] Confirm a recoverable checkpoint before any live database change (checkpoint `de757624`)
+- [x] Inspect whether `drizzle/migrations/0012_production_readiness.sql` has already been applied (it was not applied: column and index were absent)
+- [x] Apply the exact migration 0012 only if required, without unrelated schema changes (applied unchanged)
+- [x] Verify `leads2.agencyId`, `idx_leads2_agency_created`, lead backfill, and referrer quality-score correction (schema/index present; 2 legacy scraper leads remain without an unambiguous agency; zero-referral quality scores corrected)
+- [x] Run `scripts/verify-production-readiness.ts` using the existing database connection and verify `/api/health` (script correctly reports 2 unassigned leads; health response is ready)
+- [x] Keep publishing and all outreach, email schedules, OTP, and WhatsApp automation disabled; report results first (both outreach controls remain disabled)
+
+## Legacy Lead Ownership Investigation (Current Session)
+- [x] Collect read-only ownership evidence for leads `30003` and `330020` only
+- [x] Cross-check each lead’s phone, email, source, campaign, referrer, and relationship metadata against agency-scoped records (each has an exact name match to an agency 1 Google Maps scraper record created immediately before the lead)
+- [x] Report an evidence-based recommendation for each lead without assigning, deleting, archiving, publishing, or enabling automation (both are supported by source evidence; await approval before any data action)
