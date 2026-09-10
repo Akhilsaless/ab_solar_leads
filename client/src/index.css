@@ -262,6 +262,19 @@
     box-shadow: 0 0 12px oklch(0.696 0.17 162 / 0.4);
     color: oklch(0.696 0.17 162);
   }
+
+  @media (max-width: 639px) {
+    .border-orange-500\/25 .mt-8.flex.items-center.justify-between {
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+
+    .border-orange-500\/25 .mt-8.flex.items-center.justify-between > button:nth-child(2) {
+      order: 3;
+      width: 100%;
+      white-space: normal;
+    }
+  }
 }
 
 @layer utilities {

@@ -953,6 +953,30 @@ export type AgencyStateEstimateInput = typeof agencyStateEstimateInputs.$inferSe
 export type AgencyFeatureControls = typeof agencyFeatureControls.$inferSelect;
 
 /**
+ * Links the existing partner-token account model to an isolated agency
+ * configuration and preserves the partner's self-service onboarding progress.
+ * Platform communication configuration is deliberately not represented here.
+ */
+export const partnerAgencyOnboarding = mysqlTable("partnerAgencyOnboarding", {
+  id: int("id").autoincrement().primaryKey(),
+  partnerId: int("partnerId").notNull(),
+  agencyId: int("agencyId").notNull(),
+  onboardingStatus: mysqlEnum("onboardingStatus", ["setup_required", "partially_configured", "ready"]).default("setup_required").notNull(),
+  currentStep: int("currentStep").default(1).notNull(),
+  completedSteps: json("completedSteps"),
+  subsidyMode: mysqlEnum("subsidyMode", ["disclose_verified", "hide_amount"]).default("hide_amount").notNull(),
+  reviewedAt: timestamp("reviewedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (table) => ({
+  partnerUnique: uniqueIndex("partnerAgencyOnboarding_partner_unique").on(table.partnerId),
+  agencyUnique: uniqueIndex("partnerAgencyOnboarding_agency_unique").on(table.agencyId),
+  statusIndex: index("partnerAgencyOnboarding_status_idx").on(table.onboardingStatus),
+}));
+
+export type PartnerAgencyOnboarding = typeof partnerAgencyOnboarding.$inferSelect;
+
+/**
  * Platform-owned communication settings. The encrypted payload contains only
  * server-side provider credentials; clients receive a masked, status-only view.
  * Exactly one row exists per supported channel.

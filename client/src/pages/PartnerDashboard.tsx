@@ -1,5 +1,6 @@
-import { useState, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { trpc } from "@/lib/trpc";
+import PartnerOnboardingWizard from "@/components/PartnerOnboardingWizard";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -14,7 +15,7 @@ import {
 
 const STORAGE_KEY = "partner_token";
 
-type Tab = "leads" | "profile" | "marketing";
+type Tab = "leads" | "setup" | "profile" | "marketing";
 
 function StatusBadge({ status }: { status: string }) {
   const map: Record<string, string> = {
@@ -54,6 +55,8 @@ export default function PartnerDashboard() {
   const [password, setPassword] = useState("");
   const [isLoggedIn, setIsLoggedIn] = useState(!!localStorage.getItem(STORAGE_KEY));
   const [activeTab, setActiveTab] = useState<Tab>("leads");
+  const [onboardingReady, setOnboardingReady] = useState(false);
+  const [onboardingTabInitialized, setOnboardingTabInitialized] = useState(false);
   const [updatingLead, setUpdatingLead] = useState<number | null>(null);
   const [uploadingFile, setUploadingFile] = useState<"pricingSheet" | "productList" | null>(null);
   const pricingRef = useRef<HTMLInputElement>(null);
@@ -66,6 +69,7 @@ export default function PartnerDashboard() {
       localStorage.setItem(STORAGE_KEY, data.token);
       setToken(data.token);
       setIsLoggedIn(true);
+      setOnboardingTabInitialized(false);
       toast.success(`Welcome back, ${data.companyName}!`);
     },
     onError: (err) => toast.error(err.message),
@@ -85,6 +89,20 @@ export default function PartnerDashboard() {
     { token },
     { enabled: isLoggedIn && !!token }
   );
+
+  const onboardingQuery = trpc.partner.getMyOnboarding.useQuery(
+    { token },
+    { enabled: isLoggedIn && !!token }
+  );
+
+  useEffect(() => {
+    const status = (onboardingQuery.data as any)?.mapping?.onboardingStatus;
+    if (!onboardingTabInitialized && status) {
+      setOnboardingReady(status === "ready");
+      if (status !== "ready") setActiveTab("setup");
+      setOnboardingTabInitialized(true);
+    }
+  }, [onboardingQuery.data, onboardingTabInitialized]);
 
   const updateStatusMutation = trpc.partner.updateLeadStatus.useMutation({
     onSuccess: () => {
@@ -127,7 +145,7 @@ export default function PartnerDashboard() {
 
   const handleLogout = () => {
     localStorage.removeItem(STORAGE_KEY);
-    setToken(""); setIsLoggedIn(false); setEmail(""); setPassword("");
+    setToken(""); setIsLoggedIn(false); setEmail(""); setPassword(""); setOnboardingReady(false); setOnboardingTabInitialized(false);
   };
 
   const handleFileUpload = async (file: File, fileType: "pricingSheet" | "productList") => {
@@ -206,35 +224,38 @@ export default function PartnerDashboard() {
 
   const tabs: { id: Tab; label: string; icon: any }[] = [
     { id: "leads", label: "My Leads", icon: Users },
+    { id: "setup", label: onboardingReady ? "Business Settings" : "Finish Setup", icon: Zap },
     { id: "profile", label: "Company Profile", icon: FileText },
     { id: "marketing", label: "Marketing", icon: Megaphone },
   ];
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen overflow-x-hidden bg-background">
       {/* Header */}
       <div className="border-b border-border/30 bg-card/40 backdrop-blur-sm sticky top-0 z-10">
-        <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-3">
+        <div className="max-w-6xl mx-auto flex items-center justify-between gap-2 px-4 py-3">
+          <div className="flex min-w-0 items-center gap-3">
             <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-orange-500 to-amber-500 flex items-center justify-center">
               <Sun className="w-5 h-5 text-white" />
             </div>
-            <div>
-              <p className="font-semibold text-foreground text-sm">{profile?.companyName || "Partner"}</p>
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold text-foreground">{profile?.companyName || "Partner"}</p>
               <p className="text-xs text-muted-foreground">Sales Squad Partner</p>
             </div>
           </div>
-          <Button variant="outline" size="sm" onClick={handleLogout} className="border-border/50 text-xs">
+          <Button variant="outline" size="sm" onClick={handleLogout} className="shrink-0 border-border/50 text-xs">
             <LogOut className="w-3.5 h-3.5 mr-1.5" />Logout
           </Button>
         </div>
         {/* Tabs */}
-        <div className="max-w-6xl mx-auto px-4 flex gap-1 pb-0">
+        <div className="max-w-6xl mx-auto flex gap-1 overflow-x-auto px-4 pb-0">
           {tabs.map(tab => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+              disabled={!onboardingReady && tab.id !== "setup"}
+              title={!onboardingReady && tab.id !== "setup" ? "Complete Business Setup to unlock this section." : undefined}
+              className={`flex shrink-0 items-center gap-1.5 whitespace-nowrap px-3 py-2.5 text-sm font-medium border-b-2 transition-colors disabled:cursor-not-allowed disabled:opacity-45 sm:px-4 ${
                 activeTab === tab.id
                   ? "border-orange-500 text-orange-400"
                   : "border-transparent text-muted-foreground hover:text-foreground"
@@ -389,6 +410,18 @@ export default function PartnerDashboard() {
               </CardContent>
             </Card>
           </>
+        )}
+
+        {/* ── SETUP & SETTINGS TAB ── */}
+        {activeTab === "setup" && (
+          <PartnerOnboardingWizard
+            token={token}
+            onReadyChange={(ready) => {
+              setOnboardingReady(ready);
+              onboardingQuery.refetch();
+              profileQuery.refetch();
+            }}
+          />
         )}
 
         {/* ── PROFILE TAB ── */}

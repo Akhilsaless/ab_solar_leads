@@ -35,8 +35,8 @@ export default function PartnerSignup() {
   const registerMutation = trpc.partner.registerPartner.useMutation({
     onSuccess: () => {
       setSubmitted(true);
-      toast.success("Registration successful! You'll start receiving leads soon.");
-      setTimeout(() => setLocation("/"), 3000);
+      toast.success("Registration successful! Sign in to complete your business setup.");
+      setTimeout(() => setLocation("/partner/dashboard"), 1600);
     },
     onError: (err) => {
       toast.error(err.message || "Registration failed");
@@ -55,8 +55,6 @@ export default function PartnerSignup() {
     if (!email.trim() || !email.includes("@")) newErrors.email = "Valid email is required";
     if (!phone.trim()) newErrors.phone = "Phone number is required";
     if (selectedStates.length === 0) newErrors.states = "Select at least one service area";
-    if (!products.trim()) newErrors.products = "List your products/services";
-    if (!pricing.trim()) newErrors.pricing = "Enter your pricing info";
     if (password.length < 10) newErrors.password = "Password must be at least 10 characters";
     if (password !== confirmPassword) newErrors.confirmPassword = "Passwords do not match";
     if (!token) newErrors.token = "This partner invitation is invalid or missing.";
@@ -92,8 +90,8 @@ export default function PartnerSignup() {
         <div className="bg-slate-800/50 backdrop-blur border border-slate-700 rounded-lg p-8 max-w-md w-full text-center">
           <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
           <h2 className="text-2xl font-bold text-white mb-2">Welcome to Sales Squad!</h2>
-          <p className="text-gray-400 mb-6">Your registration is complete. You'll start receiving qualified leads soon.</p>
-          <p className="text-sm text-gray-500">Redirecting...</p>
+          <p className="text-gray-400 mb-6">Your registration is complete. Sign in now to finish your private business setup.</p>
+          <p className="text-sm text-gray-500">Opening your dashboard...</p>
         </div>
       </div>
     );
@@ -171,38 +169,32 @@ export default function PartnerSignup() {
               />
             </div>
 
+            <div className="rounded-lg border border-orange-500/20 bg-orange-500/10 p-4 text-sm text-orange-100">
+              After registration, your private Business Setup guides you through panels, inverters, verified pricing, state/DISCOM inputs, subsidy disclosure, and estimate settings. No price is shown to customers until you complete and verify it there.
+            </div>
+
             {/* Products */}
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">Products/Services You Offer *</label>
+              <label className="block text-sm font-medium text-gray-300 mb-2">Products/Services You Offer (Optional)</label>
               <textarea
                 value={products}
                 onChange={(e) => setProducts(e.target.value)}
-                placeholder="e.g., 5kW rooftop solar systems, 10kW commercial systems, installation + 25-year warranty"
-                className={`w-full bg-slate-700 border border-slate-600 text-white rounded px-3 py-2 text-sm focus:outline-none focus:border-orange-500 ${errors.products ? "border-red-500" : ""}`}
+                placeholder="Optional summary — detailed products are added in Business Setup"
+                className="w-full bg-slate-700 border border-slate-600 text-white rounded px-3 py-2 text-sm focus:outline-none focus:border-orange-500"
                 rows={3}
               />
-              {errors.products && (
-                <p className="text-red-400 text-sm mt-1 flex items-center gap-1">
-                  <AlertCircle className="w-4 h-4" /> {errors.products}
-                </p>
-              )}
             </div>
 
             {/* Pricing */}
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">Pricing Details *</label>
+              <label className="block text-sm font-medium text-gray-300 mb-2">Pricing Details (Optional)</label>
               <textarea
                 value={pricing}
                 onChange={(e) => setPricing(e.target.value)}
-                placeholder="e.g., ₹4.5 lakh per kW installed, financing available, 0% EMI for 7 years"
-                className={`w-full bg-slate-700 border border-slate-600 text-white rounded px-3 py-2 text-sm focus:outline-none focus:border-orange-500 ${errors.pricing ? "border-red-500" : ""}`}
+                placeholder="Optional summary — add verified pricing in Business Setup"
+                className="w-full bg-slate-700 border border-slate-600 text-white rounded px-3 py-2 text-sm focus:outline-none focus:border-orange-500"
                 rows={3}
               />
-              {errors.pricing && (
-                <p className="text-red-400 text-sm mt-1 flex items-center gap-1">
-                  <AlertCircle className="w-4 h-4" /> {errors.pricing}
-                </p>
-              )}
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

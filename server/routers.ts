@@ -44,6 +44,7 @@ import { parseQuickReplyMarkup } from "@shared/chatControls";
 import { buildBillOcrContent } from "./billOcrContent";
 import { catalogItemActivationError } from "./productionControls";
 import { isCurrentVerifiedCatalogItem, isVerifiedPricingReady } from "./catalogPricing";
+import { isPartnerAgencyReadyForMonetaryEstimates } from "./partnerOnboardingService";
 
 async function requireUserAgency(userId: number) {
   const agency = await db.getAgencyByUserId(userId);
@@ -577,7 +578,9 @@ export const appRouter = router({
         ]);
         const verifiedPanels = panels.filter(item => isCurrentVerifiedCatalogItem(item));
         const verifiedInverters = inverters.filter(item => isCurrentVerifiedCatalogItem(item));
-        const canShowMonetaryEstimate = isVerifiedPricingReady({ pricingActive: Boolean(estimateSettings?.isPricingActive), stateInput: verifiedStateInput, panels: verifiedPanels, inverters: verifiedInverters });
+        const partnerOnboardingReady = await isPartnerAgencyReadyForMonetaryEstimates(await db.getDb(), agency.id);
+        const canShowMonetaryEstimate = isVerifiedPricingReady({ pricingActive: Boolean(estimateSettings?.isPricingActive), stateInput: verifiedStateInput, panels: verifiedPanels, inverters: verifiedInverters })
+          && partnerOnboardingReady !== false;
 
         if (hasEstimateInputs(deterministicFacts) && conversation.status !== "estimate_given") {
           if (deterministicFacts.propertyType === "commercial") {
@@ -1216,7 +1219,9 @@ export const appRouter = router({
         ]) : [null, null];
         const verifiedPanels = panels.filter(item => isCurrentVerifiedCatalogItem(item));
         const verifiedInverters = inverters.filter(item => isCurrentVerifiedCatalogItem(item));
-        const catalogReady = isVerifiedPricingReady({ pricingActive: Boolean(pricing?.isPricingActive), stateInput, panels: verifiedPanels, inverters: verifiedInverters });
+        const partnerOnboardingReady = agency ? await isPartnerAgencyReadyForMonetaryEstimates(await db.getDb(), agency.id) : null;
+        const catalogReady = isVerifiedPricingReady({ pricingActive: Boolean(pricing?.isPricingActive), stateInput, panels: verifiedPanels, inverters: verifiedInverters })
+          && partnerOnboardingReady !== false;
         if (!catalogReady) {
           const tariff = Number(stateInput?.tariffPerUnit || subsidyData?.avgElectricityRate || 0);
           const sunHours = Number(stateInput?.avgSunHours || subsidyData?.avgSunHours || 0);

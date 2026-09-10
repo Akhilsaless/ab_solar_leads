@@ -9,6 +9,8 @@ import { invokeLLM } from "./_core/llm";
 import { createHash, randomBytes } from "crypto";
 import { storagePut } from "./storage";
 import { ENV } from "./_core/env";
+import { catalogItemActivationError, estimateSettingsActivationError, stateInputActivationError } from "./productionControls";
+import { getPartnerOnboardingSnapshot, markPartnerOnboardingStep } from "./partnerOnboardingService";
 
 const PARTNER_SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const PARTNER_INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -56,6 +58,161 @@ function insertId(result: any): number {
 }
 
 export const partnerRouter = router({
+  getMyOnboarding: publicProcedure
+    .input(z.object({ token: z.string().min(20) }))
+    .query(async ({ input }) => {
+      const dbConn = await db.getDb();
+      if (!dbConn) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database connection failed" });
+      const partner = await requirePartnerSession(dbConn, input.token);
+      return getPartnerOnboardingSnapshot(dbConn, partner);
+    }),
+
+  saveCompanySetup: publicProcedure
+    .input(z.object({
+      token: z.string().min(20),
+      companyName: z.string().trim().min(2).max(255),
+      phone: z.string().trim().min(6).max(30),
+      whatsappNumber: z.string().trim().max(30).nullable().optional(),
+      serviceAreas: z.array(z.string().trim().min(2).max(100)).min(1).max(30),
+      city: z.string().trim().min(2).max(100).nullable().optional(),
+      state: z.string().trim().min(2).max(100).nullable().optional(),
+      address: z.string().trim().max(1000).nullable().optional(),
+      website: z.string().url().max(1000).nullable().optional(),
+      logoUrl: z.string().url().max(2000).nullable().optional(),
+      brandColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
+    }))
+    .mutation(async ({ input }) => {
+      const dbConn = await db.getDb();
+      if (!dbConn) throw new Error("Database connection failed");
+      const partner = await requirePartnerSession(dbConn, input.token);
+      const snapshot = await getPartnerOnboardingSnapshot(dbConn, partner);
+      await dbConn.execute(sql`
+        UPDATE solarPartners SET companyName = ${input.companyName}, phone = ${input.phone},
+          whatsappNumber = ${input.whatsappNumber ?? null}, serviceAreas = ${JSON.stringify(input.serviceAreas)}
+        WHERE id = ${partner.id}
+      `);
+      await dbConn.execute(sql`
+        UPDATE agencyConfig3 SET agencyName = ${input.companyName}, phone = ${input.phone},
+          whatsappNumber = ${input.whatsappNumber ?? null}, city = ${input.city ?? null}, state = ${input.state ?? input.serviceAreas[0]},
+          address = ${input.address ?? null}, website = ${input.website ?? null}, logoUrl = ${input.logoUrl ?? null},
+          brandColor = ${input.brandColor ?? (snapshot.mapping.brandColor || "#F97316")}
+        WHERE id = ${snapshot.mapping.agencyId}
+      `);
+      await db.addAgencyConfigurationAudit({ agencyId: snapshot.mapping.agencyId, action: "partner_company_setup_saved", entityType: "agencyConfig3", metadata: { partnerId: partner.id } });
+      return markPartnerOnboardingStep(dbConn, { ...partner, companyName: input.companyName, phone: input.phone, whatsappNumber: input.whatsappNumber ?? null, serviceAreas: input.serviceAreas }, 1);
+    }),
+
+  savePanelSetup: publicProcedure
+    .input(z.object({
+      token: z.string().min(20), id: z.number().int().positive().optional(), brand: z.string().trim().min(1).max(100), model: z.string().trim().min(1).max(200),
+      wattage: z.number().int().min(1).max(2000), pricePerPanel: z.string().regex(/^\d+(\.\d{1,2})?$/), efficiency: z.string().regex(/^\d+(\.\d{1,2})?$/).nullable().optional(),
+      panelType: z.string().trim().max(50).optional(), warranty: z.number().int().min(0).max(60).optional(), isActive: z.boolean(), isPriceActive: z.boolean(),
+      pricingVersion: z.string().trim().min(1).max(80), sourceNote: z.string().trim().max(2000).nullable().optional(), effectiveFrom: z.string().date().nullable().optional(), effectiveTo: z.string().date().nullable().optional(), lastVerifiedAt: z.string().datetime().nullable().optional(),
+    }))
+    .mutation(async ({ input }) => {
+      const dbConn = await db.getDb(); if (!dbConn) throw new Error("Database connection failed");
+      const partner = await requirePartnerSession(dbConn, input.token); const setup = await getPartnerOnboardingSnapshot(dbConn, partner);
+      const error = catalogItemActivationError(input); if (error) throw new TRPCError({ code: "PRECONDITION_FAILED", message: error });
+      if (input.isPriceActive && !input.effectiveTo) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "An activated partner price requires a validity end date." });
+      const values = { brand: input.brand, model: input.model, wattage: input.wattage, pricePerPanel: input.pricePerPanel, efficiency: input.efficiency ?? null, panelType: input.panelType || "monocrystalline", warranty: input.warranty ?? 25, isActive: input.isActive, isPriceActive: input.isPriceActive, pricingVersion: input.pricingVersion, sourceNote: input.sourceNote ?? null, effectiveFrom: input.effectiveFrom ? new Date(`${input.effectiveFrom}T00:00:00.000Z`) : null, effectiveTo: input.effectiveTo ? new Date(`${input.effectiveTo}T00:00:00.000Z`) : null, lastVerifiedAt: input.lastVerifiedAt ? new Date(input.lastVerifiedAt) : null };
+      if (input.id) {
+        const owned = firstRow(await dbConn.execute(sql`SELECT id FROM panelProducts3 WHERE id = ${input.id} AND agencyId = ${setup.mapping.agencyId} LIMIT 1`));
+        if (!owned) throw new TRPCError({ code: "NOT_FOUND", message: "Panel not found in your catalog." });
+        await db.updatePanelForAgency(input.id, setup.mapping.agencyId, values as any);
+        await db.addAgencyConfigurationAudit({ agencyId: setup.mapping.agencyId, action: "partner_panel_updated", entityType: "panelProducts3", entityId: input.id, metadata: { isActive: input.isActive, isPriceActive: input.isPriceActive, pricingVersion: input.pricingVersion } });
+      } else {
+        const id = await db.createPanel({ agencyId: setup.mapping.agencyId, ...values } as any);
+        await db.addAgencyConfigurationAudit({ agencyId: setup.mapping.agencyId, action: "partner_panel_added", entityType: "panelProducts3", entityId: Number(id) || undefined, metadata: { isActive: input.isActive, isPriceActive: input.isPriceActive, pricingVersion: input.pricingVersion } });
+      }
+      return markPartnerOnboardingStep(dbConn, partner, 2);
+    }),
+
+  saveInverterSetup: publicProcedure
+    .input(z.object({
+      token: z.string().min(20), id: z.number().int().positive().optional(), brand: z.string().trim().min(1).max(100), model: z.string().trim().min(1).max(200),
+      capacityKw: z.string().regex(/^\d+(\.\d{1,2})?$/), price: z.string().regex(/^\d+(\.\d{1,2})?$/), inverterType: z.string().trim().max(50).optional(), warranty: z.number().int().min(0).max(60).optional(),
+      isActive: z.boolean(), isPriceActive: z.boolean(), pricingVersion: z.string().trim().min(1).max(80), sourceNote: z.string().trim().max(2000).nullable().optional(), effectiveFrom: z.string().date().nullable().optional(), effectiveTo: z.string().date().nullable().optional(), lastVerifiedAt: z.string().datetime().nullable().optional(),
+    }))
+    .mutation(async ({ input }) => {
+      const dbConn = await db.getDb(); if (!dbConn) throw new Error("Database connection failed");
+      const partner = await requirePartnerSession(dbConn, input.token); const setup = await getPartnerOnboardingSnapshot(dbConn, partner);
+      const error = catalogItemActivationError(input); if (error) throw new TRPCError({ code: "PRECONDITION_FAILED", message: error });
+      if (input.isPriceActive && !input.effectiveTo) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "An activated partner price requires a validity end date." });
+      const values = { brand: input.brand, model: input.model, capacityKw: input.capacityKw, price: input.price, inverterType: input.inverterType || "string", warranty: input.warranty ?? 10, isActive: input.isActive, isPriceActive: input.isPriceActive, pricingVersion: input.pricingVersion, sourceNote: input.sourceNote ?? null, effectiveFrom: input.effectiveFrom ? new Date(`${input.effectiveFrom}T00:00:00.000Z`) : null, effectiveTo: input.effectiveTo ? new Date(`${input.effectiveTo}T00:00:00.000Z`) : null, lastVerifiedAt: input.lastVerifiedAt ? new Date(input.lastVerifiedAt) : null };
+      if (input.id) {
+        const owned = firstRow(await dbConn.execute(sql`SELECT id FROM inverterProducts3 WHERE id = ${input.id} AND agencyId = ${setup.mapping.agencyId} LIMIT 1`));
+        if (!owned) throw new TRPCError({ code: "NOT_FOUND", message: "Inverter not found in your catalog." });
+        await db.updateInverterForAgency(input.id, setup.mapping.agencyId, values as any);
+        await db.addAgencyConfigurationAudit({ agencyId: setup.mapping.agencyId, action: "partner_inverter_updated", entityType: "inverterProducts3", entityId: input.id, metadata: { isActive: input.isActive, isPriceActive: input.isPriceActive, pricingVersion: input.pricingVersion } });
+      } else {
+        const id = await db.createInverter({ agencyId: setup.mapping.agencyId, ...values } as any);
+        await db.addAgencyConfigurationAudit({ agencyId: setup.mapping.agencyId, action: "partner_inverter_added", entityType: "inverterProducts3", entityId: Number(id) || undefined, metadata: { isActive: input.isActive, isPriceActive: input.isPriceActive, pricingVersion: input.pricingVersion } });
+      }
+      return markPartnerOnboardingStep(dbConn, partner, 3);
+    }),
+
+  savePricingSetup: publicProcedure
+    .input(z.object({
+      token: z.string().min(20), pricingVersion: z.string().trim().min(1).max(80), pricingMode: z.enum(["catalog", "quote_only"]), installationCostPerKw: z.string().regex(/^\d+(\.\d{1,2})?$/).nullable().optional(), balanceOfSystemCostPerKw: z.string().regex(/^\d+(\.\d{1,2})?$/).nullable().optional(), taxRatePercent: z.string().regex(/^\d+(\.\d{1,2})?$/).nullable().optional(), warrantyTerms: z.string().trim().max(5000).nullable().optional(), pricingDisclosure: z.string().trim().max(5000).nullable().optional(), sourceNote: z.string().trim().max(2000).nullable().optional(), effectiveFrom: z.string().date().nullable().optional(), effectiveTo: z.string().date().nullable().optional(), lastVerifiedAt: z.string().datetime().nullable().optional(), isPricingActive: z.boolean(),
+    }))
+    .mutation(async ({ input }) => {
+      const dbConn = await db.getDb(); if (!dbConn) throw new Error("Database connection failed");
+      const partner = await requirePartnerSession(dbConn, input.token); const setup = await getPartnerOnboardingSnapshot(dbConn, partner);
+      const error = estimateSettingsActivationError(input); if (error) throw new TRPCError({ code: "PRECONDITION_FAILED", message: error });
+      if (input.isPricingActive && !input.effectiveTo) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Activated partner pricing requires a validity end date." });
+      await db.updateAgencyEstimateSettings(setup.mapping.agencyId, { ...input, effectiveFrom: input.effectiveFrom ? new Date(`${input.effectiveFrom}T00:00:00.000Z`) : null, effectiveTo: input.effectiveTo ? new Date(`${input.effectiveTo}T00:00:00.000Z`) : null, lastVerifiedAt: input.lastVerifiedAt ? new Date(input.lastVerifiedAt) : null } as any);
+      await db.addAgencyConfigurationAudit({ agencyId: setup.mapping.agencyId, action: "partner_pricing_saved", entityType: "agencyEstimateSettings", metadata: { pricingVersion: input.pricingVersion, isPricingActive: input.isPricingActive } });
+      return markPartnerOnboardingStep(dbConn, partner, 4);
+    }),
+
+  saveServiceAreaSetup: publicProcedure
+    .input(z.object({
+      token: z.string().min(20), stateName: z.string().trim().min(2).max(100), stateCode: z.string().trim().min(2).max(10), discomName: z.string().trim().max(200).nullable().optional(), tariffPerUnit: z.string().regex(/^\d+(\.\d{1,4})?$/).nullable().optional(), avgSunHours: z.string().regex(/^\d+(\.\d{1,2})?$/).nullable().optional(), systemLossPercent: z.string().regex(/^\d+(\.\d{1,2})?$/).nullable().optional(), netMeteringStatus: z.enum(["unknown", "available", "limited", "unavailable"]), sourceNote: z.string().trim().max(2000).nullable().optional(), effectiveFrom: z.string().date().nullable().optional(), effectiveTo: z.string().date().nullable().optional(), lastVerifiedAt: z.string().datetime().nullable().optional(), isActive: z.boolean(),
+    }))
+    .mutation(async ({ input }) => {
+      const dbConn = await db.getDb(); if (!dbConn) throw new Error("Database connection failed");
+      const partner = await requirePartnerSession(dbConn, input.token); const setup = await getPartnerOnboardingSnapshot(dbConn, partner);
+      const error = stateInputActivationError(input); if (error) throw new TRPCError({ code: "PRECONDITION_FAILED", message: error });
+      if (input.isActive && !input.effectiveTo) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "An activated partner state input requires a validity end date." });
+      await db.upsertAgencyStateEstimateInput(setup.mapping.agencyId, { ...input, stateCode: input.stateCode.toUpperCase(), effectiveFrom: input.effectiveFrom ? new Date(`${input.effectiveFrom}T00:00:00.000Z`) : null, effectiveTo: input.effectiveTo ? new Date(`${input.effectiveTo}T00:00:00.000Z`) : null, lastVerifiedAt: input.lastVerifiedAt ? new Date(input.lastVerifiedAt) : null } as any);
+      await db.addAgencyConfigurationAudit({ agencyId: setup.mapping.agencyId, action: "partner_service_area_saved", entityType: "agencyStateEstimateInputs", metadata: { stateCode: input.stateCode.toUpperCase(), isActive: input.isActive } });
+      return markPartnerOnboardingStep(dbConn, partner, 5);
+    }),
+
+  saveSubsidySetup: publicProcedure
+    .input(z.object({ token: z.string().min(20), subsidyMode: z.enum(["disclose_verified", "hide_amount"]), stateCode: z.string().trim().min(2).max(10).optional(), subsidyDisclosure: z.string().trim().max(5000).optional(), subsidySourceUrl: z.string().url().max(1000).optional() }))
+    .mutation(async ({ input }) => {
+      const dbConn = await db.getDb(); if (!dbConn) throw new Error("Database connection failed");
+      const partner = await requirePartnerSession(dbConn, input.token); const setup = await getPartnerOnboardingSnapshot(dbConn, partner);
+      if (input.subsidyMode === "disclose_verified") {
+        if (!input.stateCode || !input.subsidyDisclosure || !input.subsidySourceUrl) throw new TRPCError({ code: "BAD_REQUEST", message: "Provide a verified subsidy explanation and source, or choose not to show an amount." });
+        const existing = firstRow(await dbConn.execute(sql`SELECT id FROM agencyStateEstimateInputs WHERE agencyId = ${setup.mapping.agencyId} AND stateCode = ${input.stateCode.toUpperCase()} LIMIT 1`));
+        if (!existing) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Save the matching service area before adding a verified subsidy disclosure." });
+        await dbConn.execute(sql`UPDATE agencyStateEstimateInputs SET subsidyDisclosure = ${input.subsidyDisclosure}, subsidySourceUrl = ${input.subsidySourceUrl} WHERE id = ${existing.id} AND agencyId = ${setup.mapping.agencyId}`);
+      }
+      await db.addAgencyConfigurationAudit({ agencyId: setup.mapping.agencyId, action: "partner_subsidy_mode_saved", entityType: "agencyStateEstimateInputs", metadata: { subsidyMode: input.subsidyMode } });
+      return markPartnerOnboardingStep(dbConn, partner, 6, { subsidyMode: input.subsidyMode });
+    }),
+
+  saveEstimateDisclosure: publicProcedure
+    .input(z.object({ token: z.string().min(20), pricingDisclosure: z.string().trim().min(10).max(5000), warrantyTerms: z.string().trim().max(5000).nullable().optional() }))
+    .mutation(async ({ input }) => {
+      const dbConn = await db.getDb(); if (!dbConn) throw new Error("Database connection failed");
+      const partner = await requirePartnerSession(dbConn, input.token); const setup = await getPartnerOnboardingSnapshot(dbConn, partner);
+      await db.updateAgencyEstimateSettings(setup.mapping.agencyId, { pricingDisclosure: input.pricingDisclosure, warrantyTerms: input.warrantyTerms ?? null } as any);
+      await db.addAgencyConfigurationAudit({ agencyId: setup.mapping.agencyId, action: "partner_estimate_disclosure_saved", entityType: "agencyEstimateSettings", metadata: { hasDisclosure: true } });
+      return markPartnerOnboardingStep(dbConn, partner, 7);
+    }),
+
+  reviewOnboarding: publicProcedure
+    .input(z.object({ token: z.string().min(20) }))
+    .mutation(async ({ input }) => {
+      const dbConn = await db.getDb(); if (!dbConn) throw new Error("Database connection failed");
+      const partner = await requirePartnerSession(dbConn, input.token); const current = await getPartnerOnboardingSnapshot(dbConn, partner);
+      if (current.mapping.onboardingStatus !== "ready") throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Complete each required verified setup item before finishing onboarding." });
+      await db.addAgencyConfigurationAudit({ agencyId: current.mapping.agencyId, action: "partner_onboarding_reviewed", entityType: "partnerAgencyOnboarding", entityId: current.mapping.mappingId, metadata: { status: "ready" } });
+      return markPartnerOnboardingStep(dbConn, partner, 8, { reviewed: true });
+    }),
   // Search scraped businesses to add as partners
   searchBusinesses: ownerProcedure
     .input(z.object({ city: z.string(), businessType: z.string().optional() }))
@@ -174,8 +331,8 @@ export const partnerRouter = router({
       phone: z.string(),
       whatsappNumber: z.string().optional(),
       serviceAreas: z.array(z.string()),
-      products: z.string(),
-      pricing: z.string(),
+      products: z.string().max(5000).optional().default(""),
+      pricing: z.string().max(5000).optional().default(""),
       discounts: z.string().optional(),
       password: z.string().min(10),
     }))
@@ -203,8 +360,8 @@ export const partnerRouter = router({
               SET companyName = ${input.companyName}, phone = ${input.phone},
                   whatsappNumber = ${input.whatsappNumber || null},
                   serviceAreas = ${JSON.stringify(input.serviceAreas)},
-                  products = ${input.products},
-                  pricing = ${input.pricing},
+                  products = ${input.products || null},
+                  pricing = ${input.pricing || null},
                   discounts = ${input.discounts || null},
                   passwordHash = ${passwordHash},
                   status = 'signed_up', signedUpAt = NOW(),
