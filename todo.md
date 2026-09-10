@@ -594,8 +594,8 @@
 - [x] Report the public URL and post-deployment status without development changes
 
 ## GitHub Commit 5fed3e5 Synchronization and Assignment Control Verification (Current Session)
-- [ ] Verify and synchronize only the requested GitHub main commit `5fed3e542fe362fc5d1cce1ba52a4e9df1a69400`
-- [ ] Inspect and apply the exact committed `drizzle/migrations/0016_lead_assignment_control.sql` only if its live schema is absent
-- [ ] Run only the production verifier, `/api/health`, callback consent-loop smoke test, and lead-assignment access check
-- [ ] Confirm Email, WhatsApp, SMS/OTP, schedules, agency outreach controls, both outreach masters, and emergency stop remain inactive
-- [ ] Save an unpublished validated checkpoint and provide publication guidance without modifying unrelated features
+- [x] Verify and synchronize only the requested GitHub main commit `5fed3e542fe362fc5d1cce1ba52a4e9df1a69400` (requested commit is an ancestor of the synchronized managed checkpoint)
+- [x] Inspect and apply the exact committed `drizzle/migrations/0016_lead_assignment_control.sql` only if its live schema is absent (schema was absent; exact statements applied sequentially because the database engine rejects forward `AFTER` references within one multi-column ALTER)
+- [x] Run only the production verifier, `/api/health`, callback consent-loop smoke test, and lead-assignment access check (verifier passed; health 200/ready; `chatFlow` and `leadAssignment` tests passed)
+- [x] Confirm Email, WhatsApp, SMS/OTP, schedules, agency outreach controls, both outreach masters, and emergency stop remain inactive
+- [x] Save an unpublished validated checkpoint and provide publication guidance without modifying unrelated features
