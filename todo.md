@@ -538,3 +538,16 @@
 - [x] Test the complete residential estimate journey at a 375×812 viewport for overflow, usable controls, contextual bill controls, accessible handoff, and clean rendering (exact browser regression passed all layout and rendering assertions)
 - [x] Re-run production readiness, health, and disabled-control checks without enabling SMTP, email, OTP, WhatsApp, or outreach automation (187 tests, verifier, and build pass; health is ready; both outreach controls remain disabled; no recent lead/outbound side effects)
 - [x] Report catalog evidence, OCR/mobile results, remaining P0/P1 defects, and chatbot publish safety without publishing
+
+## Final Production-Completion Upgrade (Current Session)
+- [ ] Audit and extend the existing agency-scoped panel, inverter, pricing, tariff, subsidy, disclaimer, warranty, effective-date, active-status, and auditability structures without creating a universal catalog or fabricating money values
+- [ ] Ensure active agency catalog entries are tenant-isolated and missing pricing continues to return sizing only with no invented cost, savings, subsidy, or payback output
+- [ ] Harden server-only SMTP configuration and status reporting with disabled-by-default sending, explicit enablement, provider readiness checks, and fail-closed behavior
+- [ ] Audit every current or planned external integration and classify it as core, optional, or disabled until configured without exposing secrets or creating fake credentials
+- [ ] Extend existing admin settings and operations status surfaces with masked/status-only readiness for catalog, AI, SMTP, WhatsApp, OTP/SMS, maps, OCR, webhooks, canonical URL, tenant default, storage, analytics, and outreach controls
+- [ ] Require both valid configuration and explicit enabled state before automated email outreach, WhatsApp, OTP/SMS, scheduled follow-ups, AI-dependent optional features, or any customer-contact automation can activate
+- [ ] Preserve all validated e3cf87cf chatbot behavior, agency isolation, authorization, webhook validation, upload restrictions, rate limits, and no-secret client exposure while fixing any discovered P0/P1 issue
+- [ ] Create or update production setup documentation with all credential slots, business inputs, current status, disabled-feature impact, and safe activation steps without including secret values
+- [ ] Add focused regression and security coverage for agency pricing isolation, missing pricing, integration status, SMTP disabled/invalid handling, activation guards, and catalog auditability
+- [ ] Run full type-check, automated tests, build, production verifier, health check, controlled chatbot regressions, and final read-only safety checks with outreach, email, WhatsApp, OTP, and schedules still disabled
+- [ ] Save an unpublished recovery checkpoint and report all changes, migrations, readiness state, credentials/business inputs, remaining issues, and final publish verdict
