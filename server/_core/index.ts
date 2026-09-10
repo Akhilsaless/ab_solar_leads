@@ -76,6 +76,8 @@ async function startServer() {
       await database.execute(sql`SELECT 1 FROM aiGatewaySettings LIMIT 1`);
       await database.execute(sql`SELECT 1 FROM agencyFeatureControls LIMIT 1`);
       await database.execute(sql`SELECT 1 FROM agencyEstimateSettings LIMIT 1`);
+      await database.execute(sql`SELECT 1 FROM platformCommunicationSettings LIMIT 1`);
+      await database.execute(sql`SELECT 1 FROM platformSafetyControls LIMIT 1`);
       return res.json({ status: "ok", database: "ready" });
     } catch {
       return res.status(503).json({ status: "degraded", database: "migration_required" });

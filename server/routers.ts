@@ -22,6 +22,8 @@ import { partnerManagementRouter } from "./partnerManagement";
 import { campaignIntelligenceRouter } from "./campaignIntelligence";
 import { aiGatewayRouter } from "./aiGateway";
 import { operationsRouter } from "./operations";
+import { platformCommunicationsRouter } from "./platformCommunications";
+import { isPlatformSuperAdmin } from "./platformCommunicationState";
 import { storagePut } from "./storage";
 import { ENV } from "./_core/env";
 import { calculateBusinessEvidenceScore, calculateEvidenceScore } from "./evidenceScore";
@@ -120,11 +122,12 @@ export const appRouter = router({
   campaignIntelligence: campaignIntelligenceRouter,
   aiGateway: aiGatewayRouter,
   operations: operationsRouter,
+  platformCommunications: platformCommunicationsRouter,
   automatedOutreach: automatedOutreachRouter,
   copilot: copilotRouter,
   referralCoach: referralCoachRouter,
   auth: router({
-    me: publicProcedure.query(opts => opts.ctx.user),
+    me: publicProcedure.query(opts => opts.ctx.user ? ({ ...opts.ctx.user, isPlatformOwner: isPlatformSuperAdmin(opts.ctx.user, ENV.ownerOpenId) }) : null),
     logout: publicProcedure.mutation(({ ctx }) => {
       const cookieOptions = getSessionCookieOptions(ctx.req);
       ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });

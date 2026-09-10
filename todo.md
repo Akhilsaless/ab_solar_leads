@@ -560,11 +560,11 @@
 - [x] Report migration state, isolation, controls, remaining P0/P1 issues, and publish-safety verdict without publishing
 
 ## Central Platform Communication Controls (Current Session)
-- [ ] Audit existing email, WhatsApp, schedule, permission, audit, and secure credential mechanisms without exposing secrets
-- [ ] Create a super-admin-only platform communication control plane with OFF, PAUSED, and RUNNING states plus a global emergency stop
-- [ ] Add masked central email and WhatsApp configuration status slots, provider verification controls, and controlled-test safeguards without storing or exposing fake credentials
-- [ ] Enforce platform state, provider readiness, feature prerequisites, idempotency, and emergency stop before every email/WhatsApp/scheduled send path
-- [ ] Keep partners limited to agency catalog, pricing, state/DISCOM, subsidy disclosure, and lead workflow data; prevent access to platform credentials and controls
-- [ ] Add non-secret platform operational audit events, status indicators, and safe super-admin UI controls without ambiguous toggles
-- [ ] Add regression coverage for state transitions, blocked activation, tenant permissions, emergency stop, secret masking, and no-duplicate resume behavior
-- [ ] Run full validation, production readiness, health, and disabled-control checks; save an unpublished checkpoint and report results
+- [x] Audit existing email, WhatsApp, schedule, permission, audit, and secure credential mechanisms without exposing secrets
+- [x] Create a super-admin-only platform communication control plane with OFF, PAUSED, and RUNNING states plus a global emergency stop
+- [x] Add masked central email and WhatsApp configuration status slots, provider verification controls, and controlled-test safeguards without storing or exposing fake credentials
+- [x] Enforce platform state, provider readiness, feature prerequisites, idempotency, and emergency stop before every email/WhatsApp/scheduled send path
+- [x] Keep partners limited to agency catalog, pricing, state/DISCOM, subsidy disclosure, and lead workflow data; prevent access to platform credentials and controls
+- [x] Add non-secret platform operational audit events, status indicators, and safe super-admin UI controls without ambiguous toggles
+- [x] Add regression coverage for state transitions, blocked activation, tenant permissions, emergency stop, secret masking, and no-duplicate resume behavior
+- [x] Run full validation, production readiness, health, and disabled-control checks; save an unpublished checkpoint and report results

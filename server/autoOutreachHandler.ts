@@ -18,6 +18,7 @@ import { makeRequest, PlacesSearchResult, PlaceDetailsResult } from "./_core/map
 import { sql } from "drizzle-orm";
 import { getDb, isAgencyFeatureEnabled } from "./db";
 import { ENV } from "./_core/env";
+import { getPlatformDispatchDecision } from "./platformCommunicationService";
 
 const APP_URL = ENV.publicAppUrl;
 const AGENCY_SLUG = ENV.defaultAgencySlug;
@@ -184,12 +185,13 @@ function isConfigEnabled(config: any) {
 }
 
 async function isOutreachEnabled(agencyId: number) {
-  const [config, emailEnabled, scheduleEnabled] = await Promise.all([
+  const [config, emailEnabled, scheduleEnabled, platformEmail] = await Promise.all([
     getOutreachConfig(agencyId),
     isAgencyFeatureEnabled(agencyId, "emailAutomationEnabled"),
     isAgencyFeatureEnabled(agencyId, "scheduledFollowUpsEnabled"),
+    getPlatformDispatchDecision("email"),
   ]);
-  return isConfigEnabled(config) && emailEnabled && scheduleEnabled;
+  return isConfigEnabled(config) && emailEnabled && scheduleEnabled && platformEmail.allowed;
 }
 
 /**

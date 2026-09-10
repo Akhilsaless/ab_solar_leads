@@ -951,3 +951,52 @@ export const agencyConfigurationAudit = mysqlTable("agencyConfigurationAudit", {
 export type AgencyEstimateSettings = typeof agencyEstimateSettings.$inferSelect;
 export type AgencyStateEstimateInput = typeof agencyStateEstimateInputs.$inferSelect;
 export type AgencyFeatureControls = typeof agencyFeatureControls.$inferSelect;
+
+/**
+ * Platform-owned communication settings. The encrypted payload contains only
+ * server-side provider credentials; clients receive a masked, status-only view.
+ * Exactly one row exists per supported channel.
+ */
+export const platformCommunicationSettings = mysqlTable("platformCommunicationSettings", {
+  id: int("id").autoincrement().primaryKey(),
+  channel: mysqlEnum("channel", ["email", "whatsapp"]).notNull().unique(),
+  provider: varchar("provider", { length: 80 }).default("not_configured").notNull(),
+  connectionMode: mysqlEnum("connectionMode", ["smtp", "api"]).notNull(),
+  encryptedConfig: text("encryptedConfig"),
+  configuredFields: json("configuredFields"),
+  status: mysqlEnum("status", ["not_configured", "authentication_error", "template_setup_required", "ready", "running", "paused", "off", "error"]).default("not_configured").notNull(),
+  automationState: mysqlEnum("automationState", ["off", "paused", "running"]).default("off").notNull(),
+  lastVerifiedAt: timestamp("lastVerifiedAt"),
+  lastSuccessfulSendAt: timestamp("lastSuccessfulSendAt"),
+  lastErrorCode: varchar("lastErrorCode", { length: 100 }),
+  lastErrorMessage: varchar("lastErrorMessage", { length: 500 }),
+  updatedByUserId: int("updatedByUserId"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+/** Emergency stop remains active until the platform owner explicitly clears it. */
+export const platformSafetyControls = mysqlTable("platformSafetyControls", {
+  id: int("id").autoincrement().primaryKey(),
+  emergencyStopActive: boolean("emergencyStopActive").default(true).notNull(),
+  updatedByUserId: int("updatedByUserId"),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+/** Metadata-only platform audit history; secrets and customer addresses are never stored here. */
+export const platformCommunicationAudit = mysqlTable("platformCommunicationAudit", {
+  id: int("id").autoincrement().primaryKey(),
+  channel: mysqlEnum("channel", ["email", "whatsapp", "global"]).notNull(),
+  actorUserId: int("actorUserId"),
+  action: varchar("action", { length: 120 }).notNull(),
+  result: varchar("result", { length: 80 }).notNull(),
+  fromState: varchar("fromState", { length: 40 }),
+  toState: varchar("toState", { length: 40 }),
+  metadata: json("metadata"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => ({
+  channelCreatedIndex: index("platformCommunicationAudit_channel_created_idx").on(table.channel, table.id),
+}));
+
+export type PlatformCommunicationSettings = typeof platformCommunicationSettings.$inferSelect;
+export type PlatformSafetyControls = typeof platformSafetyControls.$inferSelect;

@@ -2,6 +2,7 @@ import { TRPCError } from "@trpc/server";
 import { sql } from "drizzle-orm";
 import { z } from "zod";
 import { getEmailServiceStatus } from "./_core/emailService";
+import { ENV } from "./_core/env";
 import { protectedProcedure, router } from "./_core/trpc";
 import * as db from "./db";
 import { activationError, estimateSettingsActivationError, stateInputActivationError } from "./productionControls";
@@ -79,6 +80,13 @@ export const operationsRouter = router({
       optionalAiFeaturesEnabled: z.boolean().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      if (!ctx.user?.openId || ctx.user.openId !== ENV.ownerOpenId) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Communication eligibility is managed by the platform super-admin." });
+      }
+      const directCommunicationKeys = ["emailAutomationEnabled", "whatsappAutomationEnabled", "smsOtpEnabled", "scheduledFollowUpsEnabled"] as const;
+      if (directCommunicationKeys.some((key) => input[key] !== undefined)) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Use the central Platform communication control to arm or disarm customer communication eligibility." });
+      }
       const agency = await requireAgency(ctx.user!.id);
       const email = getEmailServiceStatus();
       const providers = await providerReadiness(agency.id);
@@ -88,7 +96,7 @@ export const operationsRouter = router({
         smsOtpAdapterAvailable: false,
         optionalAiReady: providers.some((item: any) => item.isEnabled && item.status === "connected" && item.healthStatus === "healthy"),
       });
-      if (error) throw new TRPCError({ code: "PRECONDITION_FAILED", message: error });
+      if (input.optionalAiFeaturesEnabled && error) throw new TRPCError({ code: "PRECONDITION_FAILED", message: error });
       await db.updateAgencyFeatureControls(agency.id, ctx.user!.id, input);
       await db.addAgencyConfigurationAudit({ agencyId: agency.id, actorUserId: ctx.user!.id, action: "feature_controls_updated", entityType: "agencyFeatureControls", metadata: input });
       return { success: true };

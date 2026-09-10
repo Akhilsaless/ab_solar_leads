@@ -1,3 +1,5 @@
+import { addPlatformCommunicationAudit } from "./platformCommunicationService";
+
 /**
  * WhatsApp Business API Integration Service
  * Handles both automated business outreach and hostel referrer recruitment
@@ -67,6 +69,7 @@ class WhatsAppService {
   async sendTextMessage(to: string, message: string): Promise<WhatsAppResponse> {
     void to;
     void message;
+    await addPlatformCommunicationAudit({ channel: "whatsapp", action: "automated_send", result: "blocked", metadata: { reason: "provider_adapter_not_installed" } });
     return { success: false, error: "WhatsApp is disabled until a verified provider adapter is installed and explicitly enabled." };
   }
 
@@ -81,6 +84,7 @@ class WhatsAppService {
     void to;
     void templateName;
     void templateParams;
+    await addPlatformCommunicationAudit({ channel: "whatsapp", action: "automated_template_send", result: "blocked", metadata: { reason: "provider_adapter_not_installed" } });
     return { success: false, error: "WhatsApp is disabled until a verified provider adapter is installed and explicitly enabled." };
   }
 
@@ -96,14 +100,12 @@ class WhatsAppService {
 
 Welcome to Sales Squad! 
 
-Earn milestone commissions by sharing eligible solar leads:
-✅ Lead verification and consent tracked
-✅ ₹500 subsidy verification
-✅ ₹1,500 installation commission
+Share eligible solar leads with consent tracked.
+Any referral terms are confirmed directly by Sales Squad before activation.
 
 Your referral link: ${referralLink}
 
-Share with friends → They get free solar estimates → You earn money!
+Share with contacts who have asked to hear more about solar.
 
 Questions? Reply here or visit our site.
 
@@ -128,9 +130,7 @@ We help businesses like ${businessName} cut electricity bills with solar.
 
 ${industryBenefit}
 
-Plus: Government subsidy up to ₹15 lakhs available.
-
-Get your free solar potential report:
+Get a preliminary solar assessment:
 ${chatbotLink}
 
 - Sales Squad`;
@@ -150,10 +150,10 @@ ${chatbotLink}
   ): Promise<WhatsAppResponse> {
     const message = `Hi ${referrerName}! 💰
 
-Your Sales Squad earnings:
-📊 Today: ₹${todayEarnings}
-💵 Total: ₹${totalEarnings}
-👥 Leads: ${leadsCount}
+Your Sales Squad referral activity:
+Today: ₹${todayEarnings}
+Total: ₹${totalEarnings}
+Eligible leads: ${leadsCount}
 
 Keep sharing to earn more!
 
@@ -175,11 +175,9 @@ Your link: [REFERRAL_LINK]
   ): Promise<WhatsAppResponse> {
     const message = `Hi ${referrerName}! 🎉
 
-Your payout of ₹${amount} has been processed!
+Your payout request of ₹${amount} has been recorded for confirmation.
 
-Transferred to: ${upiId}
-
-Check your bank account within 5 minutes.
+Payment details will be confirmed by Sales Squad.
 
 Keep earning with Sales Squad! 💪
 
