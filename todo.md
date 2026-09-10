@@ -551,3 +551,10 @@
 - [x] Add focused regression and security coverage for agency pricing isolation, missing pricing, integration status, SMTP disabled/invalid handling, activation guards, and catalog auditability
 - [x] Run full type-check, automated tests, build, production verifier, health check, controlled chatbot regressions, and final read-only safety checks with outreach, email, WhatsApp, OTP, and schedules still disabled
 - [x] Save an unpublished recovery checkpoint and report all changes, migrations, readiness state, credentials/business inputs, remaining issues, and final publish verdict
+
+## Production Migration 0013 Verification and Runtime Controls (Current Session)
+- [x] Inspect whether the exact committed migration `0013_agency_configuration_control_plane.sql` is already applied in production without changing data (all four tables, 12 catalog columns, the audit index, and agency feature-control seed row are present)
+- [x] Create or confirm a recoverable checkpoint before applying exact migration 0013 only if its structures are absent (no re-application was needed; checkpoint `2dcab315` already captures the applied migration)
+- [x] Verify agency-scoped catalog pricing, state/DISCOM inputs, feature controls, configuration audit metadata, and tenant isolation without inserting any business values (all 0013 structures present; only agency 1 exists and no active foreign pricing record is present)
+- [x] Run the production-readiness verifier, health check, type-safe runtime settings smoke check, and fail-closed communication-control checks with no activation (all checks passed; no agency feature control or outreach master is enabled)
+- [x] Report migration state, isolation, controls, remaining P0/P1 issues, and publish-safety verdict without publishing
