@@ -4,7 +4,9 @@ import {
   InsertUser, users, agencyConfig, panelProducts, inverterProducts,
   conversations, chatMsgs, stateSubsidies, leads, leadActivity,
   campaigns, messageTemplates, outreachMessages, campaignSteps,
-  scrapeJobs, tags, dncList, subscriptions, scrapedBusinesses
+  scrapeJobs, tags, dncList, subscriptions, scrapedBusinesses,
+  agencyEstimateSettings, agencyStateEstimateInputs, agencyFeatureControls,
+  agencyConfigurationAudit
 } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
@@ -123,6 +125,25 @@ export async function deletePanel(id: number) {
   await db.update(panelProducts).set({ isActive: false }).where(eq(panelProducts.id, id));
 }
 
+export async function getPanelByIdForAgency(id: number, agencyId: number) {
+  const db = await getDb();
+  if (!db) return null;
+  const result = await db.select().from(panelProducts).where(and(eq(panelProducts.id, id), eq(panelProducts.agencyId, agencyId))).limit(1);
+  return result[0] || null;
+}
+
+export async function updatePanelForAgency(id: number, agencyId: number, data: Partial<typeof panelProducts.$inferInsert>) {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(panelProducts).set(data).where(and(eq(panelProducts.id, id), eq(panelProducts.agencyId, agencyId)));
+}
+
+export async function deletePanelForAgency(id: number, agencyId: number) {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(panelProducts).set({ isActive: false, isPriceActive: false }).where(and(eq(panelProducts.id, id), eq(panelProducts.agencyId, agencyId)));
+}
+
 // ==================== INVERTER PRODUCTS ====================
 
 export async function getInvertersByAgency(agencyId: number) {
@@ -148,6 +169,123 @@ export async function deleteInverter(id: number) {
   const db = await getDb();
   if (!db) return;
   await db.update(inverterProducts).set({ isActive: false }).where(eq(inverterProducts.id, id));
+}
+
+export async function getInverterByIdForAgency(id: number, agencyId: number) {
+  const db = await getDb();
+  if (!db) return null;
+  const result = await db.select().from(inverterProducts).where(and(eq(inverterProducts.id, id), eq(inverterProducts.agencyId, agencyId))).limit(1);
+  return result[0] || null;
+}
+
+export async function updateInverterForAgency(id: number, agencyId: number, data: Partial<typeof inverterProducts.$inferInsert>) {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(inverterProducts).set(data).where(and(eq(inverterProducts.id, id), eq(inverterProducts.agencyId, agencyId)));
+}
+
+export async function deleteInverterForAgency(id: number, agencyId: number) {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(inverterProducts).set({ isActive: false, isPriceActive: false }).where(and(eq(inverterProducts.id, id), eq(inverterProducts.agencyId, agencyId)));
+}
+
+// ==================== PRODUCTION CONFIGURATION CONTROL PLANE ====================
+
+export async function getAgencyEstimateSettings(agencyId: number) {
+  const db = await getDb();
+  if (!db) return null;
+  await db.insert(agencyEstimateSettings).values({ agencyId }).onDuplicateKeyUpdate({ set: { agencyId } });
+  const result = await db.select().from(agencyEstimateSettings).where(eq(agencyEstimateSettings.agencyId, agencyId)).limit(1);
+  return result[0] || null;
+}
+
+export async function updateAgencyEstimateSettings(agencyId: number, data: Partial<typeof agencyEstimateSettings.$inferInsert>) {
+  const db = await getDb();
+  if (!db) return;
+  await db.insert(agencyEstimateSettings).values({ agencyId, ...data }).onDuplicateKeyUpdate({ set: data });
+}
+
+export async function getActiveAgencyStateEstimateInput(agencyId: number, state: string) {
+  const db = await getDb();
+  if (!db) return null;
+  const normalized = state.trim();
+  const result = await db.select().from(agencyStateEstimateInputs)
+    .where(and(
+      eq(agencyStateEstimateInputs.agencyId, agencyId),
+      eq(agencyStateEstimateInputs.isActive, true),
+      or(eq(agencyStateEstimateInputs.stateName, normalized), eq(agencyStateEstimateInputs.stateCode, normalized.toUpperCase())),
+    )).limit(1);
+  return result[0] || null;
+}
+
+export async function listAgencyStateEstimateInputs(agencyId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(agencyStateEstimateInputs).where(eq(agencyStateEstimateInputs.agencyId, agencyId)).orderBy(asc(agencyStateEstimateInputs.stateName));
+}
+
+export async function upsertAgencyStateEstimateInput(agencyId: number, data: Omit<typeof agencyStateEstimateInputs.$inferInsert, "agencyId">) {
+  const db = await getDb();
+  if (!db) return;
+  await db.insert(agencyStateEstimateInputs).values({ agencyId, ...data }).onDuplicateKeyUpdate({ set: data });
+}
+
+export async function getAgencyFeatureControls(agencyId: number) {
+  const db = await getDb();
+  if (!db) return null;
+  await db.insert(agencyFeatureControls).values({ agencyId }).onDuplicateKeyUpdate({ set: { agencyId } });
+  const result = await db.select().from(agencyFeatureControls).where(eq(agencyFeatureControls.agencyId, agencyId)).limit(1);
+  return result[0] || null;
+}
+
+export async function updateAgencyFeatureControls(agencyId: number, userId: number, data: Partial<typeof agencyFeatureControls.$inferInsert>) {
+  const db = await getDb();
+  if (!db) return;
+  await db.insert(agencyFeatureControls).values({ agencyId, updatedByUserId: userId, ...data }).onDuplicateKeyUpdate({ set: { ...data, updatedByUserId: userId } });
+}
+
+export async function isAgencyFeatureEnabled(agencyId: number, feature: "emailAutomationEnabled" | "whatsappAutomationEnabled" | "smsOtpEnabled" | "scheduledFollowUpsEnabled" | "optionalAiFeaturesEnabled") {
+  const controls = await getAgencyFeatureControls(agencyId);
+  return Boolean(controls?.[feature]);
+}
+
+export async function addAgencyConfigurationAudit(input: { agencyId: number; actorUserId?: number; action: string; entityType: string; entityId?: number; metadata?: unknown; }) {
+  const db = await getDb();
+  if (!db) return;
+  await db.insert(agencyConfigurationAudit).values({
+    agencyId: input.agencyId,
+    actorUserId: input.actorUserId ?? null,
+    action: input.action,
+    entityType: input.entityType,
+    entityId: input.entityId ?? null,
+    metadata: input.metadata ?? null,
+  });
+}
+
+export async function getAgencyConfigurationAudit(agencyId: number, limit = 30) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(agencyConfigurationAudit).where(eq(agencyConfigurationAudit.agencyId, agencyId)).orderBy(desc(agencyConfigurationAudit.createdAt)).limit(limit);
+}
+
+export async function getAgencyCatalogReadiness(agencyId: number) {
+  const db = await getDb();
+  if (!db) return { activePanels: 0, activeInverters: 0, verifiedPanels: 0, verifiedInverters: 0, pricingActive: false, stateInputs: 0 };
+  const [panels, inverters, pricing, stateInputs] = await Promise.all([
+    db.select().from(panelProducts).where(and(eq(panelProducts.agencyId, agencyId), eq(panelProducts.isActive, true))),
+    db.select().from(inverterProducts).where(and(eq(inverterProducts.agencyId, agencyId), eq(inverterProducts.isActive, true))),
+    getAgencyEstimateSettings(agencyId),
+    db.select().from(agencyStateEstimateInputs).where(and(eq(agencyStateEstimateInputs.agencyId, agencyId), eq(agencyStateEstimateInputs.isActive, true))),
+  ]);
+  return {
+    activePanels: panels.length,
+    activeInverters: inverters.length,
+    verifiedPanels: panels.filter(item => Boolean(item.isPriceActive)).length,
+    verifiedInverters: inverters.filter(item => Boolean(item.isPriceActive)).length,
+    pricingActive: Boolean(pricing?.isPricingActive),
+    stateInputs: stateInputs.length,
+  };
 }
 
 // ==================== CONVERSATIONS ====================

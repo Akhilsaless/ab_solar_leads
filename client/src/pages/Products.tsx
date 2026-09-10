@@ -66,6 +66,7 @@ export default function Products() {
                       <InfoBox label="Type" value={panel.panelType || "Mono"} />
                       <InfoBox label="Warranty" value={`${panel.warranty || 25} yrs`} />
                     </div>
+                    <p className={`mt-3 text-xs ${panel.isPriceActive ? "text-emerald-400" : "text-amber-400"}`}>{panel.isPriceActive ? `Verified price · ${panel.pricingVersion || "versioned"}` : "Draft price — withheld from public monetary estimates"}</p>
                   </CardContent>
                 </Card>
               ))}
@@ -105,6 +106,7 @@ export default function Products() {
                       <InfoBox label="Type" value={inv.inverterType || "String"} />
                       <InfoBox label="Warranty" value={`${inv.warranty || 10} yrs`} />
                     </div>
+                    <p className={`mt-3 text-xs ${inv.isPriceActive ? "text-emerald-400" : "text-amber-400"}`}>{inv.isPriceActive ? `Verified price · ${inv.pricingVersion || "versioned"}` : "Draft price — withheld from public monetary estimates"}</p>
                   </CardContent>
                 </Card>
               ))}
@@ -137,10 +139,10 @@ function EmptyState({ type }: { type: "panels" | "inverters" }) {
 
 function AddPanelDialog({ onSuccess }: { onSuccess: () => void }) {
   const [open, setOpen] = useState(false);
-  const [form, setForm] = useState({ brand: "", model: "", wattage: "", pricePerPanel: "", efficiency: "", panelType: "monocrystalline", warranty: "25" });
+  const [form, setForm] = useState({ brand: "", model: "", wattage: "", pricePerPanel: "", efficiency: "", panelType: "monocrystalline", warranty: "25", pricingVersion: "draft", effectiveFrom: "", verifiedOn: "", sourceNote: "", isPriceActive: false });
 
   const addPanel = trpc.panels.create.useMutation({
-    onSuccess: () => { onSuccess(); setOpen(false); toast.success("Panel added"); setForm({ brand: "", model: "", wattage: "", pricePerPanel: "", efficiency: "", panelType: "monocrystalline", warranty: "25" }); },
+    onSuccess: () => { onSuccess(); setOpen(false); toast.success("Panel added"); setForm({ brand: "", model: "", wattage: "", pricePerPanel: "", efficiency: "", panelType: "monocrystalline", warranty: "25", pricingVersion: "draft", effectiveFrom: "", verifiedOn: "", sourceNote: "", isPriceActive: false }); },
     onError: (err: any) => toast.error(err.message),
   });
 
@@ -169,7 +171,8 @@ function AddPanelDialog({ onSuccess }: { onSuccess: () => void }) {
               <option value="thin_film">Thin Film</option>
             </select>
           </div>
-          <Button className="w-full solar-gradient text-black" disabled={!form.brand || !form.model || !form.wattage || !form.pricePerPanel || addPanel.isPending} onClick={() => addPanel.mutate({ brand: form.brand, model: form.model, wattage: Number(form.wattage), pricePerPanel: form.pricePerPanel, efficiency: form.efficiency || undefined, panelType: form.panelType, warranty: Number(form.warranty) || 25 })}>
+          <div className="rounded-lg border border-border p-3 space-y-3"><p className="text-xs font-medium">Price verification</p><div className="grid grid-cols-2 gap-3"><FormField label="Pricing version" value={form.pricingVersion} onChange={(v) => setForm({ ...form, pricingVersion: v })} placeholder="2026-q4" /><FormField label="Effective from" value={form.effectiveFrom} onChange={(v) => setForm({ ...form, effectiveFrom: v })} placeholder="" type="date" /><FormField label="Verified on" value={form.verifiedOn} onChange={(v) => setForm({ ...form, verifiedOn: v })} placeholder="" type="date" /></div><FormField label="Source / owner approval" value={form.sourceNote} onChange={(v) => setForm({ ...form, sourceNote: v })} placeholder="Vendor sheet or approved quote" /><label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={form.isPriceActive} onChange={(e) => setForm({ ...form, isPriceActive: e.target.checked })} /> Mark this price verified and active</label></div>
+          <Button className="w-full solar-gradient text-black" disabled={!form.brand || !form.model || !form.wattage || !form.pricePerPanel || addPanel.isPending} onClick={() => addPanel.mutate({ brand: form.brand, model: form.model, wattage: Number(form.wattage), pricePerPanel: form.pricePerPanel, efficiency: form.efficiency || undefined, panelType: form.panelType, warranty: Number(form.warranty) || 25, pricingVersion: form.pricingVersion, effectiveFrom: form.effectiveFrom || undefined, sourceNote: form.sourceNote || undefined, lastVerifiedAt: form.verifiedOn ? new Date(`${form.verifiedOn}T00:00:00.000Z`).toISOString() : undefined, isPriceActive: form.isPriceActive })}>
             {addPanel.isPending ? "Adding..." : "Add Panel"}
           </Button>
         </div>
@@ -180,10 +183,10 @@ function AddPanelDialog({ onSuccess }: { onSuccess: () => void }) {
 
 function AddInverterDialog({ onSuccess }: { onSuccess: () => void }) {
   const [open, setOpen] = useState(false);
-  const [form, setForm] = useState({ brand: "", model: "", capacityKw: "", price: "", inverterType: "string", warranty: "10" });
+  const [form, setForm] = useState({ brand: "", model: "", capacityKw: "", price: "", inverterType: "string", warranty: "10", pricingVersion: "draft", effectiveFrom: "", verifiedOn: "", sourceNote: "", isPriceActive: false });
 
   const addInverter = trpc.inverters.create.useMutation({
-    onSuccess: () => { onSuccess(); setOpen(false); toast.success("Inverter added"); setForm({ brand: "", model: "", capacityKw: "", price: "", inverterType: "string", warranty: "10" }); },
+    onSuccess: () => { onSuccess(); setOpen(false); toast.success("Inverter added"); setForm({ brand: "", model: "", capacityKw: "", price: "", inverterType: "string", warranty: "10", pricingVersion: "draft", effectiveFrom: "", verifiedOn: "", sourceNote: "", isPriceActive: false }); },
     onError: (err: any) => toast.error(err.message),
   });
 
@@ -211,7 +214,8 @@ function AddInverterDialog({ onSuccess }: { onSuccess: () => void }) {
               <option value="off_grid">Off-Grid Inverter</option>
             </select>
           </div>
-          <Button className="w-full solar-gradient text-black" disabled={!form.brand || !form.model || !form.capacityKw || !form.price || addInverter.isPending} onClick={() => addInverter.mutate({ brand: form.brand, model: form.model, capacityKw: form.capacityKw, price: form.price, inverterType: form.inverterType, warranty: Number(form.warranty) || 10 })}>
+          <div className="rounded-lg border border-border p-3 space-y-3"><p className="text-xs font-medium">Price verification</p><div className="grid grid-cols-2 gap-3"><FormField label="Pricing version" value={form.pricingVersion} onChange={(v) => setForm({ ...form, pricingVersion: v })} placeholder="2026-q4" /><FormField label="Effective from" value={form.effectiveFrom} onChange={(v) => setForm({ ...form, effectiveFrom: v })} placeholder="" type="date" /><FormField label="Verified on" value={form.verifiedOn} onChange={(v) => setForm({ ...form, verifiedOn: v })} placeholder="" type="date" /></div><FormField label="Source / owner approval" value={form.sourceNote} onChange={(v) => setForm({ ...form, sourceNote: v })} placeholder="Vendor sheet or approved quote" /><label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={form.isPriceActive} onChange={(e) => setForm({ ...form, isPriceActive: e.target.checked })} /> Mark this price verified and active</label></div>
+          <Button className="w-full solar-gradient text-black" disabled={!form.brand || !form.model || !form.capacityKw || !form.price || addInverter.isPending} onClick={() => addInverter.mutate({ brand: form.brand, model: form.model, capacityKw: form.capacityKw, price: form.price, inverterType: form.inverterType, warranty: Number(form.warranty) || 10, pricingVersion: form.pricingVersion, effectiveFrom: form.effectiveFrom || undefined, sourceNote: form.sourceNote || undefined, lastVerifiedAt: form.verifiedOn ? new Date(`${form.verifiedOn}T00:00:00.000Z`).toISOString() : undefined, isPriceActive: form.isPriceActive })}>
             {addInverter.isPending ? "Adding..." : "Add Inverter"}
           </Button>
         </div>

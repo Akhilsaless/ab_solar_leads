@@ -130,6 +130,11 @@ export async function followUpEmailsHandler(req: Request, res: Response) {
     if (!user.isCron) {
       return res.status(403).json({ error: "cron-only endpoint" });
     }
+    const canSendForAgency = async (agencyId: number | null | undefined) => Boolean(
+      agencyId
+      && await db.isAgencyFeatureEnabled(agencyId, "emailAutomationEnabled")
+      && await db.isAgencyFeatureEnabled(agencyId, "scheduledFollowUpsEnabled"),
+    );
     let sent24 = 0, sent72 = 0, errors = 0;
 
     // 24-hour follow-ups
@@ -137,6 +142,7 @@ export async function followUpEmailsHandler(req: Request, res: Response) {
       const leads24 = await db.getUnconvertedLeadsForFollowUp(24, "followUp24Sent");
       for (const conv of leads24) {
         try {
+          if (!await canSendForAgency((conv as any).agencyId)) continue;
           if (!conv.customerEmail) { errors++; continue; }
           const html = build24hEmailHtml(conv);
           const result = await sendEmail({
@@ -157,6 +163,7 @@ export async function followUpEmailsHandler(req: Request, res: Response) {
       const leads72 = await db.getUnconvertedLeadsForFollowUp(72, "followUp72Sent");
       for (const conv of leads72) {
         try {
+          if (!await canSendForAgency((conv as any).agencyId)) continue;
           if (!conv.customerEmail) { errors++; continue; }
           const html = build72hEmailHtml(conv);
           const result = await sendEmail({
@@ -178,6 +185,7 @@ export async function followUpEmailsHandler(req: Request, res: Response) {
       const leads7d = await db.getUnconvertedLeadsForFollowUp(7 * 24, "followUp7dSent");
       for (const conv of leads7d) {
         try {
+          if (!await canSendForAgency((conv as any).agencyId)) continue;
           if (!conv.customerEmail) { errors++; continue; }
           const html = build7dEmailHtml(conv);
           const result = await sendEmail({

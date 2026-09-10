@@ -13,8 +13,7 @@ export async function initRazorpay() {
     return null;
   }
 
-  console.log("[Razorpay] Initialized with key:", razorpayKeyId.substring(0, 10) + "...");
-  return { keyId: razorpayKeyId, keySecret: razorpayKeySecret };
+  return { configured: true };
 }
 
 export async function processRazorpayPayout(
@@ -23,33 +22,18 @@ export async function processRazorpayPayout(
   upiId?: string,
   bankAccount?: string
 ) {
-  const razorpay = initRazorpay();
+  const razorpay = await initRazorpay();
   if (!razorpay) {
     console.warn("[Razorpay] Not configured. Payout cannot be processed.");
     return { success: false, message: "Razorpay not configured" };
   }
 
-  try {
-    // Razorpay payout logic would go here
-    // For now, just log the payout request
-    console.log(`[Razorpay] Processing payout of ₹${amount}`, {
-      withdrawalId,
-      upiId,
-      bankAccount,
-    });
-
-    // In production, call Razorpay API here
-    // const response = await razorpayClient.payouts.create({...})
-
-    return {
-      success: true,
-      message: "Payout processed via Razorpay",
-      transactionId: `RZP_${withdrawalId}_${Date.now()}`,
-    };
-  } catch (error) {
-    console.error("[Razorpay] Payout failed:", error);
-    return { success: false, error };
-  }
+  void razorpay;
+  void withdrawalId;
+  void amount;
+  void upiId;
+  void bankAccount;
+  return { success: false, message: "Razorpay payouts are disabled because a production payout adapter is not installed." };
 }
 
 // WhatsApp Integration (Optional)
@@ -62,8 +46,9 @@ export async function initWhatsApp() {
     return null;
   }
 
-  console.log("[WhatsApp] Initialized with phone ID:", whatsappPhoneId);
-  return { apiKey: whatsappApiKey, phoneId: whatsappPhoneId };
+  void whatsappApiKey;
+  void whatsappPhoneId;
+  return { configured: true };
 }
 
 export async function sendWhatsAppMessage(
@@ -71,31 +56,17 @@ export async function sendWhatsAppMessage(
   message: string,
   messageType: "text" | "template" = "text"
 ) {
-  const whatsapp = initWhatsApp();
+  const whatsapp = await initWhatsApp();
   if (!whatsapp) {
     console.warn("[WhatsApp] Not configured. Message not sent.");
     return { success: false, message: "WhatsApp not configured" };
   }
 
-  try {
-    console.log(`[WhatsApp] Sending ${messageType} message to ${phoneNumber}`);
-
-    // WhatsApp message logic would go here
-    // For now, just log the message
-    console.log(`[WhatsApp] Message: ${message}`);
-
-    // In production, call WhatsApp API here
-    // const response = await fetch('https://graph.instagram.com/v18.0/...')
-
-    return {
-      success: true,
-      message: "Message sent via WhatsApp",
-      messageId: `WA_${Date.now()}`,
-    };
-  } catch (error) {
-    console.error("[WhatsApp] Failed to send message:", error);
-    return { success: false, error };
-  }
+  void whatsapp;
+  void phoneNumber;
+  void message;
+  void messageType;
+  return { success: false, message: "WhatsApp sending is disabled because a verified production provider adapter is not installed." };
 }
 
 export async function sendWhatsAppNotification(
@@ -127,12 +98,14 @@ export async function sendWhatsAppNotification(
 export function getIntegrationStatus() {
   return {
     razorpay: {
-      enabled: !!(process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_SECRET),
+      enabled: false,
       configured: !!process.env.RAZORPAY_KEY_ID,
+      adapterAvailable: false,
     },
     whatsapp: {
-      enabled: !!(process.env.WHATSAPP_API_KEY && process.env.WHATSAPP_PHONE_ID),
+      enabled: false,
       configured: !!process.env.WHATSAPP_API_KEY,
+      adapterAvailable: false,
     },
   };
 }

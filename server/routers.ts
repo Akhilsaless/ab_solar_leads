@@ -21,6 +21,7 @@ import { automatedOutreachRouter } from "./automatedOutreach";
 import { partnerManagementRouter } from "./partnerManagement";
 import { campaignIntelligenceRouter } from "./campaignIntelligence";
 import { aiGatewayRouter } from "./aiGateway";
+import { operationsRouter } from "./operations";
 import { storagePut } from "./storage";
 import { ENV } from "./_core/env";
 import { calculateBusinessEvidenceScore, calculateEvidenceScore } from "./evidenceScore";
@@ -39,6 +40,8 @@ import {
 } from "./chatFlow";
 import { parseQuickReplyMarkup } from "@shared/chatControls";
 import { buildBillOcrContent } from "./billOcrContent";
+import { catalogItemActivationError } from "./productionControls";
+import { isCurrentVerifiedCatalogItem, isVerifiedPricingReady } from "./catalogPricing";
 
 async function requireUserAgency(userId: number) {
   const agency = await db.getAgencyByUserId(userId);
@@ -116,6 +119,7 @@ export const appRouter = router({
   partnerManagement: partnerManagementRouter,
   campaignIntelligence: campaignIntelligenceRouter,
   aiGateway: aiGatewayRouter,
+  operations: operationsRouter,
   automatedOutreach: automatedOutreachRouter,
   copilot: copilotRouter,
   referralCoach: referralCoachRouter,
@@ -251,12 +255,25 @@ export const appRouter = router({
         efficiency: z.string().optional(),
         panelType: z.string().optional(),
         warranty: z.number().optional(),
+        pricingVersion: z.string().trim().max(80).optional(),
+        effectiveFrom: z.string().date().optional(),
+        effectiveTo: z.string().date().optional(),
+        sourceNote: z.string().trim().max(2000).optional(),
+        lastVerifiedAt: z.string().datetime().optional(),
+        isPriceActive: z.boolean().optional(),
       }))
       .mutation(async ({ input, ctx }) => {
-        if (!ctx.user) throw new Error("Not authenticated");
-        const agency = await db.getAgencyByUserId(ctx.user.id);
-        if (!agency) throw new Error("Agency not found");
-        const id = await db.createPanel({ ...input, agencyId: agency.id });
+        const agency = await requireUserAgency(ctx.user!.id);
+        const error = catalogItemActivationError(input);
+        if (error) throw new TRPCError({ code: "PRECONDITION_FAILED", message: error });
+        const id = await db.createPanel({
+          ...input,
+          agencyId: agency.id,
+          effectiveFrom: input.effectiveFrom ? new Date(`${input.effectiveFrom}T00:00:00.000Z`) : undefined,
+          effectiveTo: input.effectiveTo ? new Date(`${input.effectiveTo}T00:00:00.000Z`) : undefined,
+          lastVerifiedAt: input.lastVerifiedAt ? new Date(input.lastVerifiedAt) : undefined,
+        });
+        await db.addAgencyConfigurationAudit({ agencyId: agency.id, actorUserId: ctx.user!.id, action: "panel_created", entityType: "panelProducts3", entityId: id ?? undefined, metadata: { pricingVersion: input.pricingVersion || "draft", isPriceActive: Boolean(input.isPriceActive) } });
         return { success: true, id };
       }),
 
@@ -270,17 +287,38 @@ export const appRouter = router({
         efficiency: z.string().optional(),
         panelType: z.string().optional(),
         warranty: z.number().optional(),
+        pricingVersion: z.string().trim().max(80).optional(),
+        effectiveFrom: z.string().date().nullable().optional(),
+        effectiveTo: z.string().date().nullable().optional(),
+        sourceNote: z.string().trim().max(2000).nullable().optional(),
+        lastVerifiedAt: z.string().datetime().nullable().optional(),
+        isPriceActive: z.boolean().optional(),
       }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
         const { id, ...data } = input;
-        await db.updatePanel(id, data);
+        const agency = await requireUserAgency(ctx.user!.id);
+        const current = await db.getPanelByIdForAgency(id, agency.id);
+        if (!current) throw new TRPCError({ code: "NOT_FOUND", message: "Panel not found" });
+        const merged = { ...current, ...data };
+        const error = catalogItemActivationError(merged);
+        if (error) throw new TRPCError({ code: "PRECONDITION_FAILED", message: error });
+        await db.updatePanelForAgency(id, agency.id, {
+          ...data,
+          effectiveFrom: data.effectiveFrom ? new Date(`${data.effectiveFrom}T00:00:00.000Z`) : data.effectiveFrom === null ? null : undefined,
+          effectiveTo: data.effectiveTo ? new Date(`${data.effectiveTo}T00:00:00.000Z`) : data.effectiveTo === null ? null : undefined,
+          lastVerifiedAt: data.lastVerifiedAt ? new Date(data.lastVerifiedAt) : data.lastVerifiedAt === null ? null : undefined,
+        });
+        await db.addAgencyConfigurationAudit({ agencyId: agency.id, actorUserId: ctx.user!.id, action: "panel_updated", entityType: "panelProducts3", entityId: id, metadata: { pricingVersion: merged.pricingVersion, isPriceActive: Boolean(merged.isPriceActive) } });
         return { success: true };
       }),
 
     delete: protectedProcedure
       .input(z.object({ id: z.number() }))
-      .mutation(async ({ input }) => {
-        await db.deletePanel(input.id);
+      .mutation(async ({ input, ctx }) => {
+        const agency = await requireUserAgency(ctx.user!.id);
+        if (!await db.getPanelByIdForAgency(input.id, agency.id)) throw new TRPCError({ code: "NOT_FOUND", message: "Panel not found" });
+        await db.deletePanelForAgency(input.id, agency.id);
+        await db.addAgencyConfigurationAudit({ agencyId: agency.id, actorUserId: ctx.user!.id, action: "panel_archived", entityType: "panelProducts3", entityId: input.id });
         return { success: true };
       }),
   }),
@@ -302,12 +340,25 @@ export const appRouter = router({
         price: z.string(),
         inverterType: z.string().optional(),
         warranty: z.number().optional(),
+        pricingVersion: z.string().trim().max(80).optional(),
+        effectiveFrom: z.string().date().optional(),
+        effectiveTo: z.string().date().optional(),
+        sourceNote: z.string().trim().max(2000).optional(),
+        lastVerifiedAt: z.string().datetime().optional(),
+        isPriceActive: z.boolean().optional(),
       }))
       .mutation(async ({ input, ctx }) => {
-        if (!ctx.user) throw new Error("Not authenticated");
-        const agency = await db.getAgencyByUserId(ctx.user.id);
-        if (!agency) throw new Error("Agency not found");
-        const id = await db.createInverter({ ...input, agencyId: agency.id });
+        const agency = await requireUserAgency(ctx.user!.id);
+        const error = catalogItemActivationError(input);
+        if (error) throw new TRPCError({ code: "PRECONDITION_FAILED", message: error });
+        const id = await db.createInverter({
+          ...input,
+          agencyId: agency.id,
+          effectiveFrom: input.effectiveFrom ? new Date(`${input.effectiveFrom}T00:00:00.000Z`) : undefined,
+          effectiveTo: input.effectiveTo ? new Date(`${input.effectiveTo}T00:00:00.000Z`) : undefined,
+          lastVerifiedAt: input.lastVerifiedAt ? new Date(input.lastVerifiedAt) : undefined,
+        });
+        await db.addAgencyConfigurationAudit({ agencyId: agency.id, actorUserId: ctx.user!.id, action: "inverter_created", entityType: "inverterProducts3", entityId: id ?? undefined, metadata: { pricingVersion: input.pricingVersion || "draft", isPriceActive: Boolean(input.isPriceActive) } });
         return { success: true, id };
       }),
 
@@ -320,17 +371,38 @@ export const appRouter = router({
         price: z.string().optional(),
         inverterType: z.string().optional(),
         warranty: z.number().optional(),
+        pricingVersion: z.string().trim().max(80).optional(),
+        effectiveFrom: z.string().date().nullable().optional(),
+        effectiveTo: z.string().date().nullable().optional(),
+        sourceNote: z.string().trim().max(2000).nullable().optional(),
+        lastVerifiedAt: z.string().datetime().nullable().optional(),
+        isPriceActive: z.boolean().optional(),
       }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
         const { id, ...data } = input;
-        await db.updateInverter(id, data);
+        const agency = await requireUserAgency(ctx.user!.id);
+        const current = await db.getInverterByIdForAgency(id, agency.id);
+        if (!current) throw new TRPCError({ code: "NOT_FOUND", message: "Inverter not found" });
+        const merged = { ...current, ...data };
+        const error = catalogItemActivationError(merged);
+        if (error) throw new TRPCError({ code: "PRECONDITION_FAILED", message: error });
+        await db.updateInverterForAgency(id, agency.id, {
+          ...data,
+          effectiveFrom: data.effectiveFrom ? new Date(`${data.effectiveFrom}T00:00:00.000Z`) : data.effectiveFrom === null ? null : undefined,
+          effectiveTo: data.effectiveTo ? new Date(`${data.effectiveTo}T00:00:00.000Z`) : data.effectiveTo === null ? null : undefined,
+          lastVerifiedAt: data.lastVerifiedAt ? new Date(data.lastVerifiedAt) : data.lastVerifiedAt === null ? null : undefined,
+        });
+        await db.addAgencyConfigurationAudit({ agencyId: agency.id, actorUserId: ctx.user!.id, action: "inverter_updated", entityType: "inverterProducts3", entityId: id, metadata: { pricingVersion: merged.pricingVersion, isPriceActive: Boolean(merged.isPriceActive) } });
         return { success: true };
       }),
 
     delete: protectedProcedure
       .input(z.object({ id: z.number() }))
-      .mutation(async ({ input }) => {
-        await db.deleteInverter(input.id);
+      .mutation(async ({ input, ctx }) => {
+        const agency = await requireUserAgency(ctx.user!.id);
+        if (!await db.getInverterByIdForAgency(input.id, agency.id)) throw new TRPCError({ code: "NOT_FOUND", message: "Inverter not found" });
+        await db.deleteInverterForAgency(input.id, agency.id);
+        await db.addAgencyConfigurationAudit({ agencyId: agency.id, actorUserId: ctx.user!.id, action: "inverter_archived", entityType: "inverterProducts3", entityId: input.id });
         return { success: true };
       }),
   }),
@@ -495,6 +567,15 @@ export const appRouter = router({
           subsidyData = await db.getSubsidyByState(deterministicFacts.state || conversation.customerState!);
         }
 
+        const estimateState = deterministicFacts.state || conversation.customerState || null;
+        const [estimateSettings, verifiedStateInput] = await Promise.all([
+          db.getAgencyEstimateSettings(agency.id),
+          estimateState ? db.getActiveAgencyStateEstimateInput(agency.id, estimateState) : Promise.resolve(null),
+        ]);
+        const verifiedPanels = panels.filter(item => isCurrentVerifiedCatalogItem(item));
+        const verifiedInverters = inverters.filter(item => isCurrentVerifiedCatalogItem(item));
+        const canShowMonetaryEstimate = isVerifiedPricingReady({ pricingActive: Boolean(estimateSettings?.isPricingActive), stateInput: verifiedStateInput, panels: verifiedPanels, inverters: verifiedInverters });
+
         if (hasEstimateInputs(deterministicFacts) && conversation.status !== "estimate_given") {
           if (deterministicFacts.propertyType === "commercial") {
             const commercialKw = estimateCommercialCapacityKw(
@@ -515,20 +596,30 @@ export const appRouter = router({
             };
           }
 
-          if (panels.length > 0 && inverters.length > 0 && subsidyData) {
+          if (canShowMonetaryEstimate && subsidyData) {
+            const configuredState = {
+              ...subsidyData,
+              avgElectricityRate: verifiedStateInput!.tariffPerUnit,
+              avgSunHours: verifiedStateInput!.avgSunHours,
+              centralSubsidy1kw: "0",
+              centralSubsidy2kw: "0",
+              centralSubsidy3kw: "0",
+              stateAdditionalPerKw: "0",
+              stateMaxAdditional: "0",
+            };
             const configuredEstimate = calculateSolarEstimate(
               deterministicFacts.monthlyBill,
               deterministicFacts.state,
-              panels,
-              inverters,
-              agency,
-              subsidyData,
+              verifiedPanels,
+              verifiedInverters,
+              { ...agency, installationChargePerKw: estimateSettings!.installationCostPerKw, marginPercent: estimateSettings!.taxRatePercent || "0" },
+              configuredState,
             );
             const estimateResponse = preliminaryEstimateMessage({
               propertyType: deterministicFacts.propertyType,
               monthlyBill: deterministicFacts.monthlyBill,
               estimate: configuredEstimate,
-              subsidyConfigured: true,
+              subsidyConfigured: false,
             });
             await db.updateConversation(input.sessionId, {
               recommendedKw: configuredEstimate.systemSizeKw.toString(),
@@ -1116,8 +1207,45 @@ export const appRouter = router({
         }
 
         const subsidyData = await db.getSubsidyByState(input.state);
-        const estimate = calculateSolarEstimate(input.monthlyBill, input.state, panels, inverters, agency, subsidyData);
-        return estimate;
+        const [pricing, stateInput] = agency ? await Promise.all([
+          db.getAgencyEstimateSettings(agency.id),
+          db.getActiveAgencyStateEstimateInput(agency.id, input.state),
+        ]) : [null, null];
+        const verifiedPanels = panels.filter(item => isCurrentVerifiedCatalogItem(item));
+        const verifiedInverters = inverters.filter(item => isCurrentVerifiedCatalogItem(item));
+        const catalogReady = isVerifiedPricingReady({ pricingActive: Boolean(pricing?.isPricingActive), stateInput, panels: verifiedPanels, inverters: verifiedInverters });
+        if (!catalogReady) {
+          const tariff = Number(stateInput?.tariffPerUnit || subsidyData?.avgElectricityRate || 0);
+          const sunHours = Number(stateInput?.avgSunHours || subsidyData?.avgSunHours || 0);
+          const systemSizeKw = tariff > 0 && sunHours > 0
+            ? Math.max(1, Math.round((((input.monthlyBill / tariff) / 30 / sunHours) * 1.2) * 10) / 10)
+            : null;
+          return {
+            systemSizeKw,
+            monetaryEstimateAvailable: false,
+            pricingStatus: "configuration_required",
+            message: "A verified agency catalog, active pricing policy, and active state estimate input are required before costs, savings, subsidy, or payback can be shown.",
+          };
+        }
+        const configuredState = {
+          ...subsidyData,
+          avgElectricityRate: stateInput!.tariffPerUnit,
+          avgSunHours: stateInput!.avgSunHours,
+          centralSubsidy1kw: "0",
+          centralSubsidy2kw: "0",
+          centralSubsidy3kw: "0",
+          stateAdditionalPerKw: "0",
+          stateMaxAdditional: "0",
+        };
+        const estimate = calculateSolarEstimate(
+          input.monthlyBill,
+          input.state,
+          verifiedPanels,
+          verifiedInverters,
+          { ...agency, installationChargePerKw: pricing!.installationCostPerKw, marginPercent: pricing!.taxRatePercent || "0" },
+          configuredState,
+        );
+        return { ...estimate, monetaryEstimateAvailable: true, pricingStatus: "verified_agency_catalog" };
       }),
   }),
 

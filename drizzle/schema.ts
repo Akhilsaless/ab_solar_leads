@@ -1,4 +1,4 @@
-import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, decimal, boolean, json, date, bigint, uniqueIndex } from "drizzle-orm/mysql-core";
+import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, decimal, boolean, json, date, bigint, uniqueIndex, index } from "drizzle-orm/mysql-core";
 
 /**
  * Core user table backing auth flow (agency owners/admins).
@@ -60,6 +60,12 @@ export const panelProducts = mysqlTable("panelProducts3", {
   efficiency: decimal("efficiency", { precision: 5, scale: 2 }),
   panelType: varchar("panelType", { length: 50 }).default("monocrystalline"),
   warranty: int("warranty").default(25),
+  pricingVersion: varchar("pricingVersion", { length: 80 }).default("draft").notNull(),
+  effectiveFrom: date("effectiveFrom"),
+  effectiveTo: date("effectiveTo"),
+  sourceNote: text("sourceNote"),
+  lastVerifiedAt: timestamp("lastVerifiedAt"),
+  isPriceActive: boolean("isPriceActive").default(false).notNull(),
   isActive: boolean("isActive").default(true),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
@@ -79,6 +85,12 @@ export const inverterProducts = mysqlTable("inverterProducts3", {
   price: decimal("price", { precision: 10, scale: 2 }).notNull(),
   inverterType: varchar("inverterType", { length: 50 }).default("string"),
   warranty: int("warranty").default(10),
+  pricingVersion: varchar("pricingVersion", { length: 80 }).default("draft").notNull(),
+  effectiveFrom: date("effectiveFrom"),
+  effectiveTo: date("effectiveTo"),
+  sourceNote: text("sourceNote"),
+  lastVerifiedAt: timestamp("lastVerifiedAt"),
+  isPriceActive: boolean("isPriceActive").default(false).notNull(),
   isActive: boolean("isActive").default(true),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
@@ -850,3 +862,92 @@ export const aiGatewayUsage = mysqlTable("aiGatewayUsage", {
 export type AiGatewaySettings = typeof aiGatewaySettings.$inferSelect;
 export type AiProviderConnection = typeof aiProviderConnections.$inferSelect;
 export type AiProviderModel = typeof aiProviderModels.$inferSelect;
+
+/**
+ * Agency-owned pricing policy. Monetary figures may only be surfaced when this
+ * policy is explicitly active, current, and supported by active catalog entries.
+ */
+export const agencyEstimateSettings = mysqlTable("agencyEstimateSettings", {
+  id: int("id").autoincrement().primaryKey(),
+  agencyId: int("agencyId").notNull(),
+  pricingVersion: varchar("pricingVersion", { length: 80 }).default("draft").notNull(),
+  pricingMode: mysqlEnum("pricingMode", ["catalog", "quote_only"]).default("catalog").notNull(),
+  installationCostPerKw: decimal("installationCostPerKw", { precision: 10, scale: 2 }),
+  balanceOfSystemCostPerKw: decimal("balanceOfSystemCostPerKw", { precision: 10, scale: 2 }),
+  taxRatePercent: decimal("taxRatePercent", { precision: 5, scale: 2 }),
+  warrantyTerms: text("warrantyTerms"),
+  pricingDisclosure: text("pricingDisclosure"),
+  sourceNote: text("sourceNote"),
+  effectiveFrom: date("effectiveFrom"),
+  effectiveTo: date("effectiveTo"),
+  lastVerifiedAt: timestamp("lastVerifiedAt"),
+  isPricingActive: boolean("isPricingActive").default(false).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (table) => ({
+  agencyUnique: uniqueIndex("agencyEstimateSettings_agency_unique").on(table.agencyId),
+}));
+
+/**
+ * State and DISCOM inputs are agency-scoped so a generic reference dataset
+ * cannot accidentally become a sales quote. Monetary subsidy figures remain
+ * informational until an agency verifies and activates a specific state input.
+ */
+export const agencyStateEstimateInputs = mysqlTable("agencyStateEstimateInputs", {
+  id: int("id").autoincrement().primaryKey(),
+  agencyId: int("agencyId").notNull(),
+  stateName: varchar("stateName", { length: 100 }).notNull(),
+  stateCode: varchar("stateCode", { length: 10 }).notNull(),
+  discomName: varchar("discomName", { length: 200 }),
+  tariffPerUnit: decimal("tariffPerUnit", { precision: 8, scale: 4 }),
+  avgSunHours: decimal("avgSunHours", { precision: 5, scale: 2 }),
+  systemLossPercent: decimal("systemLossPercent", { precision: 5, scale: 2 }),
+  netMeteringStatus: mysqlEnum("netMeteringStatus", ["unknown", "available", "limited", "unavailable"]).default("unknown").notNull(),
+  subsidyDisclosure: text("subsidyDisclosure"),
+  subsidySourceUrl: text("subsidySourceUrl"),
+  sourceNote: text("sourceNote"),
+  effectiveFrom: date("effectiveFrom"),
+  effectiveTo: date("effectiveTo"),
+  lastVerifiedAt: timestamp("lastVerifiedAt"),
+  isActive: boolean("isActive").default(false).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (table) => ({
+  stateUnique: uniqueIndex("agencyStateEstimateInputs_agency_state_unique").on(table.agencyId, table.stateCode),
+}));
+
+/**
+ * Explicit, disabled-by-default feature gates. A caller must pass both this
+ * agency control and the service-specific readiness guard before outbound work.
+ */
+export const agencyFeatureControls = mysqlTable("agencyFeatureControls", {
+  id: int("id").autoincrement().primaryKey(),
+  agencyId: int("agencyId").notNull(),
+  emailAutomationEnabled: boolean("emailAutomationEnabled").default(false).notNull(),
+  whatsappAutomationEnabled: boolean("whatsappAutomationEnabled").default(false).notNull(),
+  smsOtpEnabled: boolean("smsOtpEnabled").default(false).notNull(),
+  scheduledFollowUpsEnabled: boolean("scheduledFollowUpsEnabled").default(false).notNull(),
+  optionalAiFeaturesEnabled: boolean("optionalAiFeaturesEnabled").default(false).notNull(),
+  updatedByUserId: int("updatedByUserId"),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (table) => ({
+  agencyUnique: uniqueIndex("agencyFeatureControls_agency_unique").on(table.agencyId),
+}));
+
+/** Compact, metadata-only configuration history. Never store secrets or contact data. */
+export const agencyConfigurationAudit = mysqlTable("agencyConfigurationAudit", {
+  id: int("id").autoincrement().primaryKey(),
+  agencyId: int("agencyId").notNull(),
+  actorUserId: int("actorUserId"),
+  action: varchar("action", { length: 120 }).notNull(),
+  entityType: varchar("entityType", { length: 80 }).notNull(),
+  entityId: int("entityId"),
+  metadata: json("metadata"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => ({
+  agencyCreatedIndex: index("agencyConfigurationAudit_agency_created_idx").on(table.agencyId, table.id),
+}));
+
+export type AgencyEstimateSettings = typeof agencyEstimateSettings.$inferSelect;
+export type AgencyStateEstimateInput = typeof agencyStateEstimateInputs.$inferSelect;
+export type AgencyFeatureControls = typeof agencyFeatureControls.$inferSelect;

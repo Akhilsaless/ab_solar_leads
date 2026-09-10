@@ -9,7 +9,7 @@ import { registerStorageProxy } from "./storageProxy";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
-import { initializeEmailService } from "./emailService";
+import { getEmailServiceStatus, initializeEmailService } from "./emailService";
 import { followUpEmailsHandler } from "../followUpEmailHandler";
 import { adminDigestHandler } from "../adminDigestHandler";
 import { referrerOnboardingHandler } from "../referrerOnboardingHandler";
@@ -74,6 +74,8 @@ async function startServer() {
       await database.execute(sql`SELECT 1 FROM agencyConfig3 LIMIT 1`);
       await database.execute(sql`SELECT 1 FROM campaignProfiles LIMIT 1`);
       await database.execute(sql`SELECT 1 FROM aiGatewaySettings LIMIT 1`);
+      await database.execute(sql`SELECT 1 FROM agencyFeatureControls LIMIT 1`);
+      await database.execute(sql`SELECT 1 FROM agencyEstimateSettings LIMIT 1`);
       return res.json({ status: "ok", database: "ready" });
     } catch {
       return res.status(503).json({ status: "degraded", database: "migration_required" });
@@ -127,7 +129,7 @@ async function startServer() {
       if (emailReady) {
         console.log("[Email] Service initialized and ready");
       } else {
-        console.warn("[Email] Service initialized but SMTP verification failed - emails may not send");
+        console.warn(`[Email] Service remains ${getEmailServiceStatus().state}; no outbound email will be sent.`);
       }
     } catch (error) {
       console.error("[Email] Failed to initialize email service:", error);

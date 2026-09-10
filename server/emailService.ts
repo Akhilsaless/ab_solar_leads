@@ -9,8 +9,13 @@ const emailConfig = {
   },
 };
 
-// Create transporter
-const transporter = nodemailer.createTransport(emailConfig);
+// Legacy estimate templates are retained for migration compatibility only. They must not
+// bypass the central, disabled-by-default sender in server/_core/emailService.ts.
+const transporter = {
+  sendMail: async (_message: unknown) => {
+    throw new Error("Legacy estimate email sender is disabled. Use the central email service and explicit agency controls.");
+  },
+};
 
 export interface EstimateEmailData {
   customerName: string;
@@ -161,7 +166,7 @@ export async function sendCustomerEstimateEmail(data: EstimateEmailData): Promis
       html: htmlContent,
     });
 
-    console.log(`✓ Customer email sent to ${data.customerEmail}`);
+    console.log("[Email] Legacy customer estimate template sent through the controlled sender.");
     return true;
   } catch (error) {
     console.error("Error sending customer email:", error);
@@ -285,7 +290,7 @@ export async function sendCompanyLeadEmail(data: EstimateEmailData): Promise<boo
       html: htmlContent,
     });
 
-    console.log(`✓ Company email sent to ${data.agencyEmail}`);
+    console.log("[Email] Legacy company lead template sent through the controlled sender.");
     return true;
   } catch (error) {
     console.error("Error sending company email:", error);

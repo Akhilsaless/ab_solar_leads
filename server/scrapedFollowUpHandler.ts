@@ -31,8 +31,8 @@ function buildDay3Email(businessName: string, businessType: string): string {
     + "</div>"
     + "<div style=\"padding:40px;\">"
     + "<p style=\"color:#374151;font-size:15px;line-height:1.7;\">Hi " + name + ",</p>"
-    + "<p style=\"color:#374151;font-size:15px;line-height:1.7;\">We reached out a few days ago about solar for your " + (businessType || "business") + ". We wanted to follow up because electricity rates in India are rising — businesses that switch to solar now are locking in savings for the next 25 years.</p>"
-    + "<p style=\"color:#374151;font-size:15px;line-height:1.7;\">Our AI agent can give you a <strong>free, personalized savings estimate</strong> in under 2 minutes — no forms, no sales calls, just a quick chat.</p>"
+    + "<p style=\"color:#374151;font-size:15px;line-height:1.7;\">We reached out a few days ago about a preliminary solar assessment for your " + (businessType || "business") + ". Any savings or system recommendation depends on bill review, site assessment, and final system design.</p>"
+    + "<p style=\"color:#374151;font-size:15px;line-height:1.7;\">Our estimate assistant can collect the starting details for a preliminary assessment. It does not promise a price, savings outcome, or subsidy eligibility.</p>"
     + "<div style=\"background:#f8fafc;border-radius:12px;padding:24px;margin:24px 0;text-align:center;\">"
     + "<p style=\"margin:0 0 16px;color:#374151;font-size:14px;font-weight:600;\">Check how much you can save</p>"
     + "<a href=\"" + BOT_LINK + "\" style=\"background:linear-gradient(135deg,#f97316,#fb923c);color:#fff;padding:14px 32px;border-radius:8px;text-decoration:none;font-weight:700;display:inline-block;font-size:15px;\">Get My Free Solar Estimate</a>"
@@ -56,7 +56,7 @@ function buildDay7Email(businessName: string, businessType: string): string {
     + "<div style=\"padding:40px;\">"
     + "<p style=\"color:#374151;font-size:15px;line-height:1.7;\">Hi " + name + ",</p>"
     + "<p style=\"color:#374151;font-size:15px;line-height:1.7;\">This is our last email to you about solar for your " + (businessType || "business") + ". We don't want to keep sending emails you don't want.</p>"
-    + "<p style=\"color:#374151;font-size:15px;line-height:1.7;\">But before we go — if you ever want to know how much your " + (businessType || "business") + " could save with solar, our free estimate tool is always available. Businesses like yours typically save <strong>Rs.1,00,000 - Rs.3,00,000 per month</strong> after switching.</p>"
+    + "<p style=\"color:#374151;font-size:15px;line-height:1.7;\">If you ever want a preliminary assessment for your " + (businessType || "business") + ", the estimate assistant remains available. Any pricing, savings, tax treatment, or eligibility requires bill review, site assessment, and installer confirmation.</p>"
     + "<div style=\"background:#f8fafc;border-radius:12px;padding:24px;margin:24px 0;text-align:center;\">"
     + "<p style=\"margin:0 0 16px;color:#374151;font-size:14px;font-weight:600;\">One last chance — free solar estimate</p>"
     + "<a href=\"" + BOT_LINK + "\" style=\"background:linear-gradient(135deg,#f97316,#fb923c);color:#fff;padding:14px 32px;border-radius:8px;text-decoration:none;font-weight:700;display:inline-block;font-size:15px;\">Get My Free Estimate</a>"
@@ -84,26 +84,31 @@ export async function scrapedFollowUpHandler(req: Request, res: Response) {
     // ── Day 3 follow-ups ──────────────────────────────────────────────────────
     const day3Cutoff = now - THREE_DAYS_MS;
     const day3Result = await db.execute(sql`
-      SELECT id, businessName, businessType, email, emailSentAt
-      FROM scrapedBusinesses
-      WHERE contactStatus = 'contacted'
-        AND email IS NOT NULL
-        AND emailSentAt IS NOT NULL
-        AND emailSentAt <= ${day3Cutoff}
-        AND (followUp3dSent IS NULL OR followUp3dSent = 0)
+      SELECT sb.id, sb.agencyId, sb.businessName, sb.businessType, sb.email, sb.emailSentAt
+      FROM scrapedBusinesses sb
+      INNER JOIN agencyFeatureControls afc ON afc.agencyId = sb.agencyId
+      WHERE sb.contactStatus = 'contacted'
+        AND sb.email IS NOT NULL
+        AND sb.emailSentAt IS NOT NULL
+        AND sb.emailSentAt <= ${day3Cutoff}
+        AND (sb.followUp3dSent IS NULL OR sb.followUp3dSent = 0)
+        AND afc.emailAutomationEnabled = 1
+        AND afc.scheduledFollowUpsEnabled = 1
       LIMIT 50
     `);
     const day3Rows = Array.isArray(day3Result) && Array.isArray(day3Result[0]) ? day3Result[0] : day3Result;
 
     for (const biz of day3Rows as any[]) {
       try {
-        await sendEmail({
+        const delivery = await sendEmail({
           to: biz.email,
           subject: "Still thinking about solar? — " + (biz.businessName || "Your Business"),
           html: buildDay3Email(biz.businessName, biz.businessType),
         });
-        await db.execute(sql`UPDATE scrapedBusinesses SET followUp3dSent = ${now} WHERE id = ${biz.id}`);
-        day3Sent++;
+        if (delivery.success) {
+          await db.execute(sql`UPDATE scrapedBusinesses SET followUp3dSent = ${now} WHERE id = ${biz.id} AND agencyId = ${biz.agencyId}`);
+          day3Sent++;
+        } else errors++;
       } catch (e) {
         console.error("Day3 followup error for biz", biz.id, e);
         errors++;
@@ -113,28 +118,33 @@ export async function scrapedFollowUpHandler(req: Request, res: Response) {
     // ── Day 7 follow-ups ──────────────────────────────────────────────────────
     const day7Cutoff = now - SEVEN_DAYS_MS;
     const day7Result = await db.execute(sql`
-      SELECT id, businessName, businessType, email, emailSentAt
-      FROM scrapedBusinesses
-      WHERE contactStatus = 'contacted'
-        AND email IS NOT NULL
-        AND emailSentAt IS NOT NULL
-        AND emailSentAt <= ${day7Cutoff}
-        AND followUp3dSent IS NOT NULL
-        AND followUp3dSent > 0
-        AND (followUp7dSent IS NULL OR followUp7dSent = 0)
+      SELECT sb.id, sb.agencyId, sb.businessName, sb.businessType, sb.email, sb.emailSentAt
+      FROM scrapedBusinesses sb
+      INNER JOIN agencyFeatureControls afc ON afc.agencyId = sb.agencyId
+      WHERE sb.contactStatus = 'contacted'
+        AND sb.email IS NOT NULL
+        AND sb.emailSentAt IS NOT NULL
+        AND sb.emailSentAt <= ${day7Cutoff}
+        AND sb.followUp3dSent IS NOT NULL
+        AND sb.followUp3dSent > 0
+        AND (sb.followUp7dSent IS NULL OR sb.followUp7dSent = 0)
+        AND afc.emailAutomationEnabled = 1
+        AND afc.scheduledFollowUpsEnabled = 1
       LIMIT 50
     `);
     const day7Rows = Array.isArray(day7Result) && Array.isArray(day7Result[0]) ? day7Result[0] : day7Result;
 
     for (const biz of day7Rows as any[]) {
       try {
-        await sendEmail({
+        const delivery = await sendEmail({
           to: biz.email,
           subject: "Last email from Sales Squad — " + (biz.businessName || "Your Business"),
           html: buildDay7Email(biz.businessName, biz.businessType),
         });
-        await db.execute(sql`UPDATE scrapedBusinesses SET followUp7dSent = ${now}, contactStatus = 'follow_up_complete' WHERE id = ${biz.id}`);
-        day7Sent++;
+        if (delivery.success) {
+          await db.execute(sql`UPDATE scrapedBusinesses SET followUp7dSent = ${now} WHERE id = ${biz.id} AND agencyId = ${biz.agencyId}`);
+          day7Sent++;
+        } else errors++;
       } catch (e) {
         console.error("Day7 followup error for biz", biz.id, e);
         errors++;

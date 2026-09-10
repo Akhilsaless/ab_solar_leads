@@ -4,8 +4,41 @@ let smtpReady = false;
 let lastSmtpCheckAt = 0;
 const SMTP_RECHECK_MS = 5 * 60 * 1000;
 
+export type EmailServiceStatus = {
+  configured: boolean;
+  enabled: boolean;
+  ready: boolean;
+  state: "disabled" | "configuration_required" | "authentication_failed" | "ready";
+  lastCheckedAt: number | null;
+};
+
+function isExplicitlyEnabled() {
+  return process.env.EMAIL_SENDING_ENABLED === "true";
+}
+
+function hasRequiredConfiguration() {
+  return Boolean(process.env.EMAIL_HOST && process.env.EMAIL_USER && process.env.EMAIL_PASSWORD && process.env.EMAIL_FROM);
+}
+
+export function getEmailServiceStatus(): EmailServiceStatus {
+  const configured = hasRequiredConfiguration();
+  const enabled = isExplicitlyEnabled();
+  const state = !enabled
+    ? "disabled"
+    : !configured
+      ? "configuration_required"
+      : smtpReady
+        ? "ready"
+        : "authentication_failed";
+  return { configured, enabled, ready: enabled && smtpReady, state, lastCheckedAt: lastSmtpCheckAt || null };
+}
+
 async function verifySmtp() {
   lastSmtpCheckAt = Date.now();
+  if (!isExplicitlyEnabled()) {
+    smtpReady = false;
+    return false;
+  }
   try {
     const transporter = getTransporter();
     if (!transporter) {
@@ -24,21 +57,21 @@ async function verifySmtp() {
 }
 
 function getTransporter() {
-  // Always create fresh transporter so env var changes are picked up
+  // Always create fresh transporter so server-side secret changes are picked up.
   const emailUser = process.env.EMAIL_USER;
   const emailPassword = process.env.EMAIL_PASSWORD;
-  const emailHost = process.env.EMAIL_HOST || "smtp.gmail.com";
+  const emailHost = process.env.EMAIL_HOST;
   const emailPort = parseInt(process.env.EMAIL_PORT || "587");
 
-  if (!emailUser || !emailPassword) {
-    console.warn("[Email] Email credentials not configured. Emails will not be sent.");
+  if (!emailUser || !emailPassword || !emailHost || !process.env.EMAIL_FROM) {
+    console.warn("[Email] Required SMTP configuration is incomplete. Emails remain disabled.");
     return null;
   }
 
   return nodemailer.createTransport({
     host: emailHost,
     port: emailPort,
-    secure: emailPort === 465,
+    secure: process.env.EMAIL_SECURE === "true" || emailPort === 465,
     auth: {
       user: emailUser,
       pass: emailPassword,
@@ -47,7 +80,11 @@ function getTransporter() {
 }
 
 export async function initializeEmailService() {
-  return await verifySmtp();
+  if (!isExplicitlyEnabled()) {
+    console.log("[Email] Sending is explicitly disabled. SMTP verification skipped.");
+    return false;
+  }
+  return verifySmtp();
 }
 
 /**
@@ -55,6 +92,7 @@ export async function initializeEmailService() {
  * must fail closed rather than pretending an email was delivered.
  */
 export async function isEmailServiceReady() {
+  if (!isExplicitlyEnabled()) return false;
   if (Date.now() - lastSmtpCheckAt > SMTP_RECHECK_MS) {
     await verifySmtp();
   }
@@ -73,28 +111,34 @@ export async function sendEmail({
   text?: string;
 }) {
   try {
+    if (!isExplicitlyEnabled()) {
+      return { success: false, message: "Email sending is disabled by configuration" };
+    }
     if (!await isEmailServiceReady()) {
-      console.warn(`[Email] Skipping email to ${to} - SMTP is not verified`);
+      console.warn("[Email] Skipping outbound email because SMTP is not verified");
       return { success: false, message: "Email service is not verified" };
     }
     const transporter = getTransporter();
     if (!transporter) {
-      console.warn(`[Email] Skipping email to ${to} - credentials not configured`);
+      console.warn("[Email] Skipping outbound email because SMTP configuration is incomplete");
       return { success: false, message: "Email service not configured" };
     }
 
+    const fromName = process.env.EMAIL_FROM_NAME?.trim();
+    const fromAddress = process.env.EMAIL_FROM!;
     const result = await transporter.sendMail({
-      from: process.env.EMAIL_FROM || process.env.EMAIL_USER,
+      from: fromName ? `"${fromName.replace(/["\r\n]/g, "").slice(0, 120)}" <${fromAddress}>` : fromAddress,
+      replyTo: process.env.EMAIL_REPLY_TO || undefined,
       to,
       subject,
       html: html || text,
       text: text || html?.replace(/<[^>]*>/g, ""),
     });
 
-    console.log(`[Email] ✓ Sent to ${to}: ${subject}`);
+    console.log("[Email] Outbound email accepted by SMTP transport");
     return { success: true, messageId: result.messageId };
   } catch (error) {
-    console.error(`[Email] ✗ Failed to send email to ${to}:`, error);
+    console.error("[Email] Outbound email delivery attempt failed:", error);
     return { success: false, error };
   }
 }
