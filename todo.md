@@ -568,3 +568,14 @@
 - [x] Add non-secret platform operational audit events, status indicators, and safe super-admin UI controls without ambiguous toggles
 - [x] Add regression coverage for state transitions, blocked activation, tenant permissions, emergency stop, secret masking, and no-duplicate resume behavior
 - [x] Run full validation, production readiness, health, and disabled-control checks; save an unpublished checkpoint and report results
+
+## Partner Self-Service Onboarding and Readiness (Current Session)
+- [ ] Audit existing partner signup, agency configuration, catalog, state/DISCOM, subsidy, estimate-settings, and readiness behavior without changing platform communication ownership
+- [ ] Add agency-scoped onboarding progress and readiness persistence with SETUP REQUIRED, PARTIALLY CONFIGURED, and READY states
+- [ ] Build a first-time partner onboarding wizard for company, panels, inverters, pricing, service area/DISCOM, subsidy disclosure, estimate settings, and review
+- [ ] Preserve Save & Continue Later behavior, show progress and required/optional guidance, and keep every completed configuration section editable after onboarding
+- [ ] Maintain strict isolation so an agency can access and use only its own active catalog, pricing, state/DISCOM, subsidy, and estimate data
+- [ ] Keep unverified monetary, savings, payback, and subsidy outputs withheld until the owning agency is READY; retain non-monetary chatbot sizing where supported
+- [ ] Keep Email/WhatsApp credentials and all communication activation controls visible and operable only to the super-admin platform owner
+- [ ] Run isolated synthetic new/partial/ready/second-agency/edit/disable/subsidy-off/returning/mobile tests and remove or isolate all test-only configuration afterward
+- [ ] Run complete regression, security, production readiness, runtime checks, and confirm all communication controls remain OFF before saving an unpublished checkpoint
