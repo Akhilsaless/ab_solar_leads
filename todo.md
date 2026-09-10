@@ -579,3 +579,10 @@
 - [x] Keep Email/WhatsApp credentials and all communication activation controls visible and operable only to the super-admin platform owner
 - [x] Run isolated synthetic new/partial/ready/second-agency/edit/disable/subsidy-off/returning/mobile tests and remove or isolate all test-only configuration afterward
 - [x] Run complete regression, security, production readiness, runtime checks, and confirm all communication controls remain OFF before saving an unpublished checkpoint
+
+## Final Release Candidate Verification (Current Session)
+- [x] Confirm migration 0015 is structurally applied without rerunning it or changing production data (table, nine required columns, and three required indexes present)
+- [x] Confirm health, production/security verifiers, partner readiness, tenant-isolated pricing, and chatbot regression evidence remain passing without creating test partners or browser sessions (health ready; release and platform verifiers passed; latest full validation recorded 204 passing tests and all isolation/readiness assertions)
+- [x] Confirm email, WhatsApp, SMS/OTP, schedules, platform emergency stop, agency controls, and both outreach masters remain OFF and platform-owned credentials remain inaccessible to partners (non-owner denied; channels off; emergency stop active; all agency/master flags false)
+- [x] Confirm no synthetic records remain and no P0/P1 release blocker is open (all synthetic partner, agency, and catalog markers are zero; no P0/P1 defect discovered)
+- [x] Save an unpublished final release-candidate checkpoint and report only the requested release status fields
