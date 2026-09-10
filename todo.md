@@ -586,3 +586,16 @@
 - [x] Confirm email, WhatsApp, SMS/OTP, schedules, platform emergency stop, agency controls, and both outreach masters remain OFF and platform-owned credentials remain inaccessible to partners (non-owner denied; channels off; emergency stop active; all agency/master flags false)
 - [x] Confirm no synthetic records remain and no P0/P1 release blocker is open (all synthetic partner, agency, and catalog markers are zero; no P0/P1 defect discovered)
 - [x] Save an unpublished final release-candidate checkpoint and report only the requested release status fields
+
+## Post-Deployment Verification (Current Session)
+- [x] Verify the published public URL, production `/api/health`, and public chatbot route without submitting data
+- [x] Verify partner onboarding and super-admin dashboard route reachability without entering credentials or modifying data
+- [x] Confirm all production communication, schedule, emergency-stop, agency-feature, and outreach controls remain OFF
+- [x] Report the public URL and post-deployment status without development changes
+
+## GitHub Commit 5fed3e5 Synchronization and Assignment Control Verification (Current Session)
+- [ ] Verify and synchronize only the requested GitHub main commit `5fed3e542fe362fc5d1cce1ba52a4e9df1a69400`
+- [ ] Inspect and apply the exact committed `drizzle/migrations/0016_lead_assignment_control.sql` only if its live schema is absent
+- [ ] Run only the production verifier, `/api/health`, callback consent-loop smoke test, and lead-assignment access check
+- [ ] Confirm Email, WhatsApp, SMS/OTP, schedules, agency outreach controls, both outreach masters, and emergency stop remain inactive
+- [ ] Save an unpublished validated checkpoint and provide publication guidance without modifying unrelated features
