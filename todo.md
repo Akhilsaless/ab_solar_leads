@@ -558,3 +558,13 @@
 - [x] Verify agency-scoped catalog pricing, state/DISCOM inputs, feature controls, configuration audit metadata, and tenant isolation without inserting any business values (all 0013 structures present; only agency 1 exists and no active foreign pricing record is present)
 - [x] Run the production-readiness verifier, health check, type-safe runtime settings smoke check, and fail-closed communication-control checks with no activation (all checks passed; no agency feature control or outreach master is enabled)
 - [x] Report migration state, isolation, controls, remaining P0/P1 issues, and publish-safety verdict without publishing
+
+## Central Platform Communication Controls (Current Session)
+- [ ] Audit existing email, WhatsApp, schedule, permission, audit, and secure credential mechanisms without exposing secrets
+- [ ] Create a super-admin-only platform communication control plane with OFF, PAUSED, and RUNNING states plus a global emergency stop
+- [ ] Add masked central email and WhatsApp configuration status slots, provider verification controls, and controlled-test safeguards without storing or exposing fake credentials
+- [ ] Enforce platform state, provider readiness, feature prerequisites, idempotency, and emergency stop before every email/WhatsApp/scheduled send path
+- [ ] Keep partners limited to agency catalog, pricing, state/DISCOM, subsidy disclosure, and lead workflow data; prevent access to platform credentials and controls
+- [ ] Add non-secret platform operational audit events, status indicators, and safe super-admin UI controls without ambiguous toggles
+- [ ] Add regression coverage for state transitions, blocked activation, tenant permissions, emergency stop, secret masking, and no-duplicate resume behavior
+- [ ] Run full validation, production readiness, health, and disabled-control checks; save an unpublished checkpoint and report results
