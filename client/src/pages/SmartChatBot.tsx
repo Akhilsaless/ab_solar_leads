@@ -7,6 +7,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "wouter";
 import { Streamdown } from "streamdown";
 import { parseQuickReplyMarkup, shouldUseLocalWelcome } from "@shared/chatControls";
+import { buildConfirmedBillMessage, hasDetectedBillValue, normalizeBillConfirmation, type BillConfirmationValues } from "@shared/billConfirmation";
 
 type ChatMessage = {
   role: "bot" | "customer";
@@ -115,6 +116,7 @@ export default function SmartChatBot() {
   const [showBillTools, setShowBillTools] = useState(false);
   const [contactIntent, setContactIntent] = useState<string | null>(null);
   const [contactConsent, setContactConsent] = useState(false);
+  const [ocrConfirmation, setOcrConfirmation] = useState<BillConfirmationValues | null>(null);
   const [uploading, setUploading] = useState(false);
   const [startupError, setStartupError] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
@@ -223,17 +225,20 @@ export default function SmartChatBot() {
         reader.readAsDataURL(file);
       });
       const uploaded = await uploadBill.mutateAsync({ sessionId, fileName: file.name, contentType: file.type as any, contentBase64: base64 });
-      const parsed = await readBill.mutateAsync({ imageUrl: uploaded.url });
+      const parsed = await readBill.mutateAsync({ imageUrl: uploaded.url, contentType: file.type as "application/pdf" | "image/jpeg" | "image/png" });
       if (parsed.success && parsed.data) {
-        const d = parsed.data;
-        const facts = [
-          d.amount ? `monthly bill ₹${d.amount}` : null,
-          d.units ? `${d.units} units` : null,
-          d.state ? `state ${d.state}` : null,
-          d.discom ? `DISCOM ${d.discom}` : null,
-        ].filter(Boolean).join(", ");
-        if (facts) send(`I uploaded my electricity bill. Please use these detected details: ${facts}. If anything is uncertain, ask me to confirm only that field.`);
-        else send("I uploaded my electricity bill, but the details were unclear. Ask me for only the minimum information needed for an estimate.");
+        const detected = normalizeBillConfirmation(parsed.data);
+        if (hasDetectedBillValue(detected)) {
+          setOcrConfirmation(detected);
+          setShowBillTools(false);
+          setMessages(prev => [...prev, {
+            role: "bot",
+            content: "I found details on the uploaded bill. Please review or correct each detected field before I use it for a preliminary estimate.",
+            createdAt: new Date(),
+          }]);
+        } else {
+          send("I uploaded my electricity bill, but the details were unclear. Ask me for only the minimum information needed for an estimate.");
+        }
       } else {
         send("My bill could not be read. Ask me for only the minimum information needed for an estimate.");
       }
@@ -256,6 +261,14 @@ export default function SmartChatBot() {
     setContactIntent(null);
     setContactConsent(false);
     send(`${intent}. I consent to being contacted for this request. Please ask only for the contact detail you still need.`);
+  };
+
+  const confirmOcrDetails = () => {
+    if (!ocrConfirmation || !hasDetectedBillValue(ocrConfirmation)) return;
+    const confirmed = buildConfirmedBillMessage(ocrConfirmation);
+    setOcrConfirmation(null);
+    setShowBillTools(false);
+    send(confirmed);
   };
 
   const last = messages[messages.length - 1];
@@ -332,6 +345,23 @@ export default function SmartChatBot() {
                 <button disabled={uploading} onClick={() => fileRef.current?.click()} className="flex min-h-10 items-center gap-2 rounded-xl border border-white/10 px-3 text-xs text-gray-300 hover:bg-white/5 disabled:opacity-50">
                   {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />} Upload bill
                 </button>
+              </div>
+            </div>
+          )}
+
+          {ocrConfirmation && (
+            <div className="mb-3 rounded-2xl border border-sky-400/25 bg-sky-400/[0.06] p-3">
+              <div className="mb-1 text-sm font-semibold text-white">Confirm bill details</div>
+              <p className="mb-3 text-xs leading-relaxed text-gray-400">These values were detected from your upload. Please correct anything uncertain before Klaus uses them.</p>
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                <label className="text-xs text-gray-300">Monthly bill (₹)<input inputMode="decimal" value={ocrConfirmation.amount} onChange={event => setOcrConfirmation(prev => prev ? { ...prev, amount: event.target.value } : prev)} className="mt-1 w-full rounded-lg border border-white/10 bg-white/[0.06] px-3 py-2 text-sm text-white" placeholder="Not detected" /></label>
+                <label className="text-xs text-gray-300">Units (kWh)<input inputMode="numeric" value={ocrConfirmation.units} onChange={event => setOcrConfirmation(prev => prev ? { ...prev, units: event.target.value } : prev)} className="mt-1 w-full rounded-lg border border-white/10 bg-white/[0.06] px-3 py-2 text-sm text-white" placeholder="Not detected" /></label>
+                <label className="text-xs text-gray-300">State<input value={ocrConfirmation.state} onChange={event => setOcrConfirmation(prev => prev ? { ...prev, state: event.target.value } : prev)} className="mt-1 w-full rounded-lg border border-white/10 bg-white/[0.06] px-3 py-2 text-sm text-white" placeholder="Not detected" /></label>
+                <label className="text-xs text-gray-300">DISCOM / utility<input value={ocrConfirmation.discom} onChange={event => setOcrConfirmation(prev => prev ? { ...prev, discom: event.target.value } : prev)} className="mt-1 w-full rounded-lg border border-white/10 bg-white/[0.06] px-3 py-2 text-sm text-white" placeholder="Not detected" /></label>
+              </div>
+              <div className="mt-3 flex gap-2">
+                <Button variant="outline" onClick={() => { setOcrConfirmation(null); setShowBillTools(true); }} className="flex-1 border-white/10 bg-transparent text-gray-300">Re-upload / enter manually</Button>
+                <Button disabled={!hasDetectedBillValue(ocrConfirmation)} onClick={confirmOcrDetails} className="flex-1 bg-sky-600 text-white hover:bg-sky-700">Use confirmed details</Button>
               </div>
             </div>
           )}

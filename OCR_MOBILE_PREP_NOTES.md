@@ -1,0 +1,29 @@
+# Synthetic OCR and Mobile Regression Notes
+
+- Fixture generated locally outside the application tree: `synthetic_telanganabill_ocr_test.png` and `.pdf`.
+- Fixture is visibly labelled **SYNTHETIC TEST BILL — NOT A CUSTOMER DOCUMENT** and contains only fictional QA data: INR 6,500.00, 720 kWh, Telangana, and `TESTPOWER Telangana — DEMO DISCOM`.
+- Browser-local `smart-chat-session-sales-squad` state was cleared before the OCR regression so the test uses an isolated non-customer conversation.
+- No contact details, consent, outbound action, or production-data modification has been submitted.
+- The isolated residential/Telangana request was submitted without bill values specifically to expose the upload workflow; its first response was still pending at the initial 11-second check.
+- The completed prompt asked for a name before bill capture. A clearly non-customer value, `Synthetic QA User`, was entered only to advance the test; no phone, email, address, consent, or lead-capture action was supplied.
+- The bill stage now shows the accepted PNG/JPG/PDF upload control; it was opened from the isolated synthetic session for the fixture attachment.
+- The existing accepted file input exposed `application/pdf,image/jpeg,image/png`, and the synthetic PNG was attached successfully through that input. The UI entered its upload/processing state.
+- The initial upload proved PNG storage and extraction, but it proceeded directly to the estimate without an editable confirmation step. The browser-local session was reset after the focused confirmation repair so its retest is independent.
+- The post-repair retest began in a new isolated session with only the synthetic QA name, residential property type, Telangana, and intent to upload a bill; no real contact or customer data was supplied.
+- The repaired session reached the bill stage, and the same input advertises the expected supported types: PDF, JPEG, and PNG.
+- The post-repair synthetic PNG attachment succeeded through the supported browser input and entered the upload/OCR processing path.
+- The repaired workflow extracted `₹6,500`, `720 kWh`, `Telangana`, and `TESTPOWER Telangana — DEMO DISCOM`, then stopped at an editable confirmation panel instead of sending an estimate request automatically.
+- After explicit confirmation, the chatbot used only those confirmed synthetic values to produce a preliminary system-size estimate and deliberately withheld cost, savings, and subsidy amounts because no verified agency catalog exists.
+- A separate browser-local session was started for a synthetic PDF compatibility check, keeping it isolated from the completed PNG/OCR journey.
+- The isolated PDF session reached the same bill-upload stage before any document attachment, with no contact fields or consent action submitted.
+- The PDF session exposes the accepted file input with `application/pdf,image/jpeg,image/png`, ready for the synthetic PDF attachment.
+- The synthetic PDF was accepted by the upload endpoint and stored successfully, but the current OCR reader returned `success: false` with no data for its PDF URL. The image-based OCR path therefore passes, while PDF OCR requires a focused compatibility repair or the UI must stop advertising it as OCR-supported.
+- After the PDF content-routing repair compiled and its focused tests passed, the browser-local failed PDF session was cleared for an independent rerun against the restarted candidate server.
+- The independent rerun started with only synthetic PDF QA, residential, Telangana, and upload intent; no customer identity, contact detail, consent, or outbound request was supplied.
+- The repaired PDF session reached the expected upload stage with no estimate or contact workflow initiated.
+- The repaired PDF session exposes the accepted application/pdf input and is ready for the synthetic document attachment.
+- The repaired PDF flow stored the synthetic document, extracted `₹6,500`, `720 kWh`, `Telangana`, and the fictional TESTPOWER label, and displayed all values in the same editable confirmation panel before any estimate submission.
+- The first full-page mobile capture was blank during initialization; a repeated 375×812 viewport capture rendered the welcome, quick replies, input, send button, and mobile `Talk to a person` action without visible horizontal overflow.
+- Browser-local state was cleared before the residential mobile-flow check so the previous PDF test cannot create a duplicate welcome or hide contextual bill controls.
+- The cleared session accepted the complete synthetic `Hyderabad, residential, ₹6500 bill` input under compact mobile interaction dimensions, with no duplicate welcome shown before submission.
+- The completed estimate showed `~6.7 kW`, kept all monetary outputs withheld, removed bill-upload controls, retained visible site-visit and handoff actions, and exposed no raw quick-reply markup. The 375×812 viewport capture separately showed the initial controls without horizontal overflow.

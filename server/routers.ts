@@ -38,6 +38,7 @@ import {
   withProviderTimeout,
 } from "./chatFlow";
 import { parseQuickReplyMarkup } from "@shared/chatControls";
+import { buildBillOcrContent } from "./billOcrContent";
 
 async function requireUserAgency(userId: number) {
   const agency = await db.getAgencyByUserId(userId);
@@ -1574,23 +1575,17 @@ export const appRouter = router({
   // ===== BILL PHOTO READING =====
   billReader: router({
     readBillImage: publicProcedure
-      .input(z.object({ imageUrl: z.string() }))
+      .input(z.object({
+        imageUrl: z.string(),
+        contentType: z.enum(["application/pdf", "image/jpeg", "image/png"]).default("image/png"),
+      }))
       .mutation(async ({ input }) => {
         try {
           const response = await invokeLLM({
             messages: [
               {
                 role: "user",
-                content: [
-                  {
-                    type: "image_url",
-                    image_url: { url: input.imageUrl, detail: "high" },
-                  },
-                  {
-                    type: "text",
-                    text: "This is an Indian electricity bill. Extract: 1) Total amount due (in INR), 2) Units consumed (kWh), 3) DISCOM/utility name, 4) State. Return JSON with fields: amount (number), units (number), discom (string), state (string). If you cannot read a field clearly, return null for that field.",
-                  },
-                ],
+                content: buildBillOcrContent(input.imageUrl, input.contentType),
               },
             ] as any,
             response_format: {

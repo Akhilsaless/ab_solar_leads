@@ -529,3 +529,12 @@
 - [x] Add automated regression tests for residential context, commercial subsidy safety, callback consent, returning sessions, quick-reply parsing, and timeout fallback
 - [x] Run type-check, full test suite, production build, and repeat the failed controlled smoke-test scenarios (183 tests pass; production build succeeds; residential, commercial, consent, and returning-session retests completed)
 - [x] Keep outreach, email, OTP, automated WhatsApp, SMTP configuration, production lead ownership, production-readiness verifier, and publishing unchanged (controls remain disabled; no new AI-chat leads, outreach messages, or outreach runs recorded)
+
+## Final Catalog and Chatbot Pre-Publish Verification (Current Session)
+- [x] Audit agency 1 panel, inverter, pricing, subsidy, tariff, savings, and estimate configuration without inventing values (no agency panel/inverter catalog or verified pricing is configured; two Telangana reference rows provide tariff/generation and eligibility-reference inputs only)
+- [x] Create a clearly synthetic, non-customer Telangana electricity-bill fixture and test image/PDF OCR confirmation without contact or outbound side effects (PNG and PDF synthetic fixtures both extracted ₹6,500, 720 kWh, Telangana, and a fictional TESTPOWER label)
+- [x] Repair the OCR upload path so every detected amount, units, state, and DISCOM value is shown in an editable explicit confirmation step before an estimate request is sent
+- [x] Repair the PDF bill OCR request path so accepted application/pdf uploads are sent to the provider as file content rather than image content
+- [x] Test the complete residential estimate journey at a 375×812 viewport for overflow, usable controls, contextual bill controls, accessible handoff, and clean rendering (exact browser regression passed all layout and rendering assertions)
+- [x] Re-run production readiness, health, and disabled-control checks without enabling SMTP, email, OTP, WhatsApp, or outreach automation (187 tests, verifier, and build pass; health is ready; both outreach controls remain disabled; no recent lead/outbound side effects)
+- [x] Report catalog evidence, OCR/mobile results, remaining P0/P1 defects, and chatbot publish safety without publishing
