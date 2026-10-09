@@ -13,6 +13,12 @@ GitHub is the source of truth. This release fixes reporting and unfinished pages
 - The old WhatsApp credentials page points to the existing platform controls. Referral and partner pages no longer promise unavailable OTP, immediate payouts, or phone verification.
 - Pages load on demand instead of shipping every route in the initial bundle. Dashboard loading and errors no longer appear as zero metrics or an empty agency setup.
 
+## Follow-up from live verification
+
+The initial deployment exposed a TiDB syntax error: the alias `generated` is reserved. SQL now quotes that alias through the database dialect. North Star errors no longer incorrectly diagnose every query failure as a missing migration. Schema inspection confirmed the campaign tables already exist, so no migration or database mutation was required.
+
+Dashboard outreach reporting now separates today's emailed businesses from all-time unique business engagement. Rates use the same all-time cohort, repeated opens count once, and clicks are not labelled sales conversions. Daily outreach runs and contacted-business filters share the same IST epoch boundaries. Leads display evidence readiness instead of the obsolete stored urgency labels. The legacy production-controls verifier accepts the fail-closed `platform_control_required` SMTP state while still rejecting enabled sending.
+
 ## Validation and deployment
 
 1. Run `pnpm check`, `pnpm test`, and `pnpm build`; GitHub CI must pass.

@@ -488,7 +488,7 @@ export const campaignIntelligenceRouter = router({
     const agency = await requireAgency(ctx.user!.id);
     const totals = first(await db.execute(sql`
       SELECT
-        COUNT(clr.id) AS generated,
+        COUNT(clr.id) AS ${sql.identifier("generated")},
         COALESCE(SUM(clr.status IN ('validated','qualified','contacted','interested','appointment','appointment_validated','delivered','accepted','rejected')), 0) AS validated,
         COALESCE(SUM(clr.status IN ('qualified','contacted','interested','appointment','appointment_validated','delivered','accepted','rejected')), 0) AS qualified,
         COALESCE(SUM(clr.status IN ('contacted','interested','appointment','appointment_validated','delivered','accepted','rejected')), 0) AS contacted,
@@ -510,7 +510,7 @@ export const campaignIntelligenceRouter = router({
 
     const campaigns = rows(await db.execute(sql`
       SELECT c.id, c.name, c.status, c.targetLeadCount, cp.appointmentTarget, cp.startDate, cp.endDate, cp.campaignCost,
-             COUNT(clr.id) AS generated,
+             COUNT(clr.id) AS ${sql.identifier("generated")},
              COALESCE(SUM(clr.status = 'accepted'), 0) AS accepted,
              COALESCE(SUM(clr.status IN ('delivered','accepted','rejected')), 0) AS delivered,
              COALESCE(SUM(clr.status IN ('appointment','appointment_validated','delivered','accepted','rejected')), 0) AS appointments,
@@ -538,7 +538,7 @@ export const campaignIntelligenceRouter = router({
 
     const sources = rows(await db.execute(sql`
       SELECT clr.source,
-             COUNT(*) AS generated,
+             COUNT(*) AS ${sql.identifier("generated")},
              COALESCE(SUM(clr.status IN ('qualified','contacted','interested','appointment','appointment_validated','delivered','accepted','rejected')), 0) AS qualified,
              COALESCE(SUM(clr.status IN ('appointment','appointment_validated','delivered','accepted','rejected')), 0) AS appointments,
              COALESCE(SUM(clr.status = 'accepted'), 0) AS accepted,
@@ -602,7 +602,7 @@ export const campaignIntelligenceRouter = router({
     })();
     if (!Number(dashboard.campaignCount || 0)) return [];
     const campaignRows = rows(await db.execute(sql`
-      SELECT c.id, c.name, c.targetLeadCount, cp.startDate, cp.endDate, COUNT(clr.id) AS generated, COALESCE(SUM(clr.status = 'accepted'), 0) AS accepted
+      SELECT c.id, c.name, c.targetLeadCount, cp.startDate, cp.endDate, COUNT(clr.id) AS ${sql.identifier("generated")}, COALESCE(SUM(clr.status = 'accepted'), 0) AS accepted
       FROM campaignProfiles cp JOIN campaigns2 c ON c.id = cp.campaignId LEFT JOIN campaignLeadRecords clr ON clr.campaignId = c.id
       WHERE cp.agencyId = ${agency.id} GROUP BY c.id, cp.id
     `));

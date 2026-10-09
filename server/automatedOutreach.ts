@@ -1,3 +1,5 @@
+import { getOutreachOverview } from "./outreachReporting";
+import { istDayBounds } from "../shared/reportingTime";
 import { protectedProcedure, router } from "./_core/trpc";
 import { z } from "zod";
 import * as db from "./db";
@@ -536,19 +538,7 @@ export const automatedOutreachRouter = router({
       if (!agency) throw new Error("Agency not found");
       const dbConn = await db.getDb();
       if (!dbConn) throw new Error("DB error");
-      const rows = await dbConn.execute(sql`
-        SELECT
-          COUNT(*) as totalRuns,
-          COALESCE(SUM(scrapedCount),0) as totalScraped,
-          COALESCE(SUM(eligibleCount),0) as totalEligible,
-          COALESCE(SUM(emailSentCount),0) as totalEmailSent,
-          COALESCE(SUM(whatsappSentCount),0) as totalWhatsappSent,
-          COALESCE(SUM(errorCount),0) as totalErrors
-        FROM outreachRuns
-        WHERE agencyId = ${agency.id} AND DATE(startedAt) = CURDATE()
-      `) as any[];
-      const data = Array.isArray(rows[0]) ? rows[0] : rows;
-      return (data as any[])[0] || { totalRuns: 0, totalScraped: 0, totalEligible: 0, totalEmailSent: 0, totalWhatsappSent: 0, totalErrors: 0 };
+      return getOutreachOverview(dbConn, agency.id);
     }),
     getBusinesses: protectedProcedure
       .input(z.object({ runId: z.number() }))
@@ -575,6 +565,7 @@ export const automatedOutreachRouter = router({
       if (!agency) throw new Error("Agency not found");
       const dbConn = await db.getDb();
       if (!dbConn) throw new Error("DB error");
+      const { start, end } = istDayBounds();
       const rows = await dbConn.execute(sql`
         SELECT id, businessName, businessType, businessSize, phone, email, website, address, city, state,
                rating, reviewCount, contactStatus, emailSentAt, emailOpenCount, chatbotClickCount, lastOpenedAt
@@ -582,7 +573,7 @@ export const automatedOutreachRouter = router({
         WHERE agencyId = ${agency.id}
           AND contactStatus IN ('contacted', 'emailed', 'whatsapp_sent')
           AND emailSentAt IS NOT NULL
-          AND DATE(FROM_UNIXTIME(emailSentAt/1000)) = CURDATE()
+          AND emailSentAt >= ${start} AND emailSentAt < ${end}
         ORDER BY emailSentAt DESC LIMIT 100
       `) as any[];
       return Array.isArray(rows[0]) ? rows[0] : rows;

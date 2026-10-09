@@ -326,19 +326,15 @@ function KlausWidget() {
 // ─── Outreach Quick Stats ────────────────────────────────────────────────────
 function OutreachQuickStats() {
   const [, setLocation] = useLocation();
-  const { data: todayStats, isLoading } = trpc.automatedOutreach.runs.todayStats.useQuery();
-  const { data: leadsContacted } = trpc.automatedOutreach.runs.getLeadsContacted.useQuery();
-  const { data: emailStatus } = trpc.automatedOutreach.runs.getEmailStatus.useQuery();
+  const { data: todayStats, isLoading, isError } = trpc.automatedOutreach.runs.todayStats.useQuery();
+  const emailsSentToday = Number(todayStats?.engagement?.businessesEmailedToday ?? 0);
+  const businessesContacted = Number(todayStats?.engagement?.businessesEmailed ?? 0);
+  const emailOpens = Number(todayStats?.engagement?.businessesOpened ?? 0);
+  const chatbotClicks = Number(todayStats?.engagement?.businessesClicked ?? 0);
+  const openRate = businessesContacted > 0 ? `${((emailOpens / businessesContacted) * 100).toFixed(1)}%` : "—";
+  const clickRate = businessesContacted > 0 ? `${((chatbotClicks / businessesContacted) * 100).toFixed(1)}%` : "—";
 
-  const emailsSent = Number(todayStats?.totalEmailSent ?? 0);
-  const businessesContacted = (leadsContacted || []).length;
-  const emailOpens = (emailStatus || []).reduce((sum: number, b: any) => sum + (Number(b.emailOpenCount) || 0), 0);
-  const chatbotClicks = (emailStatus || []).reduce((sum: number, b: any) => sum + (Number(b.chatbotClickCount) || 0), 0);
-
-  // Calculate conversion rates
-  const openRate = emailsSent > 0 ? ((emailOpens / emailsSent) * 100).toFixed(1) : 0;
-  const clickRate = emailOpens > 0 ? ((chatbotClicks / emailOpens) * 100).toFixed(1) : 0;
-  const conversionRate = emailsSent > 0 ? ((chatbotClicks / emailsSent) * 100).toFixed(1) : 0;
+  if (isError) return <p role="alert" className="text-muted-foreground">Outreach reporting could not be loaded.</p>;
 
   return (
     <Card>
@@ -346,7 +342,7 @@ function OutreachQuickStats() {
         <div className="flex items-center justify-between">
           <CardTitle className="text-base flex items-center gap-2">
             <Mail className="w-4 h-4 text-orange-400" />
-            Today's Outreach
+            Email Outreach Overview
           </CardTitle>
           <Button variant="ghost" size="sm" onClick={() => setLocation("/automated-outreach")} className="text-xs gap-1">
             View Details <ArrowRight className="w-3 h-3" />
@@ -356,65 +352,34 @@ function OutreachQuickStats() {
       <CardContent>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <div className="bg-blue-500/10 rounded-lg p-3 text-center">
-            <p className="text-2xl font-bold text-blue-400">{isLoading ? "—" : emailsSent}</p>
+            <p className="text-2xl font-bold text-blue-400">{isLoading ? "—" : emailsSentToday}</p>
             <p className="text-xs text-muted-foreground mt-0.5 flex items-center justify-center gap-1">
-              <Mail className="w-3 h-3" /> Emails Sent
+              <Mail className="w-3 h-3" /> Businesses Emailed Today
             </p>
           </div>
           <div className="bg-green-500/10 rounded-lg p-3 text-center">
             <p className="text-2xl font-bold text-green-400">{isLoading ? "—" : businessesContacted}</p>
             <p className="text-xs text-muted-foreground mt-0.5 flex items-center justify-center gap-1">
-              <Users className="w-3 h-3" /> Contacted
+              <Users className="w-3 h-3" /> Emailed (All Time)
             </p>
           </div>
           <div className="bg-amber-500/10 rounded-lg p-3 text-center">
             <p className="text-2xl font-bold text-amber-400">{isLoading ? "—" : emailOpens}</p>
             <p className="text-xs text-muted-foreground mt-0.5 flex items-center justify-center gap-1">
-              <Eye className="w-3 h-3" /> Opens
+              <Eye className="w-3 h-3" /> Opened (All Time)
             </p>
           </div>
           <div className="bg-purple-500/10 rounded-lg p-3 text-center">
             <p className="text-2xl font-bold text-purple-400">{isLoading ? "—" : chatbotClicks}</p>
             <p className="text-xs text-muted-foreground mt-0.5 flex items-center justify-center gap-1">
-              <MousePointerClick className="w-3 h-3" /> Bot Clicks
+              <MousePointerClick className="w-3 h-3" /> Clicked (All Time)
             </p>
           </div>
         </div>
 
-        {/* Conversion Funnel */}
-        <div className="bg-slate-900/30 rounded-lg p-3 border border-slate-700/50 mt-4">
-          <p className="text-xs font-semibold text-muted-foreground mb-3">Conversion Funnel</p>
-          <div className="space-y-3">
-            <div>
-              <div className="flex items-center justify-between text-xs mb-1">
-                <span className="text-muted-foreground">Open Rate</span>
-                <span className="font-bold text-amber-400">{isLoading ? "—" : `${openRate}%`}</span>
-              </div>
-              <div className="w-full bg-slate-700/50 rounded-full h-1.5">
-                <div className="bg-amber-400 h-1.5 rounded-full" style={{ width: `${Math.min(Number(openRate), 100)}%` }}></div>
-              </div>
-            </div>
-
-            <div>
-              <div className="flex items-center justify-between text-xs mb-1">
-                <span className="text-muted-foreground">Click Rate (of opens)</span>
-                <span className="font-bold text-purple-400">{isLoading ? "—" : `${clickRate}%`}</span>
-              </div>
-              <div className="w-full bg-slate-700/50 rounded-full h-1.5">
-                <div className="bg-purple-400 h-1.5 rounded-full" style={{ width: `${Math.min(Number(clickRate), 100)}%` }}></div>
-              </div>
-            </div>
-
-            <div>
-              <div className="flex items-center justify-between text-xs mb-1">
-                <span className="text-muted-foreground">Overall Conversion</span>
-                <span className="font-bold text-green-400">{isLoading ? "—" : `${conversionRate}%`}</span>
-              </div>
-              <div className="w-full bg-slate-700/50 rounded-full h-1.5">
-                <div className="bg-green-400 h-1.5 rounded-full" style={{ width: `${Math.min(Number(conversionRate), 100)}%` }}></div>
-              </div>
-            </div>
-          </div>
+        <div className="mt-4 space-y-2 text-sm text-muted-foreground">
+          <p>Recorded engagement (all time): open rate {isLoading ? "—" : openRate} · click-through rate {isLoading ? "—" : clickRate}.</p>
+          <p className="text-xs">Rates count business records with a recorded email send. Repeated opens are counted once. Sales conversions are reported separately.</p>
         </div>
       </CardContent>
     </Card>

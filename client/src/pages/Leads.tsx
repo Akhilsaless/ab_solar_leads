@@ -602,8 +602,8 @@ export default function Leads() {
                 <th className="text-left text-xs font-medium text-muted-foreground px-4 py-3 hidden md:table-cell">Phone</th>
                 <th className="text-left text-xs font-medium text-muted-foreground px-4 py-3 hidden lg:table-cell">Email</th>
                 <th className="text-left text-xs font-medium text-muted-foreground px-4 py-3">Status</th>
-                <th className="text-left text-xs font-medium text-muted-foreground px-4 py-3 hidden sm:table-cell">Priority</th>
-                <th className="text-left text-xs font-medium text-muted-foreground px-4 py-3 hidden lg:table-cell">Score</th>
+                <th className="text-left text-xs font-medium text-muted-foreground px-4 py-3 hidden sm:table-cell">Readiness</th>
+                <th className="text-left text-xs font-medium text-muted-foreground px-4 py-3 hidden lg:table-cell">Evidence Score</th>
                 <th className="text-left text-xs font-medium text-muted-foreground px-4 py-3 hidden lg:table-cell">State</th>
                 <th className="text-left text-xs font-medium text-muted-foreground px-4 py-3 hidden xl:table-cell">Referrer</th>
                 <th className="text-left text-xs font-medium text-muted-foreground px-4 py-3 hidden lg:table-cell">Assigned To</th>
@@ -699,14 +699,14 @@ export default function Leads() {
                       </div>
                     </td>
                     <td className="px-4 py-3 hidden sm:table-cell">
-                      <span className={`text-xs font-semibold priority-${lead.priority}`}>
-                        {lead.priority?.toUpperCase()}
-                      </span>
+                      <Badge className={`text-[10px] capitalize ${EVIDENCE_TIER_STYLES[lead.evidenceScore?.tier || "insufficient_evidence"]}`}>
+                        {evidenceTierLabel(lead.evidenceScore?.tier)}
+                      </Badge>
                     </td>
                     <td className="px-4 py-3 hidden lg:table-cell">
                       {(() => {
                         const evidence = lead.evidenceScore;
-                        const score = evidence?.score ?? lead.leadScore ?? 0;
+                        const score = evidence?.score ?? 0;
                         return (
                           <div className="flex items-center gap-2">
                             <div className="w-12 h-1.5 bg-muted rounded-full overflow-hidden">
@@ -714,7 +714,7 @@ export default function Leads() {
                             </div>
                             <div>
                               <span className="text-xs text-muted-foreground">{score}</span>
-                              {evidence && <span className={`block text-[10px] capitalize ${EVIDENCE_TIER_STYLES[evidence.tier] || "text-muted-foreground"}`}>{evidenceTierLabel(evidence.tier)}</span>}
+
                             </div>
                           </div>
                         );
