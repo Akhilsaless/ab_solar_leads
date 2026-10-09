@@ -27,7 +27,7 @@ describe("North Star reporting with multiple deliveries", () => {
     const dialect = new MySqlDialect();
     mocks.execute.mockImplementation(async (query) => {
       const compiled = dialect.sqlToQuery(query);
-      expect(compiled.sql).not.toMatch(/AS\s+generated\b/i);
+      expect(compiled.sql).not.toMatch(/(?:AS\s+|,\s*)generated\b/i);
       return [database.prepare(compiled.sql).all(...compiled.params as any[])];
     });
     try {

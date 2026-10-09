@@ -547,7 +547,7 @@ export const campaignIntelligenceRouter = router({
       JOIN campaignProfiles cp ON cp.campaignId = clr.campaignId
       LEFT JOIN (SELECT campaignLeadId, SUM(revenue) AS revenue, SUM(commission) AS commission FROM campaignDeliveries GROUP BY campaignLeadId) cd ON cd.campaignLeadId = clr.id
       WHERE cp.agencyId = ${agency.id}
-      GROUP BY clr.source ORDER BY accepted DESC, appointments DESC, generated DESC
+      GROUP BY clr.source ORDER BY accepted DESC, appointments DESC, ${sql.identifier("generated")} DESC
     `));
 
     const clients = rows(await db.execute(sql`
