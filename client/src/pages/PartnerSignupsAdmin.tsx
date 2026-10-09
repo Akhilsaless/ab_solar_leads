@@ -236,7 +236,7 @@ export default function PartnerSignupsAdmin() {
                       <TableCell className="text-sm text-muted-foreground">
                         <div className="flex items-center gap-1">
                           <Calendar className="w-3.5 h-3.5" />
-                          {new Date(signup.signedUpAt).toLocaleDateString()}
+                          {signup.signedUpAt && !Number.isNaN(new Date(signup.signedUpAt).getTime()) ? new Date(signup.signedUpAt).toLocaleDateString() : "Not recorded"}
                         </div>
                       </TableCell>
                       <TableCell>
