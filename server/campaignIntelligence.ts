@@ -500,11 +500,11 @@ export const campaignIntelligenceRouter = router({
         COALESCE(SUM(clr.status = 'rejected'), 0) AS rejected,
         COALESCE(SUM(cd.revenue), 0) AS revenue,
         COALESCE(SUM(cd.commission), 0) AS commission,
-        COALESCE(SUM(cp.campaignCost), 0) AS campaignCost
+        (SELECT COALESCE(SUM(cost.campaignCost), 0) FROM campaignProfiles cost WHERE cost.agencyId = ${agency.id}) AS campaignCost
       FROM campaignProfiles cp
       JOIN campaigns2 c ON c.id = cp.campaignId
       LEFT JOIN campaignLeadRecords clr ON clr.campaignId = cp.campaignId
-      LEFT JOIN campaignDeliveries cd ON cd.campaignLeadId = clr.id
+      LEFT JOIN (SELECT campaignLeadId, SUM(revenue) AS revenue, SUM(commission) AS commission FROM campaignDeliveries GROUP BY campaignLeadId) cd ON cd.campaignLeadId = clr.id
       WHERE cp.agencyId = ${agency.id}
     `)) || {};
 
@@ -519,7 +519,7 @@ export const campaignIntelligenceRouter = router({
              COALESCE(SUM(cd.commission), 0) AS commission
       FROM campaignProfiles cp JOIN campaigns2 c ON c.id = cp.campaignId
       LEFT JOIN campaignLeadRecords clr ON clr.campaignId = c.id
-      LEFT JOIN campaignDeliveries cd ON cd.campaignLeadId = clr.id
+      LEFT JOIN (SELECT campaignLeadId, SUM(revenue) AS revenue, SUM(commission) AS commission FROM campaignDeliveries GROUP BY campaignLeadId) cd ON cd.campaignLeadId = clr.id
       WHERE cp.agencyId = ${agency.id}
       GROUP BY c.id, cp.id ORDER BY cp.endDate IS NULL, cp.endDate ASC, c.createdAt DESC
     `)).map((campaign: any) => {
@@ -545,7 +545,7 @@ export const campaignIntelligenceRouter = router({
              COALESCE(SUM(cd.revenue), 0) AS revenue
       FROM campaignLeadRecords clr
       JOIN campaignProfiles cp ON cp.campaignId = clr.campaignId
-      LEFT JOIN campaignDeliveries cd ON cd.campaignLeadId = clr.id
+      LEFT JOIN (SELECT campaignLeadId, SUM(revenue) AS revenue, SUM(commission) AS commission FROM campaignDeliveries GROUP BY campaignLeadId) cd ON cd.campaignLeadId = clr.id
       WHERE cp.agencyId = ${agency.id}
       GROUP BY clr.source ORDER BY accepted DESC, appointments DESC, generated DESC
     `));
@@ -573,7 +573,7 @@ export const campaignIntelligenceRouter = router({
       FROM campaignLeadRecords clr
       JOIN campaignProfiles cp ON cp.campaignId = clr.campaignId
       LEFT JOIN users u ON u.id = clr.assignedTo
-      LEFT JOIN campaignDeliveries cd ON cd.campaignLeadId = clr.id
+      LEFT JOIN (SELECT campaignLeadId, SUM(revenue) AS revenue, SUM(commission) AS commission FROM campaignDeliveries GROUP BY campaignLeadId) cd ON cd.campaignLeadId = clr.id
       WHERE cp.agencyId = ${agency.id} AND clr.assignedTo IS NOT NULL
       GROUP BY clr.assignedTo, u.name ORDER BY accepted DESC, appointments DESC
     `));
