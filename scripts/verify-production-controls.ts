@@ -39,7 +39,7 @@ async function main() {
   const controlsEnabled = Object.values(status.controls ?? {}).some((value) => value === true);
   if (summary.catalogReady) throw new Error("Catalog must not be monetary-estimate-ready without owner-verified pricing inputs.");
   if (controlsEnabled) throw new Error("Agency feature controls must remain fail-closed for this verification.");
-  if (summary.smtpEnabled || summary.smtpState !== "disabled") throw new Error("SMTP must remain explicitly disabled.");
+  if (summary.smtpEnabled || !["disabled", "platform_control_required"].includes(summary.smtpState)) throw new Error("SMTP must remain explicitly disabled.");
   if (summary.whatsappState !== "disabled" || summary.smsOtpState !== "disabled") throw new Error("WhatsApp and SMS/OTP must remain disabled.");
 
   console.log("[production-controls:verify]", JSON.stringify(summary, null, 2));

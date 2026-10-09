@@ -9,6 +9,7 @@ import { notifyOwner } from "./_core/notification";
 import { invokeAiGateway } from "./aiGateway";
 import { ENV } from "./_core/env";
 import { calculateEvidenceScore } from "./evidenceScore";
+import { istDayBounds } from "../shared/reportingTime";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -25,12 +26,6 @@ function safeCount(result: any): number {
   if (!row) return 0;
   const val = row.cnt ?? row["COUNT(*)"] ?? 0;
   return Number(val) || 0;
-}
-
-function istDayBounds() {
-  const shifted = new Date(Date.now() + 5.5 * 60 * 60 * 1000);
-  const start = Date.parse(`${shifted.toISOString().slice(0, 10)}T00:00:00+05:30`);
-  return { start, end: start + 86_400_000 };
 }
 
 type KlausProviderConfig = {
