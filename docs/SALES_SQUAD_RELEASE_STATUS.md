@@ -21,8 +21,25 @@ Dashboard outreach reporting now separates today's emailed businesses from all-t
 
 ## Validation and deployment
 
+### Zero Manus development credits requirement
+
+The owner requires all further fixes and upgrades to be done through GitHub without consuming Manus agent credits. Do not send Manus prompts, click "Ask Manus to sync", resume a stopped agent, or run commands in its cloud environment to perform development or validation. Use the local checkout and existing GitHub CI instead.
+
+Manus documentation describes publishing completed outputs as separate from agent task processing; live hosting, database, and API usage can still incur WebDev running costs. This does not establish that creating a new checkpoint or syncing this project is credit-free. The observed project UI currently shows GitHub "Outdated" with only "Ask Manus to sync", and its Publish menu has no unpublished checkpoint. Until a supported non-agent sync/checkpoint path is verified, keep the deployment pending. Do not disconnect the existing repository, create another project/database, or migrate hosting without an explicit owner decision.
+
+### Verified release state (9 October 2026, IST)
+
+- PR #5 was merged and published to the existing Sales Squad URL. Its live page checks completed.
+- PR #6 was merged as `e776f5e3c6e1e43b6459a8646fb6de68557e1847`; GitHub CI passed. Its code reached the Manus workspace before the agent was stopped, but no new deployable checkpoint was saved. It is not verified live.
+- Before stopping Manus, actual agency-1 calls returned successfully: North Star dashboard with zero recorded campaign outcomes, campaign guidance as an empty list, and outreach reporting with 142 emailed business records, 38 unique opened records, zero clicked records, and zero emailed records in that IST day.
+- These are workspace/database procedure results, not proof that the public deployment contains PR #6.
+- No migrations or production-record deletion were performed. Communication and payment activation remain out of scope until their setup and controlled verification are complete.
+- Manus was stopped on the owner's zero-credit instruction. Do not resume it using these deployment notes as authorization.
+
+### Deployment sequence once a non-agent path exists
+
 1. Run `pnpm check`, `pnpm test`, and `pnpm build`; GitHub CI must pass.
-2. Sync the merged GitHub commit into the existing Sales Squad Manus task. Do not create a second project, deployment, or database.
+2. Sync the merged GitHub commit into the existing Sales Squad Manus task only using a supported, verified non-agent route that respects the zero-credit requirement. Do not create a second project, deployment, or database.
 3. This release contains no SQL migration. Confirm the existing migrations through `0016` are already applied; do not reset the database.
 4. Run the production verifier and `/api/health`. Review Dashboard, Copilot, Leads, North Star, partner signups, outreach planning, solar resources, and Settings.
 5. Publish the validated Manus checkpoint to the existing URL, then verify the live pages again. A GitHub merge alone does not publish the website.
@@ -32,7 +49,7 @@ Dashboard outreach reporting now separates today's emailed businesses from all-t
 
 - A valid AI provider credential must be entered securely and validated. The audited Groq configuration returned an authentication error.
 - Real panels, inverters, current installer pricing, state/DISCOM inputs, and owner-approved estimate policy are required before monetary estimates can be enabled.
-- Confirm agency city/state and missing contact details on the production account.
+- Agency city/state was corrected to Hyderabad, Telangana and persisted after reload. Missing contact details still need owner review.
 - Review existing duplicate businesses and leads, preserving history. Do not delete production records automatically.
 - WhatsApp and payouts have incomplete provider adapters; credentials alone do not make them operational. These require implementation and provider testing before activation.
 - Verify referrer signup, partner signup, lead assignment, payment/withdrawal flows, and outbound delivery using approved test accounts and recipients before calling the entire product ready.
