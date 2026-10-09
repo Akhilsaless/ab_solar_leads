@@ -23,11 +23,11 @@ export default function ReferralLanding() {
   }, []);
 
   const steps = [
-    { n: "1", title: "Sign Up", desc: "Create your referrer account with OTP" },
+    { n: "1", title: "Sign Up", desc: "Register when account verification is available" },
     { n: "2", title: "Get Link", desc: "Get your unique referral code" },
     { n: "3", title: "Share", desc: "Send to friends, family & neighbors" },
     { n: "4", title: "They Apply", desc: "Customer applies for govt subsidy" },
-    { n: "5", title: "Withdraw", desc: "Payout to UPI/Bank anytime" },
+    { n: "5", title: "Withdraw", desc: "Request an eligible withdrawal; processing requires an enabled payment provider" },
   ];
 
   return (

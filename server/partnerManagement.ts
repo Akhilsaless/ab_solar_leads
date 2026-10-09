@@ -43,6 +43,7 @@ export const partnerManagementRouter = router({
         SELECT id, companyName, email, phone, whatsappNumber, serviceAreas, products, pricing, discounts, status, signedUpAt
         FROM solarPartners ORDER BY signedUpAt DESC
       `));
+      data = data.map((partner: any) => ({ ...partner, status: partner.status === "signed_up" ? "new" : partner.status === "email_sent" ? "contacted" : partner.status }));
       if (input.status) data = data.filter((p: any) => p.status === input.status);
       if (input.search) {
         const search = input.search.toLowerCase();

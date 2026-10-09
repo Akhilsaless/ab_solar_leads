@@ -115,11 +115,11 @@ export default function Copilot() {
         ) : summary ? (
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
             <SummaryCard icon={<TrendingUp className="h-4 w-4 text-emerald-500" />} label="New Leads Today" value={summary.newLeadsToday} accent="emerald" />
-            <SummaryCard icon={<AlertTriangle className="h-4 w-4 text-red-500" />} label="Urgent Leads" value={summary.urgentLeads} accent={summary.urgentLeads > 0 ? "red" : "muted"} />
+            <SummaryCard icon={<AlertTriangle className="h-4 w-4 text-red-500" />} label="Sales-ready Leads" value={summary.urgentLeads} accent={summary.urgentLeads > 0 ? "red" : "muted"} />
             <SummaryCard icon={<Mail className="h-4 w-4 text-yellow-500" />} label="Emails Sent Today" value={summary.emailsSentToday} accent={summary.emailsSentToday > 0 ? "yellow" : "muted"} />
-            <SummaryCard icon={<Eye className="h-4 w-4 text-purple-500" />} label="Email Opens" value={summary.businessesThatOpened} accent={summary.businessesThatOpened > 0 ? "purple" : "muted"} />
+            <SummaryCard icon={<Eye className="h-4 w-4 text-purple-500" />} label="Businesses Opened (All Time)" value={summary.businessesThatOpened} accent={summary.businessesThatOpened > 0 ? "purple" : "muted"} />
             <SummaryCard icon={<Zap className="h-4 w-4 text-orange-500" />} label="Runs Today" value={summary.runsToday} accent={summary.runsToday > 0 ? "orange" : "muted"} />
-            <SummaryCard icon={<BarChart2 className="h-4 w-4 text-blue-500" />} label="Unassigned Leads" value={(summary as any).unassignedLeads ?? 0} accent="blue" />
+            <SummaryCard icon={<BarChart2 className="h-4 w-4 text-blue-500" />} label="Unassigned Leads" value={summary.unassignedLeads} accent="blue" />
           </div>
         ) : (
           <Card><CardContent className="p-6 text-center text-muted-foreground text-sm">Could not load summary.</CardContent></Card>

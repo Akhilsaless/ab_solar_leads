@@ -1,43 +1,44 @@
+import { lazy, Suspense } from "react";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import NotFound from "@/pages/NotFound";
-import Home from "@/pages/Home";
-import Leads from "@/pages/Leads";
-import Conversations from "@/pages/Conversations";
-import ConversationDetail from "@/pages/ConversationDetail";
-import Products from "@/pages/Products";
-import Analytics from "@/pages/Analytics";
-import Subsidies from "@/pages/Subsidies";
-import Settings from "@/pages/Settings";
-import SmartChatBot from "@/pages/SmartChatBot";
-import BusinessScraper from "@/pages/BusinessScraper";
-import Pricing from "@/pages/Pricing";
-import ReferrerSignup from "@/pages/ReferrerSignup";
-import ReferrerDashboard from "@/pages/ReferrerDashboard";
-import ReferralManagement from "@/pages/ReferralManagement";
-import ReferralLanding from "@/pages/ReferralLanding";
-import ReferralTerms from "@/pages/ReferralTerms";
-import VerifyReferral from "@/pages/VerifyReferral";
-import PartnerOutreach from "@/pages/PartnerOutreach";
-import PartnerSignup from "@/pages/PartnerSignup";
-import ForPartners from "@/pages/ForPartners";
-import PartnerDashboard from "@/pages/PartnerDashboard";
-import ScrapedContacts from "@/pages/ScrapedContacts";
-import ProductGuide from "@/pages/ProductGuide";
-import { AutomatedOutreach } from "@/pages/AutomatedOutreach";
-import { WhatsAppSettings } from "@/pages/WhatsAppSettings";
-import { HostelReferrerSignup } from "@/pages/HostelReferrerSignup";
-import { QRCodeGenerator } from "@/pages/QRCodeGenerator";
-import { DualLeadPages } from "@/pages/DualLeadPages";
-import { SolarBenefitsVideo } from "@/pages/SolarBenefitsVideo";
-import PartnerSignupsAdmin from "@/pages/PartnerSignupsAdmin";
-import Copilot from "@/pages/Copilot";
-import FindLeads from "@/pages/FindLeads";
-import Partners from "@/pages/Partners";
-import Campaigns from "@/pages/Campaigns";
-import CampaignDetail from "@/pages/CampaignDetail";
-import NorthStar from "@/pages/NorthStar";
-import ClientDeliveryReview from "@/pages/ClientDeliveryReview";
+const NotFound = lazy(() => import("@/pages/NotFound"));
+const Home = lazy(() => import("@/pages/Home"));
+const Leads = lazy(() => import("@/pages/Leads"));
+const Conversations = lazy(() => import("@/pages/Conversations"));
+const ConversationDetail = lazy(() => import("@/pages/ConversationDetail"));
+const Products = lazy(() => import("@/pages/Products"));
+const Analytics = lazy(() => import("@/pages/Analytics"));
+const Subsidies = lazy(() => import("@/pages/Subsidies"));
+const Settings = lazy(() => import("@/pages/Settings"));
+const SmartChatBot = lazy(() => import("@/pages/SmartChatBot"));
+const BusinessScraper = lazy(() => import("@/pages/BusinessScraper"));
+const Pricing = lazy(() => import("@/pages/Pricing"));
+const ReferrerSignup = lazy(() => import("@/pages/ReferrerSignup"));
+const ReferrerDashboard = lazy(() => import("@/pages/ReferrerDashboard"));
+const ReferralManagement = lazy(() => import("@/pages/ReferralManagement"));
+const ReferralLanding = lazy(() => import("@/pages/ReferralLanding"));
+const ReferralTerms = lazy(() => import("@/pages/ReferralTerms"));
+const VerifyReferral = lazy(() => import("@/pages/VerifyReferral"));
+const PartnerOutreach = lazy(() => import("@/pages/PartnerOutreach"));
+const PartnerSignup = lazy(() => import("@/pages/PartnerSignup"));
+const ForPartners = lazy(() => import("@/pages/ForPartners"));
+const PartnerDashboard = lazy(() => import("@/pages/PartnerDashboard"));
+const ScrapedContacts = lazy(() => import("@/pages/ScrapedContacts"));
+const ProductGuide = lazy(() => import("@/pages/ProductGuide"));
+const AutomatedOutreach = lazy(() => import("@/pages/AutomatedOutreach").then(module => ({ default: module.AutomatedOutreach })));
+const WhatsAppSettings = lazy(() => import("@/pages/WhatsAppSettings").then(module => ({ default: module.WhatsAppSettings })));
+const HostelReferrerSignup = lazy(() => import("@/pages/HostelReferrerSignup").then(module => ({ default: module.HostelReferrerSignup })));
+const QRCodeGenerator = lazy(() => import("@/pages/QRCodeGenerator").then(module => ({ default: module.QRCodeGenerator })));
+const DualLeadPages = lazy(() => import("@/pages/DualLeadPages").then(module => ({ default: module.DualLeadPages })));
+const SolarBenefitsVideo = lazy(() => import("@/pages/SolarBenefitsVideo").then(module => ({ default: module.SolarBenefitsVideo })));
+const PartnerSignupsAdmin = lazy(() => import("@/pages/PartnerSignupsAdmin"));
+const Copilot = lazy(() => import("@/pages/Copilot"));
+const FindLeads = lazy(() => import("@/pages/FindLeads"));
+const Partners = lazy(() => import("@/pages/Partners"));
+const Campaigns = lazy(() => import("@/pages/Campaigns"));
+const CampaignDetail = lazy(() => import("@/pages/CampaignDetail"));
+const NorthStar = lazy(() => import("@/pages/NorthStar"));
+const ClientDeliveryReview = lazy(() => import("@/pages/ClientDeliveryReview"));
 import DashboardLayout from "@/components/DashboardLayout";
 import { Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
@@ -147,7 +148,7 @@ function App() {
       <ThemeProvider defaultTheme="dark">
         <TooltipProvider>
           <Toaster />
-          <Router />
+          <Suspense fallback={<p role="status" className="p-6 text-muted-foreground">Loading page…</p>}><Router /></Suspense>
         </TooltipProvider>
       </ThemeProvider>
     </ErrorBoundary>

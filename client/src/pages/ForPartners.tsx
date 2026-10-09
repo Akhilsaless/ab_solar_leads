@@ -97,7 +97,7 @@ export default function ForPartners() {
           <p className="text-gray-400 text-center mb-14">No more cold calling. Every lead is pre-qualified and ready to talk.</p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {[
-              { icon: <Phone className="w-5 h-5 text-green-400" />, title: "Phone Number", desc: "Direct mobile number, verified during chat" },
+              { icon: <Phone className="w-5 h-5 text-green-400" />, title: "Phone Number", desc: "Contact number shared during chat; verification must be confirmed" },
               { icon: <Mail className="w-5 h-5 text-blue-400" />, title: "Email Address", desc: "For follow-up and estimate delivery" },
               { icon: <MapPin className="w-5 h-5 text-orange-400" />, title: "Location", desc: "City, state, and GPS coordinates of the property" },
               { icon: <Zap className="w-5 h-5 text-yellow-400" />, title: "Monthly Electricity Bill", desc: "Exact bill amount — you know the ROI before you visit" },

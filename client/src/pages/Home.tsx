@@ -10,15 +10,34 @@ import {
 import { useState } from "react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
+import { getLoginUrl } from "@/const";
 
 export default function Home() {
   const { user } = useAuth();
   const [, setLocation] = useLocation();
 
-  const { data: agency, isLoading: agencyLoading } = trpc.agency.get.useQuery();
-  const { data: convStats } = trpc.conversations.stats.useQuery();
-  const { data: conversations } = trpc.conversations.list.useQuery();
-  const { data: leads } = trpc.leads.list.useQuery();
+  const enabled = Boolean(user);
+  const { data: agency, isLoading: agencyLoading, error: agencyError } = trpc.agency.get.useQuery(undefined, { enabled });
+  const { data: convStats, isLoading: statsLoading, error: statsError } = trpc.conversations.stats.useQuery(undefined, { enabled });
+  const { data: conversations, isLoading: conversationsLoading, error: conversationsError } = trpc.conversations.list.useQuery(undefined, { enabled });
+  const { data: leads, isLoading: leadsLoading, error: leadsError } = trpc.leads.list.useQuery(undefined, { enabled });
+
+  if (!user) {
+    return <div className="p-6 space-y-4"><h1 className="text-2xl font-bold">Sales Squad Leads</h1><p>Sign in to open your sales workspace.</p><Button onClick={() => { window.location.href = getLoginUrl(); }}>Sign In</Button></div>;
+  }
+
+  if (agencyLoading || statsLoading || conversationsLoading || leadsLoading) {
+    return <p role="status" className="p-6 text-muted-foreground">Loading dashboard…</p>;
+  }
+
+  if (agencyError || statsError || conversationsError || leadsError) {
+    return (
+      <Card><CardContent className="space-y-3 pt-6">
+        <p role="alert">Dashboard data could not be loaded. Please refresh to retry.</p>
+        <Button onClick={() => window.location.reload()}>Retry Dashboard</Button>
+      </CardContent></Card>
+    );
+  }
 
   // If no agency configured yet, show setup
   if (!agencyLoading && !agency) {
@@ -183,7 +202,7 @@ export default function Home() {
                       {lead.firstName} {lead.lastName}
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      {lead.phone || lead.email || "No contact"} · Score: {lead.leadScore || 0}
+                      {lead.phone || lead.email || "No contact"} · Score: {lead.evidenceScore.score}
                     </p>
                   </div>
                   <span className={`status-badge status-${lead.status}`}>{lead.status}</span>

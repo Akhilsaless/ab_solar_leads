@@ -8,6 +8,7 @@ import { sendEmail } from "./_core/emailService";
 import { notifyOwner } from "./_core/notification";
 import { invokeAiGateway } from "./aiGateway";
 import { ENV } from "./_core/env";
+import { calculateEvidenceScore } from "./evidenceScore";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -24,6 +25,12 @@ function safeCount(result: any): number {
   if (!row) return 0;
   const val = row.cnt ?? row["COUNT(*)"] ?? 0;
   return Number(val) || 0;
+}
+
+function istDayBounds() {
+  const shifted = new Date(Date.now() + 5.5 * 60 * 60 * 1000);
+  const start = Date.parse(`${shifted.toISOString().slice(0, 10)}T00:00:00+05:30`);
+  return { start, end: start + 86_400_000 };
 }
 
 type KlausProviderConfig = {
@@ -222,10 +229,11 @@ async function executeTool(toolName: string, args: any, agencyId: number): Promi
     switch (toolName) {
       case "get_stats": {
         const metric = args.metric || "all";
+        const { start: dayStart, end: dayEnd } = istDayBounds();
         const results: Record<string, number> = {};
 
         if (metric === "emails_today" || metric === "all") {
-          const r = await db.execute(sql`SELECT COUNT(*) as cnt FROM scrapedBusinesses WHERE agencyId = ${agencyId} AND emailSentAt IS NOT NULL AND DATE(FROM_UNIXTIME(emailSentAt/1000)) = CURDATE()`);
+          const r = await db.execute(sql`SELECT COUNT(*) as cnt FROM scrapedBusinesses WHERE agencyId = ${agencyId} AND emailSentAt >= ${dayStart} AND emailSentAt < ${dayEnd}`);
           results.emailsSentToday = safeCount(r);
         }
         if (metric === "email_opens" || metric === "all") {
@@ -239,14 +247,14 @@ async function executeTool(toolName: string, args: any, agencyId: number): Promi
           results.totalChatbotClicks = safeCount(r);
         }
         if (metric === "leads_count" || metric === "all") {
-          const r = await db.execute(sql`SELECT COUNT(*) as cnt FROM leads2 WHERE assignedPartnerId IS NOT NULL OR conversationId IS NOT NULL`);
+          const r = await db.execute(sql`SELECT COUNT(*) as cnt FROM leads2 l LEFT JOIN conversations3 c ON c.id = l.conversationId WHERE COALESCE(l.agencyId, c.agencyId) = ${agencyId}`);
           results.totalLeads = safeCount(r);
         }
         if (metric === "outreach_runs_today" || metric === "all") {
           // Use IST offset (+5:30) for date comparison
-          const r = await db.execute(sql`SELECT COUNT(*) as cnt FROM outreachRuns WHERE agencyId = ${agencyId} AND DATE(CONVERT_TZ(FROM_UNIXTIME(startedAt/1000), '+00:00', '+05:30')) = DATE(CONVERT_TZ(NOW(), '+00:00', '+05:30'))`);
+          const r = await db.execute(sql`SELECT COUNT(*) as cnt FROM outreachRuns WHERE agencyId = ${agencyId} AND startedAt >= ${dayStart} AND startedAt < ${dayEnd}`);
           results.runsToday = safeCount(r);
-          const r2 = await db.execute(sql`SELECT COALESCE(SUM(emailSentCount),0) as cnt FROM outreachRuns WHERE agencyId = ${agencyId} AND DATE(CONVERT_TZ(FROM_UNIXTIME(startedAt/1000), '+00:00', '+05:30')) = DATE(CONVERT_TZ(NOW(), '+00:00', '+05:30'))`);
+          const r2 = await db.execute(sql`SELECT COALESCE(SUM(emailSentCount),0) as cnt FROM outreachRuns WHERE agencyId = ${agencyId} AND startedAt >= ${dayStart} AND startedAt < ${dayEnd}`);
           results.emailsSentInRunsToday = safeCount(r2);
         }
         if (metric === "scraped_today" || metric === "all") {
@@ -348,12 +356,12 @@ async function executeTool(toolName: string, args: any, agencyId: number): Promi
         if (!confirmed) {
           // Preview mode
           if (leadId) {
-            const r = await db.execute(sql`SELECT id, firstName, lastName, email, status FROM leads2 WHERE id = ${leadId}`);
+            const r = await db.execute(sql`SELECT id, firstName, lastName, email, status FROM leads2 WHERE agencyId = ${agencyId} AND id = ${leadId}`);
             const lead = firstRow(r);
             if (!lead) return `No lead found with ID ${leadId}.`;
             return `Would delete: ${lead.firstName} ${lead.lastName} (${lead.email}) — Status: ${lead.status}. Confirm to proceed.`;
           } else if (leadName) {
-            const r = await db.execute(sql`SELECT id, firstName, lastName, email, status FROM leads2 WHERE CONCAT(firstName, ' ', lastName) LIKE ${'%' + leadName + '%'} LIMIT 5`);
+            const r = await db.execute(sql`SELECT id, firstName, lastName, email, status FROM leads2 WHERE agencyId = ${agencyId} AND CONCAT(firstName, ' ', lastName) LIKE ${'%' + leadName + '%'} LIMIT 5`);
             const found = rows(r);
             if (!found.length) return `No leads found matching "${leadName}".`;
             return `Found ${found.length} lead(s) matching "${leadName}": ${found.map((l: any) => `${l.firstName} ${l.lastName} (ID: ${l.id})`).join(", ")}. Confirm to delete.`;
@@ -363,13 +371,13 @@ async function executeTool(toolName: string, args: any, agencyId: number): Promi
 
         // Actual delete
         if (leadId) {
-          await db.execute(sql`DELETE FROM leads2 WHERE id = ${leadId}`);
+          await db.execute(sql`DELETE FROM leads2 WHERE agencyId = ${agencyId} AND id = ${leadId}`);
           return `Lead #${leadId} deleted successfully.`;
         } else if (leadName) {
-          const r = await db.execute(sql`SELECT id FROM leads2 WHERE CONCAT(firstName, ' ', lastName) LIKE ${'%' + leadName + '%'} LIMIT 1`);
+          const r = await db.execute(sql`SELECT id FROM leads2 WHERE agencyId = ${agencyId} AND CONCAT(firstName, ' ', lastName) LIKE ${'%' + leadName + '%'} LIMIT 1`);
           const lead = firstRow(r);
           if (!lead) return `No lead found matching "${leadName}".`;
-          await db.execute(sql`DELETE FROM leads2 WHERE id = ${lead.id}`);
+          await db.execute(sql`DELETE FROM leads2 WHERE agencyId = ${agencyId} AND id = ${lead.id}`);
           return `Lead "${leadName}" (ID: ${lead.id}) deleted successfully.`;
         }
         return "Please provide a lead ID or name.";
@@ -465,19 +473,19 @@ export const copilotRouter = router({
     if (!db) return null;
     const agency = await getAgencyByUserId(ctx.user!.id);
     if (!agency) return null;
-    const todayStr = new Date().toISOString().slice(0, 10);
+    const { start: dayStart, end: dayEnd } = istDayBounds();
 
     try {
-      const [newLeadsTodayRes, urgentLeadsRes, emailsSentTodayRes, emailOpensRes, runsToday] = await Promise.all([
-        db.execute(sql`SELECT COUNT(*) as cnt FROM leads2 WHERE DATE(createdAt) = ${todayStr}`),
-        db.execute(sql`SELECT COUNT(*) as cnt FROM leads2 WHERE priority IN ('urgent','high') AND status NOT IN ('converted','lost')`),
-        db.execute(sql`SELECT COUNT(*) as cnt FROM scrapedBusinesses WHERE agencyId = ${agency.id} AND emailSentAt IS NOT NULL AND DATE(FROM_UNIXTIME(emailSentAt/1000)) = CURDATE()`),
+      const [agencyLeadsRes, emailsSentTodayRes, emailOpensRes, runsToday] = await Promise.all([
+        db.execute(sql`SELECT l.* FROM leads2 l LEFT JOIN conversations3 c ON c.id = l.conversationId WHERE COALESCE(l.agencyId, c.agencyId) = ${agency.id}`),
+        db.execute(sql`SELECT COUNT(*) as cnt FROM scrapedBusinesses WHERE agencyId = ${agency.id} AND emailSentAt >= ${dayStart} AND emailSentAt < ${dayEnd}`),
         db.execute(sql`SELECT COUNT(*) as cnt FROM scrapedBusinesses WHERE agencyId = ${agency.id} AND emailOpenCount > 0`),
-        db.execute(sql`SELECT COUNT(*) as cnt FROM outreachRuns WHERE agencyId = ${agency.id} AND DATE(startedAt) = CURDATE()`),
+        db.execute(sql`SELECT COUNT(*) as cnt FROM outreachRuns WHERE agencyId = ${agency.id} AND startedAt >= ${dayStart} AND startedAt < ${dayEnd}`),
       ]);
       return {
-        newLeadsToday: safeCount(newLeadsTodayRes),
-        urgentLeads: safeCount(urgentLeadsRes),
+        newLeadsToday: rows(agencyLeadsRes).filter(lead => new Date(lead.createdAt).getTime() >= dayStart && new Date(lead.createdAt).getTime() < dayEnd).length,
+        urgentLeads: rows(agencyLeadsRes).filter(lead => !["converted", "lost"].includes(lead.status) && calculateEvidenceScore(lead).tier === "sales_ready").length,
+        unassignedLeads: rows(agencyLeadsRes).filter(lead => lead.assignedAgencyId == null && lead.assignedTo == null && lead.assignedPartnerId == null && !["converted", "lost"].includes(lead.status)).length,
         emailsSentToday: safeCount(emailsSentTodayRes),
         businessesThatOpened: safeCount(emailOpensRes),
         runsToday: safeCount(runsToday),
@@ -512,21 +520,21 @@ export const copilotRouter = router({
           priority: b.chatbotClickCount > 0 ? "critical" : "high",
           reason: `Opened email ${b.emailOpenCount}x${b.chatbotClickCount > 0 ? `, clicked chatbot ${b.chatbotClickCount}x` : ""}`,
           record: `${b.businessName} (${b.city || "unknown city"})`,
-          nextStep: "Follow up by WhatsApp or call — they're interested",
+          nextStep: "Review the engagement and confirm interest before planning follow-up",
           type: "hot_lead",
         });
       }
 
       const topUnassigned = rows(await db.execute(
-        sql`SELECT id, firstName, lastName, leadScore, state FROM leads2 WHERE assignedTo IS NULL AND status NOT IN ('converted','lost') ORDER BY leadScore DESC LIMIT 2`
+        sql`SELECT l.* FROM leads2 l LEFT JOIN conversations3 c ON c.id = l.conversationId WHERE COALESCE(l.agencyId, c.agencyId) = ${agency.id} AND l.assignedAgencyId IS NULL AND l.assignedTo IS NULL AND l.assignedPartnerId IS NULL AND l.status NOT IN ('converted','lost') AND COALESCE(l.isDnc, 0) = 0`
       ));
-      for (const lead of topUnassigned) {
-        const score = Number(lead.leadScore || 0);
+      for (const lead of topUnassigned.map(lead => ({ ...lead, evidence: calculateEvidenceScore(lead) })).sort((a, b) => b.evidence.score - a.evidence.score).slice(0, 2)) {
+        const score = lead.evidence.score;
         recommendations.push({
-          priority: score >= 80 ? "critical" : "high",
-          reason: `Score ${score} — unassigned lead from ${lead.state || "unknown"}`,
+          priority: score >= 80 ? "critical" : score >= 65 ? "high" : "medium",
+          reason: `Evidence score ${score} — unassigned lead from ${lead.state || "unknown"}`,
           record: `${lead.firstName || ""} ${lead.lastName || ""}`.trim() || `Lead #${lead.id}`,
-          nextStep: "Open Leads page → assign to a partner or contact directly",
+          nextStep: lead.evidence.nextAction,
           type: "lead",
         });
       }
