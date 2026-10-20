@@ -22,27 +22,49 @@ import {
 import { getLoginUrl } from "@/const";
 import { useIsMobile } from "@/hooks/useMobile";
 import {
-  LayoutDashboard, Users, MessageSquare, BarChart3,
-  Settings, LogOut, Search, Handshake, Send, Target, Trophy
+  LayoutDashboard, Users, MessageSquare, MoreHorizontal,
+  Settings, LogOut, Handshake, Target
 } from "lucide-react";
 import { SalesSquadLogo, SalesSquadIcon } from "./SalesSquadLogo";
 import { CSSProperties, useEffect, useRef, useState } from "react";
-import { useLocation } from "wouter";
+import { Link, useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from './DashboardLayoutSkeleton';
 import { Button } from "./ui/button";
 
-const menuItems = [
-  { icon: LayoutDashboard, label: "Dashboard", path: "/" },
-  { icon: MessageSquare, label: "Conversations", path: "/conversations" },
-  { icon: Users, label: "Leads", path: "/leads" },
-  { icon: Target, label: "Campaigns", path: "/campaigns" },
-  { icon: Trophy, label: "North Star", path: "/north-star" },
-  { icon: Send, label: "Automated Outreach", path: "/automated-outreach" },
-  { icon: Search, label: "Find Leads", path: "/find-leads" },
-  { icon: Handshake, label: "Partners", path: "/partners" },
-  { icon: BarChart3, label: "Analytics", path: "/analytics" },
-  { icon: Settings, label: "Settings", path: "/settings" },
+// Keep existing URLs so bookmarks and links continue to work.
+const workspaces = [
+  { icon: LayoutDashboard, label: "Overview", path: "/", pages: [
+    { label: "Dashboard", path: "/" },
+    { label: "Sales funnel", path: "/north-star" },
+    { label: "Analytics", path: "/analytics" },
+  ] },
+  { icon: Users, label: "Leads", path: "/leads", pages: [
+    { label: "Lead pipeline", path: "/leads" },
+  ] },
+  { icon: MessageSquare, label: "Inbox", path: "/conversations", pages: [
+    { label: "Conversations", path: "/conversations" },
+    { label: "AI assistant", path: "/copilot" },
+  ] },
+  { icon: Handshake, label: "Partners", path: "/partners", pages: [
+    { label: "Partner workspace", path: "/partners" },
+  ] },
+  { icon: Settings, label: "Settings", path: "/settings", pages: [
+    { label: "Platform", path: "/settings" },
+    { label: "WhatsApp", path: "/whatsapp-settings" },
+    { label: "Equipment", path: "/products" },
+    { label: "Subsidies", path: "/subsidies" },
+  ] },
+  { icon: Target, label: "Marketing", path: "/campaigns", pages: [
+    { label: "Campaigns", path: "/campaigns" },
+    { label: "Find leads", path: "/find-leads" },
+    { label: "Outreach", path: "/automated-outreach" },
+    { label: "QR codes", path: "/qr-generator" },
+    { label: "Lead pages", path: "/dual-leads" },
+    { label: "Solar video", path: "/solar-video" },
+  ] },
 ];
+const matchesPage = (location: string, path: string) =>
+  path === "/" ? location === "/" : location === path || location.startsWith(`${path}/`);
 
 const SIDEBAR_WIDTH_KEY = "sidebar-width";
 const DEFAULT_WIDTH = 260;
@@ -117,13 +139,24 @@ function DashboardLayoutContent({
 }: DashboardLayoutContentProps) {
   const { user, logout } = useAuth();
   const [location, setLocation] = useLocation();
-  const { state, toggleSidebar } = useSidebar();
+  const { state, toggleSidebar, setOpenMobile } = useSidebar();
   const isCollapsed = state === "collapsed";
   const [isResizing, setIsResizing] = useState(false);
   const sidebarRef = useRef<HTMLDivElement>(null);
-  const activeMenuItem = menuItems.find(item =>
-    item.path === "/" ? location === "/" : location.startsWith(item.path)
+  const navigationLocation = ({
+    "/scraper": "/find-leads",
+    "/scraped-contacts": "/find-leads",
+    "/partner-signups": "/partners",
+    "/admin/referrals": "/partners",
+  } as Record<string, string>)[location] ?? location;
+  const activeWorkspace = workspaces.find(workspace =>
+    workspace.pages.some(page => matchesPage(navigationLocation, page.path))
   );
+  const activePage = activeWorkspace?.pages.find(page => matchesPage(navigationLocation, page.path));
+  const navigate = (path: string) => {
+    setLocation(path);
+    setOpenMobile(false);
+  };
   const isMobile = useIsMobile();
 
   useEffect(() => {
@@ -189,13 +222,13 @@ function DashboardLayoutContent({
 
           <SidebarContent className="gap-0">
             <SidebarMenu className="px-2 py-1">
-              {menuItems.map(item => {
-                const isActive = item.path === "/" ? location === "/" : location.startsWith(item.path);
+              {workspaces.slice(0, 5).map(item => {
+                const isActive = activeWorkspace === item;
                 return (
                   <SidebarMenuItem key={item.path}>
                     <SidebarMenuButton
                       isActive={isActive}
-                      onClick={() => setLocation(item.path)}
+                      onClick={() => navigate(item.path)}
                       tooltip={item.label}
                       className="h-10 transition-all font-normal"
                     >
@@ -207,6 +240,20 @@ function DashboardLayoutContent({
                   </SidebarMenuItem>
                 );
               })}
+              <SidebarMenuItem>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <SidebarMenuButton tooltip="More" isActive={activeWorkspace?.label === "Marketing"} className="h-10">
+                      <MoreHorizontal className="h-4 w-4" /><span>More</span>
+                    </SidebarMenuButton>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent side="right" align="start">
+                    <DropdownMenuItem onClick={() => navigate("/campaigns")}>
+                      <Target className="mr-2 h-4 w-4" />Marketing
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </SidebarMenuItem>
             </SidebarMenu>
           </SidebarContent>
 
@@ -259,14 +306,32 @@ function DashboardLayoutContent({
               <div className="flex items-center gap-3">
                 <div className="flex flex-col gap-1">
                   <span className="tracking-tight text-foreground">
-                    {activeMenuItem?.label ?? "Menu"}
+                    {activeWorkspace?.label ?? "Menu"}
                   </span>
                 </div>
               </div>
             </div>
           </div>
         )}
-        <main className="flex-1 p-4 md:p-6">{children}</main>
+        <main className="flex-1 min-w-0 p-4 md:p-6">
+          {activeWorkspace && (
+            <div className="mb-6 space-y-3">
+              <p className="text-sm font-medium text-muted-foreground">{activeWorkspace.label}</p>
+              {activeWorkspace.pages.length > 1 && (
+                <nav aria-label={`${activeWorkspace.label} pages`} className="flex flex-wrap gap-2">
+                  {activeWorkspace.pages.map(page => (
+                    <Link key={page.path} href={page.path}
+                      aria-current={activePage === page ? "page" : undefined}
+                      className={`rounded-md px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${activePage === page ? "bg-primary text-primary-foreground" : "bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground"}`}>
+                      {page.label}
+                    </Link>
+                  ))}
+                </nav>
+              )}
+            </div>
+          )}
+          {children}
+        </main>
       </SidebarInset>
     </>
   );
