@@ -139,6 +139,50 @@ suite("solar operations against isolated MySQL", () => {
       })
     ).resolves.toEqual({ success: true });
   });
+  it("does not reveal installer or appointment details before phone verification", async () => {
+    const caller = solarOperationsRouter.createCaller(ctx);
+    const progress = await caller.customerProgress({
+      sessionId: "synthetic-customer-session-0001",
+    });
+    expect(progress.captured).toBe(true);
+    expect(progress.phoneVerified).toBe(false);
+    expect(progress.partnerName).toBeNull();
+    expect(progress.booking).toBeNull();
+    expect(progress.slots).toEqual([]);
+  });
+  it("does not let an unverified new session overwrite a matching customer's lead", async () => {
+    const conversation = {
+      id: 3,
+      sessionId: "synthetic-customer-session-0003",
+      agencyId: 9,
+    };
+    await pool.execute(
+      "INSERT INTO conversations3 (id, agencyId, sessionId) VALUES (3, 9, ?)",
+      [conversation.sessionId]
+    );
+    await captureConsentedChatLead(
+      state.db,
+      conversation,
+      { name: "Different Visitor", phone: "9876543210", city: "Mumbai" },
+      [
+        {
+          role: "customer",
+          content: "I agree to be contacted about this solar request",
+        },
+      ]
+    );
+    const [leads]: any = await pool.query(
+      "SELECT firstName, city FROM leads2 WHERE id = 1"
+    );
+    expect(leads[0]).toMatchObject({
+      firstName: "Synthetic",
+      city: "Hyderabad",
+    });
+    const progress = await solarOperationsRouter
+      .createCaller(ctx)
+      .customerProgress({ sessionId: conversation.sessionId });
+    expect(progress.partnerName).toBeNull();
+  });
   it("prevents two leads from booking the same slot and rolls back the losing workflow", async () => {
     await pool.query(
       "INSERT INTO leads2 (id, assignedPartnerId) VALUES (100, 1); INSERT INTO solarLeadWorkflow (leadId, partnerId, stage) VALUES (100, 1, 'accepted')"
