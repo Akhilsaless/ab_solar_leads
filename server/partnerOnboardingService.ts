@@ -1,5 +1,6 @@
 import { nanoid } from "nanoid";
 import { sql } from "drizzle-orm";
+import { isCurrentVerifiedInput } from "./catalogPricing";
 import { calculatePartnerOnboardingStatus, nextIncompletePartnerStep, normalizeCompletedSteps, partnerOnboardingChecklist, type PartnerOnboardingStatus, type PartnerOnboardingSnapshot } from "./partnerOnboarding";
 
 type PartnerSession = {
@@ -91,8 +92,8 @@ export async function getPartnerOnboardingSnapshot(dbConn: any, partner: Partner
     companyComplete: completedSteps.includes(1) && Boolean(mapping.agencyName && (mapping.phone || mapping.email) && (mapping.city || mapping.state || toServiceAreas(partner.serviceAreas).length)),
     panelCount: panels.filter((item: any) => Boolean(item.isActive)).length,
     inverterCount: inverters.filter((item: any) => Boolean(item.isActive)).length,
-    pricingActive: Boolean(pricing?.isPricingActive && pricing?.pricingVersion !== "draft" && pricing?.sourceNote && pricing?.effectiveFrom && pricing?.effectiveTo && pricing?.lastVerifiedAt && pricing?.installationCostPerKw != null && pricing?.balanceOfSystemCostPerKw != null),
-    stateInputReady: stateInputs.some((item: any) => Boolean(item.isActive && item.tariffPerUnit != null && item.avgSunHours != null && item.sourceNote && item.effectiveFrom && item.effectiveTo && item.lastVerifiedAt)),
+    pricingActive: Boolean(pricing?.isPricingActive && pricing?.pricingVersion !== "draft" && isCurrentVerifiedInput(pricing) && pricing?.effectiveTo && pricing?.installationCostPerKw != null && pricing?.balanceOfSystemCostPerKw != null),
+    stateInputReady: stateInputs.some((item: any) => Boolean(item.isActive && Number(item.tariffPerUnit) > 0 && Number(item.avgSunHours) > 0 && isCurrentVerifiedInput(item) && item.effectiveTo)),
     subsidyStepComplete: completedSteps.includes(6) && (subsidyMode === "hide_amount" || hasVerifiedSubsidyDisclosure),
     estimateSettingsComplete: completedSteps.includes(7) && Boolean(pricing?.pricingDisclosure?.trim()),
     panels,

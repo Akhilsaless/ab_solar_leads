@@ -19,6 +19,8 @@ import { trackEmailOpenHandler } from "../trackEmailOpenHandler";
 import { emailEventWebhookHandler } from "../emailEventWebhook";
 import { getDb } from "../db";
 import { sql } from "drizzle-orm";
+import { readFileSync } from "node:fs";
+import { registerAgencyWhatsAppRoutes, dispatchSolarWhatsApp } from "../agencyWhatsApp";
 
 // Owner auth middleware for admin endpoints
 const authenticateOwner = async (req: express.Request, res: express.Response, next: express.NextFunction) => {
@@ -60,6 +62,7 @@ async function startServer() {
   // Stripe webhook must be registered BEFORE json body parser
   const { registerStripeRoutes } = await import("../stripe-handler");
   registerStripeRoutes(app);
+  registerAgencyWhatsAppRoutes(app);
   // Configure body parser with larger size limit for file uploads
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
@@ -78,9 +81,23 @@ async function startServer() {
       await database.execute(sql`SELECT 1 FROM agencyEstimateSettings LIMIT 1`);
       await database.execute(sql`SELECT 1 FROM platformCommunicationSettings LIMIT 1`);
       await database.execute(sql`SELECT 1 FROM platformSafetyControls LIMIT 1`);
-      return res.json({ status: "ok", database: "ready" });
-    } catch {
-      return res.status(503).json({ status: "degraded", database: "migration_required" });
+      await database.execute(sql`SELECT 1 FROM solarLeadWorkflow LIMIT 1`);
+      await database.execute(sql`SELECT 1 FROM solarChatIdentity LIMIT 1`);
+      await database.execute(sql`SELECT 1 FROM solarSurveySlots LIMIT 1`);
+      await database.execute(sql`SELECT 1 FROM partnerSalesOperations LIMIT 1`);
+      await database.execute(sql`SELECT 1 FROM leadCaptureKeys LIMIT 1`);
+      await database.execute(sql`SELECT 1 FROM solarOtpLimits LIMIT 1`);
+      await database.execute(sql`SELECT 1 FROM agencyWhatsAppConnections LIMIT 1`);
+      await database.execute(sql`SELECT 1 FROM solarWhatsAppMessages LIMIT 1`);
+      await database.execute(sql`SELECT 1 FROM solarProposals LIMIT 1`);
+      await database.execute(sql`SELECT 1 FROM solarWhatsAppReceipts LIMIT 1`);
+      await database.execute(sql`SELECT 1 FROM solarCommercialAccruals LIMIT 1`);
+      let release = null;
+      try { release = JSON.parse(readFileSync(new URL("./release.json", import.meta.url), "utf8")); } catch { /* No claimed release provenance in development. */ }
+      return res.json({ status: "ok", database: "ready", release });
+    } catch (error: any) {
+      const code = error?.code || error?.cause?.code;
+      return res.status(503).json({ status: "degraded", database: code === "ER_NO_SUCH_TABLE" ? "migration_required" : "query_failed" });
     }
   });
   // Follow-up email scheduler (cron-only endpoint)
@@ -99,6 +116,7 @@ async function startServer() {
   app.get("/api/track/open", trackEmailOpenHandler);
   // Provider-neutral email events. It fails closed until EMAIL_EVENT_WEBHOOK_SECRET is configured.
   app.post("/api/webhooks/email-events", emailEventWebhookHandler);
+  app.post("/api/scheduled/solar-whatsapp", dispatchSolarWhatsApp);
 
   // tRPC API
   app.use(
