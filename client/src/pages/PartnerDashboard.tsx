@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { trpc } from "@/lib/trpc";
 import PartnerOnboardingWizard from "@/components/PartnerOnboardingWizard";
+import PartnerSalesOperations from "@/components/PartnerSalesOperations";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -15,7 +16,7 @@ import {
 
 const STORAGE_KEY = "partner_token";
 
-type Tab = "leads" | "setup" | "profile" | "marketing";
+type Tab = "leads" | "setup" | "profile" | "marketing" | "operations";
 
 function StatusBadge({ status }: { status: string }) {
   const map: Record<string, string> = {
@@ -224,6 +225,7 @@ export default function PartnerDashboard() {
 
   const tabs: { id: Tab; label: string; icon: any }[] = [
     { id: "leads", label: "My Leads", icon: Users },
+    { id: "operations", label: "Surveys & Sales", icon: Calendar },
     { id: "setup", label: onboardingReady ? "Business Settings" : "Finish Setup", icon: Zap },
     { id: "profile", label: "Company Profile", icon: FileText },
     { id: "marketing", label: "Marketing", icon: Megaphone },
@@ -269,6 +271,7 @@ export default function PartnerDashboard() {
       </div>
 
       <div className="max-w-6xl mx-auto px-4 py-6 space-y-6">
+        {activeTab === "operations" && <PartnerSalesOperations token={token} />}
 
         {/* ── LEADS TAB ── */}
         {activeTab === "leads" && (
@@ -388,15 +391,13 @@ export default function PartnerDashboard() {
                         {/* Status Update */}
                         <div className="mt-3 flex items-center gap-2">
                           <span className="text-xs text-muted-foreground">Update status:</span>
-                          {(["contacted", "converted", "lost"] as const).map(s => (
+                          {(["contacted"] as const).map(s => (
                             <button
                               key={s}
                               disabled={updatingLead === lead.id || (lead.status || "new") === s}
                               onClick={() => handleStatusChange(lead.id, s)}
                               className={`text-xs px-2.5 py-1 rounded-md border transition-colors disabled:opacity-40 ${
-                                s === "converted" ? "border-green-500/30 text-green-400 hover:bg-green-500/10" :
-                                s === "contacted" ? "border-yellow-500/30 text-yellow-400 hover:bg-yellow-500/10" :
-                                "border-red-500/30 text-red-400 hover:bg-red-500/10"
+                                "border-yellow-500/30 text-yellow-400 hover:bg-yellow-500/10"
                               } ${(lead.status || "new") === s ? "opacity-40 cursor-default" : ""}`}
                             >
                               {updatingLead === lead.id ? <Loader2 className="w-3 h-3 animate-spin" /> : s.charAt(0).toUpperCase() + s.slice(1)}

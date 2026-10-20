@@ -63,9 +63,10 @@ function parsePropertyType(text: string): ChatPropertyType | undefined {
 }
 
 function parseName(text: string): string | undefined {
-  const match = text.match(/\b(?:my name is|i am|i'm|this is)\s+([a-z][a-z .'-]{1,40})/i);
+  const match = text.match(/\b(?:my name is|i am|i'm|this is)\s+([a-z][a-z '-]{1,40})/i);
   if (!match?.[1]) return undefined;
   const name = match[1].replace(/\s+(?:and|from|with|in|my)\b.*$/i, "").trim();
+  if (/\b(?:test|qa|looking|interested|paying|trying|calling|homeowner|resident|planning|not|a|an)\b/i.test(name)) return undefined;
   return /^[a-z][a-z .'-]{1,40}$/i.test(name) ? name : undefined;
 }
 
@@ -105,7 +106,18 @@ export function isCallbackRequest(text: string): boolean {
 }
 
 export function hasExplicitContactConsent(text: string): boolean {
+  if (/\b(?:do not|don't|not|never|withdraw|revoke)\b/i.test(text.split(/[.!?]/).find(part => /agree|consent/i.test(part)) || "")) return false;
   return /\b(?:i\s+)?(?:agree|consent)\b[^.]{0,100}\b(?:contact|callback|call|solar request|team)\b/i.test(text);
+}
+
+export function latestContactConsent(messages: Array<{ role: string; content: string }>): boolean {
+  let consent = false;
+  for (const message of messages) {
+    if (message.role !== "customer") continue;
+    if (/\b(?:stop contacting|do not contact|don't contact|withdraw.*consent|revoke.*consent|unsubscribe)\b/i.test(message.content)) consent = false;
+    else if (hasExplicitContactConsent(message.content)) consent = true;
+  }
+  return consent;
 }
 
 export function buildCallbackConsentPrompt(): string {

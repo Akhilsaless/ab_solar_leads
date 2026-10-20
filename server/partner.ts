@@ -689,6 +689,7 @@ export const partnerRouter = router({
         sql`SELECT id FROM leads2 WHERE id = ${input.leadId} AND assignedPartnerId = ${partner.id}`
       ));
       if (!lead) throw new Error("Lead not found or not assigned to you");
+      if (input.status === "converted" || input.status === "lost") throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Use Surveys & Sales to record installation, revenue, or cancellation with supporting evidence." });
       await dbConn.execute(
         sql`UPDATE leads2 SET status = ${input.status} WHERE id = ${input.leadId}`
       );
