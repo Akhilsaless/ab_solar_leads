@@ -1,4 +1,4 @@
-import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, decimal, boolean, json, date, bigint, uniqueIndex, index } from "drizzle-orm/mysql-core";
+import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, decimal, boolean, json, date, bigint, uniqueIndex, index, char, datetime, longtext } from "drizzle-orm/mysql-core";
 
 /**
  * Core user table backing auth flow (agency owners/admins).
@@ -205,6 +205,11 @@ export type StateSubsidy = typeof stateSubsidies.$inferSelect;
 export const leads = mysqlTable("leads2", {
   id: int("id").autoincrement().primaryKey(),
   agencyId: int("agencyId"),
+  sourceAgencyId: int("sourceAgencyId"),
+  assignedAgencyId: int("assignedAgencyId"),
+  assignmentStatus: mysqlEnum("assignmentStatus", ["UNASSIGNED", "ASSIGNED", "REASSIGNED"]).default("UNASSIGNED").notNull(),
+  assignedBy: int("assignedBy"),
+  assignedAt: timestamp("assignedAt"),
   firstName: varchar("firstName", { length: 100 }).notNull(),
   lastName: varchar("lastName", { length: 100 }).notNull(),
   email: varchar("email", { length: 320 }),
@@ -1024,3 +1029,43 @@ export const platformCommunicationAudit = mysqlTable("platformCommunicationAudit
 
 export type PlatformCommunicationSettings = typeof platformCommunicationSettings.$inferSelect;
 export type PlatformSafetyControls = typeof platformSafetyControls.$inferSelect;
+
+export const partnerSalesOperations = mysqlTable("partnerSalesOperations", {
+  partnerId: int("partnerId").primaryKey(), acceptingLeads: boolean("acceptingLeads").default(false).notNull(),
+  serviceCities: json("serviceCities"), servicePincodes: json("servicePincodes"),
+  commercialModel: varchar("commercialModel", { length: 40 }).default("not_agreed").notNull(),
+  commercialRate: decimal("commercialRate", { precision: 12, scale: 2 }), termsEffectiveFrom: date("termsEffectiveFrom"), termsNote: text("termsNote"), termsUpdatedBy: int("termsUpdatedBy"),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export const solarSurveySlots = mysqlTable("solarSurveySlots", {
+  id: int("id").autoincrement().primaryKey(), partnerId: int("partnerId").notNull(),
+  startsAt: datetime("startsAt").notNull(), endsAt: datetime("endsAt").notNull(), city: varchar("city", { length: 100 }).notNull(),
+  status: varchar("status", { length: 20 }).default("available").notNull(), leadId: int("leadId"), createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, t => ({ partnerStart: uniqueIndex("partner_start").on(t.partnerId, t.startsAt), available: index("available_slots").on(t.partnerId, t.status, t.startsAt) }));
+export const solarLeadWorkflow = mysqlTable("solarLeadWorkflow", {
+  leadId: int("leadId").primaryKey(), partnerId: int("partnerId"), stage: varchar("stage", { length: 40 }).default("awaiting_partner").notNull(), surveySlotId: int("surveySlotId"), version: int("version").default(0).notNull(),
+  revenuePaise: bigint("revenuePaise", { mode: "number" }), paymentReference: varchar("paymentReference", { length: 200 }), updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, t => ({ partnerStage: index("partner_stage").on(t.partnerId, t.stage) }));
+export const solarWorkflowEvents = mysqlTable("solarWorkflowEvents", {
+  id: int("id").autoincrement().primaryKey(), leadId: int("leadId").notNull(), partnerId: int("partnerId"), actor: varchar("actor", { length: 100 }).notNull(), fromStage: varchar("fromStage", { length: 40 }), toStage: varchar("toStage", { length: 40 }).notNull(), note: varchar("note", { length: 2000 }), createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, t => ({ history: index("lead_history").on(t.leadId, t.id) }));
+export const leadCaptureKeys = mysqlTable("leadCaptureKeys", { captureKey: char("captureKey", { length: 64 }).primaryKey(), leadId: int("leadId"), createdAt: timestamp("createdAt").defaultNow().notNull() });
+export const solarChatIdentity = mysqlTable("solarChatIdentity", {
+  sessionId: varchar("sessionId", { length: 128 }).primaryKey(), agencyId: int("agencyId").notNull(), phone: varchar("phone", { length: 30 }), consentAt: timestamp("consentAt"), whatsappConsentAt: timestamp("whatsappConsentAt"), revokedAt: timestamp("revokedAt"), phoneVerifiedAt: timestamp("phoneVerifiedAt"), otpRequestedAt: timestamp("otpRequestedAt"), otpAttempts: int("otpAttempts").default(0).notNull(), otpGeneration: int("otpGeneration").default(0).notNull(),
+});
+export const solarOtpLimits = mysqlTable("solarOtpLimits", { phoneHash: char("phoneHash", { length: 64 }).primaryKey(), lastRequestedAt: datetime("lastRequestedAt"), windowStartedAt: datetime("windowStartedAt").notNull(), requestCount: int("requestCount").default(0).notNull() });
+export const agencyWhatsAppConnections = mysqlTable("agencyWhatsAppConnections", {
+  agencyId: int("agencyId").primaryKey(), encryptedConfig: text("encryptedConfig").notNull(), phoneNumberId: varchar("phoneNumberId", { length: 100 }).notNull().unique(), enabled: boolean("enabled").default(false).notNull(), verifiedAt: timestamp("verifiedAt"), webhookVerifiedAt: timestamp("webhookVerifiedAt"), templateVerifiedAt: timestamp("templateVerifiedAt"), updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export const solarWhatsAppMessages = mysqlTable("solarWhatsAppMessages", {
+  id: int("id").autoincrement().primaryKey(), agencyId: int("agencyId").notNull(), leadId: int("leadId").notNull(), direction: varchar("direction", { length: 10 }).notNull(), providerMessageId: varchar("providerMessageId", { length: 255 }).unique(), dedupeKey: char("dedupeKey", { length: 64 }).notNull().unique(), body: text("body").notNull(), providerTimestamp: bigint("providerTimestamp", { mode: "number" }), status: varchar("status", { length: 30 }).default("pending").notNull(), lastError: varchar("lastError", { length: 100 }), createdAt: timestamp("createdAt").defaultNow().notNull(), updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, t => ({ queue: index("queue_status").on(t.status, t.id), inbox: index("agency_inbox").on(t.agencyId, t.leadId, t.id) }));
+export const solarProposals = mysqlTable("solarProposals", {
+  id: int("id").autoincrement().primaryKey(), leadId: int("leadId").notNull(), partnerId: int("partnerId").notNull(), reference: varchar("reference", { length: 100 }).notNull().unique(), contentHash: char("contentHash", { length: 64 }).notNull().unique(), snapshot: json("snapshot").notNull(), pdfBase64: longtext("pdfBase64").notNull(), validUntil: date("validUntil").notNull(), downloadTokenHash: char("downloadTokenHash", { length: 64 }).unique(), encryptedDownloadToken: text("encryptedDownloadToken"), downloadExpiresAt: timestamp("downloadExpiresAt"), createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, t => ({ history: index("lead_proposals").on(t.leadId, t.id) }));
+export const solarWhatsAppReceipts = mysqlTable("solarWhatsAppReceipts", {
+  id: int("id").autoincrement().primaryKey(), agencyId: int("agencyId").notNull(), providerMessageId: varchar("providerMessageId", { length: 255 }).notNull(), status: varchar("status", { length: 30 }).notNull(), errorCode: varchar("errorCode", { length: 100 }), createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, t => ({ receiptOnce: uniqueIndex("receipt_once").on(t.agencyId, t.providerMessageId, t.status) }));
+export const solarCommercialAccruals = mysqlTable("solarCommercialAccruals", {
+  id: int("id").autoincrement().primaryKey(), leadId: int("leadId").notNull(), partnerId: int("partnerId").notNull(), milestone: varchar("milestone", { length: 40 }).notNull(), model: varchar("model", { length: 40 }).notNull(), rate: decimal("rate", { precision: 12, scale: 2 }).notNull(), amountPaise: bigint("amountPaise", { mode: "number" }).notNull(), termsEffectiveFrom: date("termsEffectiveFrom").notNull(), termsReference: text("termsReference").notNull(), createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, t => ({ milestoneOnce: uniqueIndex("milestone_once").on(t.leadId, t.partnerId, t.milestone) }));

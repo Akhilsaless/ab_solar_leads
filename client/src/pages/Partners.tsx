@@ -3,6 +3,7 @@ import { Handshake, Users, UserCheck } from "lucide-react";
 import PartnerOutreach from "./PartnerOutreach";
 import PartnerSignupsAdmin from "./PartnerSignupsAdmin";
 import ReferralManagement from "./ReferralManagement";
+import { OwnerSalesOperations } from "@/components/PartnerSalesOperations";
 
 export default function Partners() {
   return (
@@ -13,6 +14,7 @@ export default function Partners() {
       </div>
       <Tabs defaultValue="outreach" className="w-full">
         <TabsList className="h-auto flex-wrap gap-1">
+          <TabsTrigger value="operations">Installer Operations</TabsTrigger>
           <TabsTrigger value="outreach" className="flex items-center gap-1.5">
             <Handshake className="w-3.5 h-3.5" /> Partner Outreach
           </TabsTrigger>
@@ -23,6 +25,7 @@ export default function Partners() {
             <UserCheck className="w-3.5 h-3.5" /> Referral Management
           </TabsTrigger>
         </TabsList>
+        <TabsContent value="operations" className="mt-4"><OwnerSalesOperations /></TabsContent>
         <TabsContent value="outreach" className="mt-4">
           <PartnerOutreach />
         </TabsContent>

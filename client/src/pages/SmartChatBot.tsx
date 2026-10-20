@@ -1,4 +1,5 @@
 import { trpc } from "@/lib/trpc";
+import ChatNextSteps from "@/components/ChatNextSteps";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Loader2, MessageCircle, Send, Sun, Upload, UserRound, Zap } from "lucide-react";
@@ -256,6 +257,7 @@ export default function SmartChatBot() {
         {messages.map((message, index) => <div key={`${index}-${message.createdAt}`} className={`flex ${message.role === "customer" ? "justify-end" : "justify-start"}`}><div className={`max-w-[88%] sm:max-w-[78%] ${message.role === "customer" ? "items-end" : "items-start"} flex flex-col`}><div className={`rounded-2xl px-4 py-3 text-sm leading-relaxed ${message.role === "bot" ? "rounded-bl-md border border-white/10 bg-white/[0.06] text-gray-100" : "rounded-br-md text-white"}`} style={message.role === "customer" ? { background: `linear-gradient(135deg, ${brandColor}, ${brandColor}cc)` } : undefined}>{message.role === "bot" ? <Streamdown>{parseQuickReplyMarkup(message.content).content}</Streamdown> : <span className="whitespace-pre-wrap">{message.content}</span>}</div>{index === messages.length - 1 && message.role === "bot" && <QuickReplies replies={showStartActions ? START_ACTIONS : quickReplies} brandColor={brandColor} onPick={send} />}</div></div>)}
         {isLoading && <div className="flex justify-start"><div className="flex items-center gap-2 rounded-2xl rounded-bl-md border border-white/10 bg-white/[0.06] px-4 py-3 text-xs text-gray-400"><Loader2 className="h-4 w-4 animate-spin" /> Klaus is thinking…</div></div>}
         {estimate && <EstimateCard estimate={estimate} brandColor={brandColor} />}
+        {agency && <ChatNextSteps sessionId={sessionId} />}
         {estimate && !contactIntent && <div className="grid grid-cols-1 gap-2 sm:grid-cols-3"><button onClick={() => requestContact("Please send my detailed estimate on WhatsApp")} className="min-h-11 rounded-xl border border-white/10 bg-white/[0.04] px-3 text-sm text-gray-200 hover:bg-white/[0.08]">💬 WhatsApp estimate</button><button onClick={() => requestContact("I’d like to book a free solar site visit")} className="min-h-11 rounded-xl border border-white/10 bg-white/[0.04] px-3 text-sm text-gray-200 hover:bg-white/[0.08]">🏠 Book site visit</button><button onClick={() => send("I want to keep chatting about this estimate")} className="min-h-11 rounded-xl border border-white/10 bg-white/[0.04] px-3 text-sm text-gray-200 hover:bg-white/[0.08]">Ask another question</button></div>}
         <div ref={endRef} />
       </div></main>
