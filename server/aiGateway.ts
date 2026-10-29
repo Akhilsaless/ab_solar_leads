@@ -1,3 +1,4 @@
+import { callSarvam, SARVAM_BASE_URL, SARVAM_MODEL } from "./sarvam";
 import { TRPCError } from "@trpc/server";
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from "crypto";
 import { sql } from "drizzle-orm";
@@ -7,7 +8,7 @@ import { invokeLLM } from "./_core/llm";
 import { protectedProcedure, router } from "./_core/trpc";
 import { getAgencyByUserId, getDb } from "./db";
 
-export const AI_PROVIDERS = ["builtin", "gemini", "groq", "openrouter", "cloudflare", "mistral", "huggingface", "openai", "custom"] as const;
+export const AI_PROVIDERS = ["builtin", "sarvam", "gemini", "groq", "openrouter", "cloudflare", "mistral", "huggingface", "openai", "custom"] as const;
 export type AiProvider = typeof AI_PROVIDERS[number];
 export type RoutingMode = "auto" | "fastest" | "free_first" | "best_quality" | "manual";
 
@@ -27,6 +28,13 @@ export const PROVIDER_PRESETS: Record<AiProvider, ProviderPreset> = {
   builtin: {
     label: "Built-in AI", connectionType: "builtin", defaultModel: "gpt-5-nano", purpose: "Existing safe fallback while no external provider is configured.", supportsModelDiscovery: false, credentialFields: [],
     staticModels: [{ id: "gpt-5-nano", categories: ["fast", "agent_tool_calling"], capabilities: ["streaming", "tool_calling", "structured_output"], isFree: false }],
+  },
+  sarvam: {
+    label: "Sarvam AI", connectionType: "api_key", defaultBaseUrl: SARVAM_BASE_URL,
+    defaultModel: SARVAM_MODEL, purpose: "Optional Telugu, Hindi and English text brain for customer chat and Klaus. Calling and WhatsApp automation are separate paid features.",
+    supportsModelDiscovery: false,
+    credentialFields: [{ key: "apiKey", label: "Sarvam API subscription key (optional)", secret: true }],
+    staticModels: [{ id: SARVAM_MODEL, categories: ["general", "agent_tool_calling"], capabilities: ["tool_calling", "structured_output"], isFree: false }],
   },
   gemini: {
     label: "Google Gemini", connectionType: "api_key", defaultBaseUrl: "https://generativelanguage.googleapis.com/v1beta/openai", defaultModel: "gemini-2.5-flash", purpose: "Fast multimodal and tool-capable Google models.", supportsModelDiscovery: true,
@@ -138,6 +146,7 @@ function normalizeModelList(provider: AiProvider, payload: any) {
 
 async function fetchModelList(connection: any, apiKey: string) {
   const provider = connection.provider as AiProvider;
+  if (provider === "sarvam") return PROVIDER_PRESETS.sarvam.staticModels.map(model => ({ modelId: model.id, displayName: model.id, categories: JSON.stringify(model.categories), capabilities: JSON.stringify(model.capabilities), isFree: false }));
   if (provider === "gemini") {
     const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(apiKey)}`);
     if (!response.ok) throw new Error(`Model discovery failed (${response.status})`);
@@ -224,10 +233,15 @@ async function updateConnectionHealth(connectionId: number, patch: { status?: st
   `);
 }
 
-function selectCandidates(connections: any[], settings: any, requirement: { requiresTools?: boolean; manualProvider?: AiProvider; manualModel?: string }) {
+export function selectCandidates(connections: any[], settings: any, requirement: { requiresTools?: boolean; manualProvider?: AiProvider; manualModel?: string }) {
   const mode = settings.routingMode as RoutingMode;
+  const pinned = jsonParse(settings.featurePolicies, {}).textBrainProvider;
   let candidates = connections.filter(connection => connection.isEnabled && connection.status === "connected" && connection.healthStatus !== "authentication_error" && connection.healthStatus !== "unavailable" && connection.encryptedCredential);
-  if (settings.freeModelsOnly || !settings.allowPaidFallback) candidates = candidates.filter(connection => connection.isFreeTier);
+  if (pinned && pinned !== "automatic") {
+    // An explicit brain selection never falls through to a different vendor.
+    return candidates.filter(connection => connection.provider === pinned && (!settings.freeModelsOnly || (connection.provider !== "sarvam" && connection.isFreeTier)));
+  }
+  if (settings.freeModelsOnly || !settings.allowPaidFallback) candidates = candidates.filter(connection => connection.provider !== "sarvam" && connection.isFreeTier);
   if (mode === "manual" && requirement.manualProvider) candidates = candidates.filter(connection => connection.provider === requirement.manualProvider);
   if (mode === "fastest") candidates.sort((a, b) => Number(a.averageLatencyMs || 999999) - Number(b.averageLatencyMs || 999999));
   else if (mode === "best_quality") candidates.sort((a, b) => Number(a.priority || 100) - Number(b.priority || 100));
@@ -237,6 +251,7 @@ function selectCandidates(connections: any[], settings: any, requirement: { requ
 }
 
 async function callOpenAiCompatible(connection: any, apiKey: string, request: { messages: any[]; tools?: any; tool_choice?: any; model?: string }) {
+  if (connection.provider === "sarvam") return callSarvam(apiKey, request);
   const baseUrl = providerBaseUrl(connection);
   const response = await fetch(`${baseUrl}/chat/completions`, {
     method: "POST",
@@ -253,14 +268,21 @@ async function callOpenAiCompatible(connection: any, apiKey: string, request: { 
   return response.json();
 }
 
+export class SelectedAiBrainError extends TRPCError {
+  constructor(message: string) { super({ code: "PRECONDITION_FAILED", message }); }
+}
+
 /** Central normalized gateway used by application features. */
 export async function invokeAiGateway(input: { agencyId: number; feature: string; messages: any[]; tools?: any; tool_choice?: any; manualProvider?: AiProvider; manualModel?: string }) {
   const settings = await getSettings(input.agencyId);
   const connections = await listConnections(input.agencyId);
   const candidates = selectCandidates(connections, settings, { manualProvider: input.manualProvider, manualModel: input.manualModel, requiresTools: Boolean(input.tools) });
   const mode = settings.routingMode as RoutingMode;
+  const pinned = jsonParse(settings.featurePolicies, {}).textBrainProvider;
+  const explicitlySelected = pinned && pinned !== "automatic";
 
   if (candidates.length === 0) {
+    if (explicitlySelected) throw new SelectedAiBrainError("Selected AI brain is not enabled and verified. Review AI Providers settings.");
     if (mode === "manual" || settings.freeModelsOnly) {
       throw new TRPCError({ code: "PRECONDITION_FAILED", message: "No eligible external AI provider is connected for the selected routing policy." });
     }
@@ -294,6 +316,7 @@ export async function invokeAiGateway(input: { agencyId: number; feature: string
       await logUsage({ agencyId: input.agencyId, providerConnectionId: connection.id, provider: connection.provider, modelId: connection.defaultModel, feature: input.feature, routingMode: mode, latencyMs: Date.now() - started, success: false, usedFallback: index > 0, errorCode: String(status || "provider_error") });
     }
   }
+  if (explicitlySelected) throw new SelectedAiBrainError("Selected AI brain is unavailable. Please try again or change the brain in Settings.");
   throw new TRPCError({ code: "BAD_GATEWAY", message: "No configured AI provider could complete this request. Please try again shortly." });
 }
 
@@ -326,6 +349,24 @@ export const aiGatewayRouter = router({
     return { settings: { ...settings, providerPriority: jsonParse(settings.providerPriority, []), featurePolicies: jsonParse(settings.featurePolicies, {}) }, connections: connections.map(cleanConnection), usage };
   }),
 
+  selectTextBrain: protectedProcedure.input(z.object({ provider: z.enum(["automatic", "sarvam"]) })).mutation(async ({ ctx, input }) => {
+    const agency = await agencyForUser(ctx.user.id);
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable." });
+    await getSettings(agency.id);
+    await db.transaction(async tx => {
+      await tx.execute(sql`SELECT agencyId FROM aiGatewaySettings WHERE agencyId = ${agency.id} FOR UPDATE`);
+      if (input.provider === "sarvam") {
+        const connection = normalizeRows(await tx.execute(sql`SELECT * FROM aiProviderConnections WHERE agencyId = ${agency.id} AND provider = 'sarvam' FOR UPDATE`))[0];
+        if (!connection?.encryptedCredential || !connection.isEnabled || connection.status !== "connected" || !["healthy", "slow"].includes(connection.healthStatus))
+          throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Save, test and enable Sarvam before using it as the AI brain." });
+      }
+      await tx.execute(sql`UPDATE aiGatewaySettings SET featurePolicies = JSON_SET(COALESCE(featurePolicies, JSON_OBJECT()), '$.textBrainProvider', ${input.provider}), freeModelsOnly = CASE WHEN ${input.provider} = 'sarvam' THEN FALSE ELSE freeModelsOnly END WHERE agencyId = ${agency.id}`);
+    });
+    // Does not modify any communication, calling, schedule or payment control.
+    return { provider: input.provider };
+  }),
+
   saveProvider: protectedProcedure.input(providerInput).mutation(async ({ ctx, input }) => {
     const agency = await agencyForUser(ctx.user.id);
     const db = await getDb();
@@ -336,12 +377,13 @@ export const aiGatewayRouter = router({
       throw new TRPCError({ code: "BAD_REQUEST", message: `${preset.credentialFields.find(field => field.key === "apiKey")?.label || "API key"} is required to save this provider.` });
     }
     if (input.provider === "cloudflare" && !input.accountId) throw new TRPCError({ code: "BAD_REQUEST", message: "Cloudflare Account ID is required." });
-    const baseUrl = input.provider === "cloudflare" || input.provider === "builtin" ? null : normalizeGatewayBaseUrl(input.baseUrl || preset.defaultBaseUrl || "");
+    const baseUrl = input.provider === "sarvam" ? SARVAM_BASE_URL : input.provider === "cloudflare" || input.provider === "builtin" ? null : normalizeGatewayBaseUrl(input.baseUrl || preset.defaultBaseUrl || "");
+    if (input.provider === "sarvam" && input.defaultModel && input.defaultModel !== SARVAM_MODEL) throw new TRPCError({ code: "BAD_REQUEST", message: "Choose sarvam-105b for the Sarvam AI brain." });
     const encryptedCredential = input.apiKey ? encryptGatewayCredential(input.apiKey) : null;
     const hint = input.apiKey ? maskCredential(input.apiKey) : null;
     await db.execute(sql`
       INSERT INTO aiProviderConnections (agencyId, provider, connectionType, status, healthStatus, encryptedCredential, credentialHint, accountId, baseUrl, defaultModel, isEnabled, isFreeTier, priority)
-      VALUES (${agency.id}, ${input.provider}, ${preset.connectionType}, ${input.provider === "builtin" ? "connected" : "configuration_required"}, ${input.provider === "builtin" ? "healthy" : "unknown"}, ${encryptedCredential}, ${hint}, ${input.accountId || null}, ${baseUrl}, ${input.defaultModel || preset.defaultModel || null}, ${input.isEnabled}, ${input.isFreeTier}, ${input.priority})
+      VALUES (${agency.id}, ${input.provider}, ${preset.connectionType}, ${input.provider === "builtin" ? "connected" : "configuration_required"}, ${input.provider === "builtin" ? "healthy" : "unknown"}, ${encryptedCredential}, ${hint}, ${input.accountId || null}, ${baseUrl}, ${input.defaultModel || preset.defaultModel || null}, ${input.isEnabled}, ${input.provider === "sarvam" ? false : input.isFreeTier}, ${input.priority})
       ON DUPLICATE KEY UPDATE connectionType = VALUES(connectionType), encryptedCredential = COALESCE(VALUES(encryptedCredential), encryptedCredential), credentialHint = COALESCE(VALUES(credentialHint), credentialHint), accountId = VALUES(accountId), baseUrl = VALUES(baseUrl), defaultModel = VALUES(defaultModel), isEnabled = VALUES(isEnabled), isFreeTier = VALUES(isFreeTier), priority = VALUES(priority), status = CASE WHEN VALUES(encryptedCredential) IS NOT NULL THEN 'configuration_required' ELSE status END, healthStatus = CASE WHEN VALUES(encryptedCredential) IS NOT NULL THEN 'unknown' ELSE healthStatus END
     `);
     const connection = normalizeRows(await db.execute(sql`SELECT * FROM aiProviderConnections WHERE agencyId = ${agency.id} AND provider = ${input.provider} LIMIT 1`))[0];
