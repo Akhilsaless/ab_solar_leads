@@ -421,7 +421,7 @@ export function registerAgencyWhatsAppRoutes(app: express.Express) {
             }
             for (const msg of value.messages || []) {
               const phone = normalizeIndianPhone(String(msg.from || ""));
-              if (!phone || msg.type !== "text" || typeof msg.id !== "string")
+              if (!phone || !["text", "image"].includes(msg.type) || typeof msg.id !== "string")
                 continue;
               const text = String(msg.text?.body || "").slice(0, 1500);
               const lead = rows(
@@ -438,6 +438,12 @@ export function registerAgencyWhatsAppRoutes(app: express.Express) {
               await db.execute(
                 sql`INSERT IGNORE INTO solarWhatsAppMessages (agencyId, leadId, direction, providerMessageId, dedupeKey, body, providerTimestamp, status) VALUES (${agencyId}, ${lead.id}, 'inbound', ${msg.id}, ${hash(`${agencyId}:${msg.id}`)}, ${text}, ${Number.isSafeInteger(timestamp) ? timestamp : null}, ${timely ? "received" : "needs_human"})`
               );
+              if (msg.type === "image" && timely && ["image/jpeg", "image/png"].includes(msg.image?.mime_type)) {
+                await db.execute(sql`UPDATE solarChatIdentity SET phoneVerifiedAt = NOW() WHERE agencyId = ${lead.sourceAgencyId} AND phone = ${phone} AND revokedAt IS NULL`);
+                const { enqueue } = await import("./followup/store");
+                await enqueue(agencyId, lead.id, "bill", `bill:${lead.id}:${msg.image.sha256 || msg.image.id}`, { mediaId: msg.image.id }).catch(() => false);
+                await db.execute(sql`UPDATE solarWhatsAppMessages SET status = 'media_received' WHERE providerMessageId = ${msg.id} AND agencyId = ${agencyId}`);
+              }
               if (
                 /^(stop|unsubscribe|do not contact|don't contact)\b/i.test(
                   text.trim()
@@ -584,6 +590,7 @@ export async function dispatchSolarWhatsApp(req: Request, res: Response) {
         await db.execute(
           sql`UPDATE solarWhatsAppMessages SET status = 'blocked', lastError = 'readiness_or_consent' WHERE id = ${claimed.id}`
         );
+        if (data.followupJobId) { const { settle } = await import("./followup/store"); await settle(db, data.followupJobId, 0, "blocked", { reason: "readiness_or_consent" }); }
         continue;
       }
       let payload: Record<string, unknown>;
@@ -659,6 +666,7 @@ export async function dispatchSolarWhatsApp(req: Request, res: Response) {
         payload
       );
       if (!result.ok) {
+        if (data.followupJobId) { const { settle } = await import("./followup/store"); await settle(db, data.followupJobId, 0, "failed", { reason: `http_${result.status}` }); }
         await db.execute(
           sql`UPDATE solarWhatsAppMessages SET status = 'failed', lastError = ${`http_${result.status}`} WHERE id = ${claimed.id}`
         );
@@ -670,6 +678,11 @@ export async function dispatchSolarWhatsApp(req: Request, res: Response) {
       await db.execute(
         sql`UPDATE solarWhatsAppMessages SET status = 'accepted', providerMessageId = ${String(id)} WHERE id = ${claimed.id}`
       );
+      if (data.followupJobId) {
+        const { settle, rows: followupRows } = await import("./followup/store");
+        const job = followupRows(await db.execute(sql`SELECT reservedPaise FROM followupJobs WHERE id = ${data.followupJobId} AND agencyId = ${claimed.agencyId}`))[0];
+        if (job) await settle(db, data.followupJobId, Number(job.reservedPaise), "message_accepted", { providerMessageId: id, delivery: "accepted_not_delivered" });
+      }
       sent++;
       // Receipts can arrive before the API response is persisted. Reconcile the
       // durable receipt inbox so that early delivery callbacks are never lost.
@@ -703,4 +716,15 @@ export async function dispatchSolarWhatsApp(req: Request, res: Response) {
     }
   }
   return res.json({ processed: pending.length, accepted: sent });
+}
+
+export async function queueBillFollowup(db: any, agencyId: number, leadId: number, jobId: number) {
+  const { leadEligible } = await import("./followup/store");
+  const lead = await leadEligible(db, agencyId, leadId);
+  const c = await connection(db, agencyId);
+  if (!c?.row.enabled || !lead.whatsappConsentAt) return false;
+  const identity = rows(await db.execute(sql`SELECT sessionId FROM solarChatIdentity WHERE agencyId = ${lead.sourceAgencyId} AND phone = ${lead.phone} AND phoneVerifiedAt IS NOT NULL AND revokedAt IS NULL LIMIT 1`))[0];
+  if (!identity) return false;
+  const result: any = await db.execute(sql`INSERT IGNORE INTO solarWhatsAppMessages (agencyId, leadId, direction, dedupeKey, body) VALUES (${agencyId}, ${leadId}, 'outbound', ${hash(`bill-followup:${jobId}`)}, ${JSON.stringify({ to: lead.phone, name: lead.firstName, stage: "Please reply with a clear photo of one page of your latest electricity bill for solar assessment. Reply STOP to opt out.", followupJobId: jobId })})`);
+  return Boolean(result[0]?.affectedRows);
 }

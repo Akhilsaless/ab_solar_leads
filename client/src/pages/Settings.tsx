@@ -1,3 +1,4 @@
+import FollowupPanel from "@/components/FollowupPanel";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -141,6 +142,7 @@ export default function Settings() {
       {Boolean((user as any)?.isPlatformOwner) && <PlatformCommunicationPanel />}
 
       <AiGatewayPanel />
+      <FollowupPanel owner={Boolean((user as any)?.isPlatformOwner)} />
 
       <Button className="w-full solar-gradient text-black font-semibold" onClick={() => updateAgency.mutate(form)} disabled={updateAgency.isPending}>
         {updateAgency.isPending ? "Saving..." : "Save Settings"}
@@ -300,7 +302,7 @@ function AiGatewayPanel() {
           <div className="flex flex-wrap gap-2"><Button size="sm" disabled={selectTextBrain.isPending || settings?.featurePolicies?.textBrainProvider === "sarvam"} onClick={() => selectTextBrain.mutate({ provider: "sarvam" })}>Use Sarvam as AI brain</Button><Button size="sm" variant="outline" disabled={selectTextBrain.isPending || settings?.featurePolicies?.textBrainProvider !== "sarvam"} onClick={() => selectTextBrain.mutate({ provider: "automatic" })}>Use existing provider routing</Button></div>
           <p className="text-xs text-muted-foreground">Sarvam API requests are billed by Sarvam. Test connection sends a small paid request. Selecting Sarvam does not allow fallback to another provider.</p>
         </div>
-        <div className="rounded-xl border border-border p-4 space-y-2"><p className="font-medium">AI Follow-up add-on · Not activated</p><p className="text-sm text-muted-foreground">Automated qualification calls and WhatsApp bill follow-up are a separate paid workflow. Saving an AI key does not activate them. Calling, telephony, messaging and OCR need separate setup, usage limits and agency billing before launch.</p></div>
+        <div className="rounded-xl border border-border p-4 space-y-2"><p className="font-medium">AI Follow-up add-on · Separate controls</p><p className="text-sm text-muted-foreground">Use the separate AI Follow-up panel below for calling, bill handling and prepaid controls. Saving a text AI key does not activate this workflow.</p></div>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           <MetricMini label="Connected" value={String((gateway.data?.connections || []).filter((item: any) => item.status === "connected").length)} />
           <MetricMini label="Requests today" value={String((gateway.data?.usage || []).reduce((sum: number, item: any) => sum + Number(item.requestsToday || 0), 0))} />

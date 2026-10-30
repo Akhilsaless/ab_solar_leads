@@ -441,7 +441,7 @@ export default function ChatBot() {
     setIsLoading(true);
     setMessages(prev => [...prev, { role: "customer", content: "📎 [Electricity bill uploaded]", createdAt: new Date() }]);
     try {
-      const result = await readBill.mutateAsync({ imageUrl });
+      const result = await readBill.mutateAsync({ sessionId, imageUrl });
       if (result.success && result.data) {
         const d = result.data;
         if (d.amount || d.units || d.state || d.discom) {
@@ -483,13 +483,13 @@ export default function ChatBot() {
     const lastBotMsg = messages.filter(m => m.role === "bot").pop();
     const meta = lastBotMsg?.metadata || {};
     const name = meta.customerName || "Valued Customer";
-    const bill = meta.monthlyBill ? `₹${meta.monthlyBill}` : "₹2,500 (default)";
-    const systemKw = meta.systemSizeKw ? `~${meta.systemSizeKw} kW` : "~3 kW";
+    const bill = meta.monthlyBill ? `₹${meta.monthlyBill}` : "Not provided";
+    const systemKw = meta.systemSizeKw ? `~${meta.systemSizeKw} kW` : "Site assessment required";
     const cost = meta.estimatedCost ? `₹${Math.round(Number(meta.estimatedCost)).toLocaleString("en-IN")}` : "On Request";
-    const subsidy = meta.subsidyAmount ? `₹${Math.round(Number(meta.subsidyAmount)).toLocaleString("en-IN")}` : "₹78,000";
+    const subsidy = meta.subsidyAmount ? `₹${Math.round(Number(meta.subsidyAmount)).toLocaleString("en-IN")}` : "Eligibility review required";
     const netCost = meta.netCost ? `₹${Math.round(Number(meta.netCost)).toLocaleString("en-IN")}` : "On Request";
     const savings = meta.estimatedSavingsMonthly ? `₹${Math.round(Number(meta.estimatedSavingsMonthly)).toLocaleString("en-IN")}/month` : "On Request";
-    const payback = meta.paybackYears ? `~${meta.paybackYears} years` : "~4 years";
+    const payback = meta.paybackYears ? `~${meta.paybackYears} years` : "Not calculated";
     const loc = meta.customerCity ? `${meta.customerCity}${meta.customerState ? ", " + meta.customerState : ""}` : (meta.customerState || "");
     const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
     const green = [16, 185, 129] as [number, number, number];
