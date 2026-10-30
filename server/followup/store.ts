@@ -16,7 +16,9 @@ export async function account(
 ) {
   if (create)
     await db.execute(
-      sql`INSERT IGNORE INTO followupAccounts (agencyId) VALUES (${agencyId})`
+      lock
+        ? sql`INSERT INTO followupAccounts (agencyId) VALUES (${agencyId}) ON DUPLICATE KEY UPDATE agencyId = VALUES(agencyId)`
+        : sql`INSERT IGNORE INTO followupAccounts (agencyId) VALUES (${agencyId})`
     );
   const a = rows(
     await db.execute(

@@ -7,13 +7,17 @@ const state = vi.hoisted(() => ({ db: null as any }));
 vi.mock("./db", () => ({
   getDb: async () => state.db,
   getAgencyByUserId: vi.fn(),
+  getUserByOpenId: vi.fn(),
 }));
 vi.mock("./_core/env", () => ({
-  ENV: { cookieSecret: "synthetic-followup-test-encryption" },
+  ENV: { cookieSecret: "synthetic-followup-test-encryption", ownerOpenId: "synthetic-owner" },
 }));
 import { encryptGatewayCredential } from "./aiGateway";
 import { reserve, settle, rows } from "./followup/store";
 import { configSchema } from "./followup/policy";
+import { hash } from "./followup/policy";
+import { followupRouter } from "./followup";
+import { claimBillRead, cacheBillRead } from "./billAccess";
 const suite = process.env.TEST_DATABASE_URL ? describe : describe.skip;
 suite("follow-up wallet on isolated MySQL", () => {
   let pool: ReturnType<typeof createPool>;
@@ -110,5 +114,25 @@ suite("follow-up wallet on isolated MySQL", () => {
     )[0];
     expect(Boolean(a.enabled)).toBe(false);
     expect(Number(a.balancePaise)).toBe(800);
+  });
+  it("credits a reconciled payment once even when owner requests race", async () => {
+    const caller = followupRouter.createCaller({ user: { id: 1, role: 'admin', openId: 'synthetic-owner' } } as any);
+    const input = { agencyId: 902, amountPaise: 200, paymentReference: 'synthetic-payment-reference-1' };
+    await Promise.all([caller.credit(input), caller.credit(input)]);
+    const [accounts]: any = await pool.query('SELECT balancePaise FROM followupAccounts WHERE agencyId = 902');
+    expect(Number(accounts[0].balancePaise)).toBe(1000);
+  });
+  it("rejects credits from a different administrator", async () => {
+    const caller = followupRouter.createCaller({ user: { id: 2, role: 'admin', openId: 'another-admin' } } as any);
+    await expect(caller.credit({ agencyId: 902, amountPaise: 200, paymentReference: 'synthetic-payment-reference-2' })).rejects.toMatchObject({ code: 'FORBIDDEN' });
+  });
+  it("runs paid legacy OCR only once per same-session upload and then uses its cache", async () => {
+    const url = 'https://storage.test.invalid/synthetic-bill.png';
+    await pool.execute('INSERT INTO solarBillUploadReceipts (urlHash, sessionId, contentType) VALUES (?, ?, ?)', [hash(url), 'synthetic-chat-alpha', 'image/png']);
+    const results = await Promise.allSettled([claimBillRead(state.db, 'synthetic-chat-alpha', url), claimBillRead(state.db, 'synthetic-chat-alpha', url)]);
+    expect(results.filter(r => r.status === 'fulfilled')).toHaveLength(1);
+    await expect(claimBillRead(state.db, 'synthetic-chat-beta', url)).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    await cacheBillRead(state.db, 'synthetic-chat-alpha', url, { amount: 2500 });
+    expect(await claimBillRead(state.db, 'synthetic-chat-alpha', url)).toMatchObject({ cached: { amount: 2500 }, contentType: 'image/png' });
   });
 });
