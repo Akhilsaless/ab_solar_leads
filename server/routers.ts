@@ -1,3 +1,5 @@
+import { registerBillUpload, finalizeBillUpload, claimBillRead, cacheBillRead } from "./billAccess";
+import { followupRouter } from "./followup";
 import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
@@ -132,6 +134,7 @@ export const appRouter = router({
   platformCommunications: platformCommunicationsRouter,
   solarOperations: solarOperationsRouter,
   agencyWhatsApp: agencyWhatsAppRouter,
+  followup: followupRouter,
   automatedOutreach: automatedOutreachRouter,
   copilot: copilotRouter,
   referralCoach: referralCoachRouter,
@@ -449,7 +452,11 @@ export const appRouter = router({
           throw new TRPCError({ code: "PAYLOAD_TOO_LARGE", message: "Bill files must be between 1 byte and 4 MB." });
         }
         const safeName = input.fileName.replace(/[^a-zA-Z0-9._-]/g, "_");
-        const { url } = await storagePut(`bill-uploads/${conversation.id}/${Date.now()}-${safeName}`, bytes, input.contentType);
+        const database = await db.getDb(); if (!database) throw new Error("Database unavailable");
+        const storageKey = `bill-uploads/${conversation.id}/${Date.now()}-${safeName}`;
+        await registerBillUpload(database, input.sessionId, storageKey, input.contentType);
+        const { url } = await storagePut(storageKey, bytes, input.contentType);
+        await finalizeBillUpload(database, input.sessionId, storageKey, url);
         return { url };
       }),
 
@@ -1498,16 +1505,20 @@ export const appRouter = router({
   billReader: router({
     readBillImage: publicProcedure
       .input(z.object({
-        imageUrl: z.string(),
+        sessionId: z.string().min(16).max(128),
+        imageUrl: z.string().url().max(4000),
         contentType: z.enum(["application/pdf", "image/jpeg", "image/png"]).default("image/png"),
       }))
       .mutation(async ({ input }) => {
         try {
+          const database = await db.getDb(); if (!database) throw new Error("Database unavailable");
+          const cached = await claimBillRead(database, input.sessionId, input.imageUrl);
+          if (cached.cached) return { success: true, data: cached.cached };
           const response = await invokeLLM({
             messages: [
               {
                 role: "user",
-                content: buildBillOcrContent(input.imageUrl, input.contentType),
+                content: buildBillOcrContent(input.imageUrl, cached.contentType),
               },
             ] as any,
             response_format: {
@@ -1531,7 +1542,9 @@ export const appRouter = router({
           });
           const content = response.choices[0]?.message?.content;
           if (typeof content === "string") {
-            return { success: true, data: JSON.parse(content) };
+            const data = JSON.parse(content);
+            await cacheBillRead(database, input.sessionId, input.imageUrl, data);
+            return { success: true, data };
           }
           return { success: false, data: null };
         } catch (e) {

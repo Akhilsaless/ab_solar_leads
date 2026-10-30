@@ -1,3 +1,4 @@
+import FollowupPanel from "@/components/FollowupPanel";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -141,6 +142,7 @@ export default function Settings() {
       {Boolean((user as any)?.isPlatformOwner) && <PlatformCommunicationPanel />}
 
       <AiGatewayPanel />
+      <FollowupPanel owner={Boolean((user as any)?.isPlatformOwner)} />
 
       <Button className="w-full solar-gradient text-black font-semibold" onClick={() => updateAgency.mutate(form)} disabled={updateAgency.isPending}>
         {updateAgency.isPending ? "Saving..." : "Save Settings"}
@@ -220,7 +222,7 @@ function AiGatewayPanel() {
   const utils = trpc.useUtils();
   const gateway = trpc.aiGateway.getDashboard.useQuery();
   const catalog = trpc.aiGateway.catalog.useQuery();
-  const [provider, setProvider] = useState("gemini");
+  const [provider, setProvider] = useState("sarvam");
   const [apiKey, setApiKey] = useState("");
   const [accountId, setAccountId] = useState("");
   const [baseUrl, setBaseUrl] = useState("");
@@ -268,7 +270,7 @@ function AiGatewayPanel() {
     if (!selectedPreset) return;
     saveProvider.mutate({
       provider: provider as any,
-      ...(provider === "builtin" ? {} : { apiKey }),
+      ...(provider === "builtin" || !apiKey.trim() ? {} : { apiKey: apiKey.trim() }),
       ...(provider === "cloudflare" ? { accountId } : {}),
       ...(provider !== "builtin" && provider !== "cloudflare" ? { baseUrl } : {}),
       defaultModel,
@@ -278,6 +280,10 @@ function AiGatewayPanel() {
     });
   };
 
+  const selectTextBrain = trpc.aiGateway.selectTextBrain.useMutation({
+    onSuccess: () => { toast.success("Text AI brain updated. Follow-up automation stays separately controlled."); refresh(); },
+    onError: (error: any) => toast.error(error.message),
+  });
   const settings = gateway.data?.settings as any;
   const connectionState = selectedConnection?.status || "not_connected";
   const statusTone = connectionState === "connected" ? "text-emerald-400" : connectionState === "configuration_required" ? "text-amber-400" : connectionState === "error" ? "text-red-400" : "text-muted-foreground";
@@ -289,6 +295,14 @@ function AiGatewayPanel() {
         <p className="text-sm text-muted-foreground">The AI Gateway keeps provider credentials encrypted server-side, routes Klaus through one normalized service, and never exposes saved secret values. Normal users only receive a fast answer—not provider complexity.</p>
       </CardHeader>
       <CardContent className="space-y-5">
+        <div className="rounded-xl border border-primary/30 p-4 space-y-3">
+          <p className="font-medium">Sales Squad Core · Optional AI brain</p>
+          <p className="text-sm text-muted-foreground">Keep lead capture, agency workspaces, surveys and proposals together. Add your Sarvam key below to use Sarvam for customer chat and Klaus. No key is required to retain the existing provider setup.</p>
+          <p className="text-sm">Current text brain: {settings?.featurePolicies?.textBrainProvider === "sarvam" ? "Sarvam AI" : "Existing provider routing"}</p>
+          <div className="flex flex-wrap gap-2"><Button size="sm" disabled={selectTextBrain.isPending || settings?.featurePolicies?.textBrainProvider === "sarvam"} onClick={() => selectTextBrain.mutate({ provider: "sarvam" })}>Use Sarvam as AI brain</Button><Button size="sm" variant="outline" disabled={selectTextBrain.isPending || settings?.featurePolicies?.textBrainProvider !== "sarvam"} onClick={() => selectTextBrain.mutate({ provider: "automatic" })}>Use existing provider routing</Button></div>
+          <p className="text-xs text-muted-foreground">Sarvam API requests are billed by Sarvam. Test connection sends a small paid request. Selecting Sarvam does not allow fallback to another provider.</p>
+        </div>
+        <div className="rounded-xl border border-border p-4 space-y-2"><p className="font-medium">AI Follow-up add-on · Separate controls</p><p className="text-sm text-muted-foreground">Use the separate AI Follow-up panel below for calling, bill handling and prepaid controls. Saving a text AI key does not activate this workflow.</p></div>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           <MetricMini label="Connected" value={String((gateway.data?.connections || []).filter((item: any) => item.status === "connected").length)} />
           <MetricMini label="Requests today" value={String((gateway.data?.usage || []).reduce((sum: number, item: any) => sum + Number(item.requestsToday || 0), 0))} />
@@ -315,18 +329,19 @@ function AiGatewayPanel() {
           {provider !== "builtin" && <div className="grid gap-3 sm:grid-cols-2">
             {selectedPreset.credentialFields?.some((field: any) => field.key === "apiKey") && <div className="sm:col-span-2"><label className="text-sm font-medium mb-1.5 block">{selectedConnection?.credentialConfigured ? "Replace credential" : selectedPreset.credentialFields.find((field: any) => field.key === "apiKey")?.label}</label><input type="password" autoComplete="new-password" value={apiKey} onChange={(event) => setApiKey(event.target.value)} placeholder={selectedConnection?.credentialHint || "Enter once — it will be encrypted and masked after save"} className="w-full px-3 py-2 rounded-lg bg-background border border-border text-sm" /><p className="mt-1 text-xs text-muted-foreground">The value is sent only to the server to be encrypted. It is never returned or shown after saving.</p></div>}
             {provider === "cloudflare" && <Field label="Cloudflare Account ID" value={accountId} onChange={setAccountId} />}
-            {provider !== "cloudflare" && <Field label="Provider Base URL" value={baseUrl} onChange={setBaseUrl} />}
+            {provider !== "cloudflare" && provider !== "sarvam" && <Field label="Provider Base URL" value={baseUrl} onChange={setBaseUrl} />}
             <div><label className="text-sm font-medium mb-1.5 block">Default model</label><input list="provider-models" value={defaultModel} onChange={(event) => setDefaultModel(event.target.value)} className="w-full px-3 py-2 rounded-lg bg-background border border-border text-sm" placeholder="Choose or enter a model ID" /><datalist id="provider-models">{(models.data || []).map((model: any) => <option key={model.modelId || model.id} value={model.modelId || model.id}>{model.displayName || model.modelId || model.id}</option>)}</datalist></div>
             <Field label="Priority (lower routes first)" value={priority} onChange={setPriority} type="number" />
           </div>}
-          <div className="flex flex-wrap gap-3 text-sm"><label className="flex items-center gap-2"><input type="checkbox" checked={isFreeTier} onChange={(event) => setIsFreeTier(event.target.checked)} /> Prefer as free-tier capable</label><label className="flex items-center gap-2"><input type="checkbox" checked={isEnabled} onChange={(event) => setIsEnabled(event.target.checked)} /> Eligible for live routing</label></div>
+          <div className="flex flex-wrap gap-3 text-sm"><label className="flex items-center gap-2"><input type="checkbox" checked={provider === "sarvam" ? false : isFreeTier} disabled={provider === "sarvam"} onChange={(event) => setIsFreeTier(event.target.checked)} /> Prefer as free-tier capable</label><label className="flex items-center gap-2"><input type="checkbox" checked={isEnabled} onChange={(event) => setIsEnabled(event.target.checked)} /> Eligible for live routing</label></div>
           {selectedConnection?.lastErrorMessage && <p className="rounded-lg bg-destructive/10 px-3 py-2 text-xs text-destructive">Latest provider issue: {selectedConnection.lastErrorMessage}</p>}
           <div className="flex flex-wrap gap-2"><Button size="sm" onClick={saveSelected} disabled={saveProvider.isPending}>{saveProvider.isPending ? "Saving…" : "Configure securely"}</Button><Button size="sm" variant="outline" onClick={() => testProvider.mutate({ provider: provider as any })} disabled={!selectedConnection?.credentialConfigured || testProvider.isPending}>{testProvider.isPending ? "Testing…" : "Test connection"}</Button>{selectedConnection?.credentialConfigured && provider !== "builtin" && <Button size="sm" variant="outline" className="text-destructive" onClick={() => disconnectProvider.mutate({ provider: provider as any })}>Disconnect</Button>}</div>
         </div>}
 
         <div className="rounded-xl border border-border p-4 space-y-3">
-          <div className="flex items-center gap-2"><Gauge className="w-4 h-4 text-primary" /><p className="font-medium">Gateway routing and cost protection</p></div>
-          <div className="grid gap-3 sm:grid-cols-2"><div><label className="text-sm font-medium mb-1.5 block">Routing mode</label><select value={settings?.routingMode || "auto"} onChange={(event) => updateGateway.mutate({ routingMode: event.target.value as any, freeModelsOnly: Boolean(settings?.freeModelsOnly), allowPaidFallback: Boolean(settings?.allowPaidFallback), monthlyBudgetInr: Number(settings?.monthlyBudgetInr || 0), warningThresholdPercent: Number(settings?.warningThresholdPercent || 70), criticalThresholdPercent: Number(settings?.criticalThresholdPercent || 90), providerPriority: settings?.providerPriority || [], featurePolicies: settings?.featurePolicies || {} })} className="w-full px-3 py-2 rounded-lg bg-secondary border border-border text-sm"><option value="auto">Auto — capability and health aware</option><option value="fastest">Fastest available</option><option value="free_first">Free first</option><option value="best_quality">Best configured quality</option><option value="manual">Manual selection only</option></select></div><Field label="Monthly paid-AI budget (₹)" value={String(settings?.monthlyBudgetInr || 0)} onChange={(value) => updateGateway.mutate({ routingMode: settings?.routingMode || "auto", freeModelsOnly: Boolean(settings?.freeModelsOnly), allowPaidFallback: Boolean(settings?.allowPaidFallback), monthlyBudgetInr: Number(value || 0), warningThresholdPercent: Number(settings?.warningThresholdPercent || 70), criticalThresholdPercent: Number(settings?.criticalThresholdPercent || 90), providerPriority: settings?.providerPriority || [], featurePolicies: settings?.featurePolicies || {} })} type="number" /></div>
+          <p className="text-xs text-muted-foreground">The budget target is for planning; it is not an enforced spending cap. Set a provider-side limit before production use.</p>
+          <div className="flex items-center gap-2"><Gauge className="w-4 h-4 text-primary" /><p className="font-medium">Gateway routing and budget planning</p></div>
+          <div className="grid gap-3 sm:grid-cols-2"><div><label className="text-sm font-medium mb-1.5 block">Routing mode</label><select value={settings?.routingMode || "auto"} onChange={(event) => updateGateway.mutate({ routingMode: event.target.value as any, freeModelsOnly: Boolean(settings?.freeModelsOnly), allowPaidFallback: Boolean(settings?.allowPaidFallback), monthlyBudgetInr: Number(settings?.monthlyBudgetInr || 0), warningThresholdPercent: Number(settings?.warningThresholdPercent || 70), criticalThresholdPercent: Number(settings?.criticalThresholdPercent || 90), providerPriority: settings?.providerPriority || [], featurePolicies: settings?.featurePolicies || {} })} className="w-full px-3 py-2 rounded-lg bg-secondary border border-border text-sm"><option value="auto">Auto — capability and health aware</option><option value="fastest">Fastest available</option><option value="free_first">Free first</option><option value="best_quality">Best configured quality</option><option value="manual">Manual selection only</option></select></div><Field label="Monthly paid-AI budget target (₹)" value={String(settings?.monthlyBudgetInr || 0)} onChange={(value) => updateGateway.mutate({ routingMode: settings?.routingMode || "auto", freeModelsOnly: Boolean(settings?.freeModelsOnly), allowPaidFallback: Boolean(settings?.allowPaidFallback), monthlyBudgetInr: Number(value || 0), warningThresholdPercent: Number(settings?.warningThresholdPercent || 70), criticalThresholdPercent: Number(settings?.criticalThresholdPercent || 90), providerPriority: settings?.providerPriority || [], featurePolicies: settings?.featurePolicies || {} })} type="number" /></div>
           <div className="flex flex-wrap gap-3 text-sm"><label className="flex items-center gap-2"><input type="checkbox" checked={Boolean(settings?.freeModelsOnly)} onChange={(event) => updateGateway.mutate({ routingMode: settings?.routingMode || "auto", freeModelsOnly: event.target.checked, allowPaidFallback: Boolean(settings?.allowPaidFallback), monthlyBudgetInr: Number(settings?.monthlyBudgetInr || 0), warningThresholdPercent: Number(settings?.warningThresholdPercent || 70), criticalThresholdPercent: Number(settings?.criticalThresholdPercent || 90), providerPriority: settings?.providerPriority || [], featurePolicies: settings?.featurePolicies || {} })} /> Free models only</label><label className="flex items-center gap-2"><input type="checkbox" checked={Boolean(settings?.allowPaidFallback)} onChange={(event) => updateGateway.mutate({ routingMode: settings?.routingMode || "auto", freeModelsOnly: Boolean(settings?.freeModelsOnly), allowPaidFallback: event.target.checked, monthlyBudgetInr: Number(settings?.monthlyBudgetInr || 0), warningThresholdPercent: Number(settings?.warningThresholdPercent || 70), criticalThresholdPercent: Number(settings?.criticalThresholdPercent || 90), providerPriority: settings?.providerPriority || [], featurePolicies: settings?.featurePolicies || {} })} /> Allow paid fallback</label></div>
         </div>
 

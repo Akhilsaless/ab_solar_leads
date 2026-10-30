@@ -33,7 +33,7 @@ export async function captureConsentedChatLead(
   const phone = facts.phone ? normalizeIndianPhone(facts.phone) : null;
   const email = facts.email?.trim().toLowerCase();
   const name = facts.name || conversation.customerName;
-  return db.transaction(async (tx: any) => {
+  const captured = await db.transaction(async (tx: any) => {
     await tx.execute(
       sql`INSERT INTO solarChatIdentity (sessionId, agencyId, phone, consentAt, revokedAt) VALUES (${conversation.sessionId}, ${conversation.agencyId}, ${phone}, ${consent ? new Date() : null}, ${consent ? null : new Date()}) ON DUPLICATE KEY UPDATE phoneVerifiedAt = CASE WHEN phone <=> VALUES(phone) THEN phoneVerifiedAt ELSE NULL END, otpGeneration = CASE WHEN phone <=> VALUES(phone) THEN otpGeneration ELSE otpGeneration + 1 END, phone = VALUES(phone), consentAt = CASE WHEN VALUES(consentAt) IS NOT NULL THEN COALESCE(consentAt, VALUES(consentAt)) ELSE consentAt END, revokedAt = VALUES(revokedAt)`
     );
@@ -86,4 +86,9 @@ export async function captureConsentedChatLead(
     );
     return leadId;
   });
+  if (captured) {
+    try { const { enqueueCapturedLead } = await import('./followup/store'); await enqueueCapturedLead(conversation.agencyId, captured); }
+    catch { /* Core lead capture survives an unconfigured or unmigrated add-on. */ }
+  }
+  return captured;
 }

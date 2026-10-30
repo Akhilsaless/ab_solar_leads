@@ -203,7 +203,7 @@ export default function SmartChatBot() {
         const reader = new FileReader(); reader.onerror = () => reject(new Error("read_failed")); reader.onload = () => resolve(String(reader.result).split(",")[1] || ""); reader.readAsDataURL(file);
       });
       const uploaded = await uploadBill.mutateAsync({ sessionId, fileName: file.name, contentType: file.type as any, contentBase64: base64 });
-      const parsed = await readBill.mutateAsync({ imageUrl: uploaded.url, contentType: file.type as "application/pdf" | "image/jpeg" | "image/png" });
+      const parsed = await readBill.mutateAsync({ sessionId, imageUrl: uploaded.url, contentType: file.type as "application/pdf" | "image/jpeg" | "image/png" });
       if (parsed.success && parsed.data) {
         const detected = normalizeBillConfirmation(parsed.data);
         if (hasDetectedBillValue(detected)) {

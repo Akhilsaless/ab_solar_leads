@@ -6,7 +6,7 @@ import { getDb, getAgencyByUserId } from "./db";
 import { sql } from "drizzle-orm";
 import { sendEmail } from "./_core/emailService";
 import { notifyOwner } from "./_core/notification";
-import { invokeAiGateway } from "./aiGateway";
+import { invokeAiGateway, SelectedAiBrainError } from "./aiGateway";
 import { ENV } from "./_core/env";
 import { calculateEvidenceScore } from "./evidenceScore";
 import { istDayBounds } from "../shared/reportingTime";
@@ -52,6 +52,7 @@ async function invokeKlaus(
     const gateway = await invokeAiGateway({ agencyId, feature: "klaus", messages: params.messages, tools: params.tools, tool_choice: params.tool_choice });
     return gateway.result;
   } catch (gatewayError) {
+    if (gatewayError instanceof SelectedAiBrainError) throw gatewayError;
     // Preserve the previously configured single-provider connector during migration.
     if (config.provider !== "openai_compatible") throw gatewayError;
     const apiKey = process.env.KLAUS_EXTERNAL_API_KEY;
