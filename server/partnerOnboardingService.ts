@@ -78,7 +78,7 @@ export async function getPartnerOnboardingSnapshot(dbConn: any, partner: Partner
   const [panelsResult, invertersResult, pricingResult, stateInputsResult] = await Promise.all([
     dbConn.execute(sql`SELECT id, brand, model, wattage, pricePerPanel, efficiency, panelType, warranty, isActive, isPriceActive, pricingVersion, sourceNote, lastVerifiedAt, effectiveFrom, effectiveTo FROM panelProducts3 WHERE agencyId = ${mapping.agencyId}`),
     dbConn.execute(sql`SELECT id, brand, model, capacityKw, price, inverterType, warranty, isActive, isPriceActive, pricingVersion, sourceNote, lastVerifiedAt, effectiveFrom, effectiveTo FROM inverterProducts3 WHERE agencyId = ${mapping.agencyId}`),
-    dbConn.execute(sql`SELECT pricingVersion, pricingMode, installationCostPerKw, balanceOfSystemCostPerKw, pricingDisclosure, sourceNote, effectiveFrom, effectiveTo, lastVerifiedAt, isPricingActive FROM agencyEstimateSettings WHERE agencyId = ${mapping.agencyId} LIMIT 1`),
+    dbConn.execute(sql`SELECT pricingVersion, pricingMode, installationCostPerKw, balanceOfSystemCostPerKw, taxRatePercent, pricingDisclosure, sourceNote, effectiveFrom, effectiveTo, lastVerifiedAt, isPricingActive FROM agencyEstimateSettings WHERE agencyId = ${mapping.agencyId} LIMIT 1`),
     dbConn.execute(sql`SELECT id, stateName, stateCode, discomName, tariffPerUnit, avgSunHours, systemLossPercent, netMeteringStatus, subsidyDisclosure, subsidySourceUrl, sourceNote, effectiveFrom, effectiveTo, lastVerifiedAt, isActive FROM agencyStateEstimateInputs WHERE agencyId = ${mapping.agencyId} ORDER BY stateName ASC`),
   ]);
   const panels = rows(panelsResult);

@@ -24,6 +24,7 @@ describe("solar sales operational gates", () => {
   it("normalizes equivalent Indian contacts and rejects invalid numbers", () => {
     expect(normalizeIndianPhone("9876543210")).toBe("+919876543210");
     expect(normalizeIndianPhone("+91 98765-43210")).toBe("+919876543210");
+    expect(normalizeIndianPhone("919876543210")).toBe("+919876543210");
     expect(normalizeIndianPhone("123")).toBeNull();
     expect(normalizeIndianPhone("9876543210123")).toBeNull();
   });

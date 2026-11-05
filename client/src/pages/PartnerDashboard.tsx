@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { trpc } from "@/lib/trpc";
+import { normalizeIndianPhone } from "@shared/solarWorkflow";
 import PartnerOnboardingWizard from "@/components/PartnerOnboardingWizard";
 import PartnerSalesOperations from "@/components/PartnerSalesOperations";
 import { Button } from "@/components/ui/button";
@@ -376,9 +377,9 @@ export default function PartnerDashboard() {
                               <Calendar className="w-3 h-3 inline mr-1" />
                               {new Date(lead.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
                             </p>
-                            {lead.phone && (
+                            {lead.phone && normalizeIndianPhone(lead.phone) && (
                               <a
-                                href={`https://wa.me/91${lead.phone.replace(/\D/g, "")}?text=${encodeURIComponent(`Hi ${lead.firstName}, I'm calling from Sales Squad regarding your solar inquiry. Is this a good time to talk?`)}`}
+                                href={`https://wa.me/${normalizeIndianPhone(lead.phone)!.slice(1)}?text=${encodeURIComponent(`Hi ${lead.firstName}, I'm calling from Sales Squad regarding your solar inquiry. Is this a good time to talk?`)}`}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="inline-flex items-center gap-1 text-xs bg-green-600/20 text-green-400 border border-green-500/30 rounded-md px-2 py-1 hover:bg-green-600/30 transition-colors"
