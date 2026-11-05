@@ -618,8 +618,8 @@ export const appRouter = router({
               Number(subsidyData?.avgSunHours),
             );
             const commercialResponse = buildCommercialEstimateResponse(deterministicFacts, commercialKw);
-            await db.updateConversation(input.sessionId, {
-              ...(commercialKw ? { recommendedKw: commercialKw.toString(), status: "estimate_given" as const } : {}),
+            if (commercialKw) await db.updateConversation(input.sessionId, {
+              recommendedKw: commercialKw.toString(), status: "estimate_given" as const,
             });
             await db.addChatMessage({ conversationId: conversation.id, role: "bot", content: commercialResponse });
             return {
@@ -694,8 +694,8 @@ export const appRouter = router({
             Number(subsidyData?.avgSunHours),
           );
           const limitedEstimateResponse = buildLimitedResidentialEstimateResponse(deterministicFacts, residentialKw);
-          await db.updateConversation(input.sessionId, {
-            ...(residentialKw ? { recommendedKw: residentialKw.toString(), status: "estimate_given" as const } : {}),
+          if (residentialKw) await db.updateConversation(input.sessionId, {
+            recommendedKw: residentialKw.toString(), status: "estimate_given" as const,
           });
           await db.addChatMessage({ conversationId: conversation.id, role: "bot", content: limitedEstimateResponse });
           return {

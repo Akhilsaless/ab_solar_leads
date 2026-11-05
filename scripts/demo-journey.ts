@@ -42,6 +42,15 @@ await db.execute(sql`INSERT IGNORE INTO agencyConfig3 (id,userId,agencyName,agen
 const publicCaller = appRouter.createCaller({ user: null, req: {} as any, res: {} as any });
 const ownerCaller = appRouter.createCaller({ user: (await getUserByOpenId("demo-owner"))!, req: {} as any, res: {} as any });
 const partner = partnerRouter.createCaller({} as any);
+// The empty local reference dataset must not turn a safe withheld estimate into an SQL error.
+for (const property of ["residential", "commercial"]) {
+  const sessionId = `demo-no-reference-${property}-${suffix}`;
+  await publicCaller.chat.startConversation({agencySlug:"sales-squad",sessionId});
+  const answer = await publicCaller.chat.sendMessage({sessionId,message:`Hyderabad, Telangana, ${property}, monthly bill Rs 3000`});
+  assert.ok(answer.response.length > 0);
+  assert.equal(answer.estimate?.estimatedCost ?? null,null);
+}
+pass("residential and commercial enquiries survive missing reference data without invented prices");
 const email = `installer-${suffix}@example.invalid`, password = "DemoOnly!2026";
 const invitation = randomBytes(24).toString("base64url");
 const inserted: any = await db.execute(sql`INSERT INTO solarPartners (companyName,email,phone,serviceAreas,status,signupTokenHash,signupExpiresAt) VALUES (${`DEMO ONLY Installer ${suffix}`},${email},'0000000000',${JSON.stringify(["Telangana"])},'not_contacted',${sha(invitation)},${Date.now()+3600000})`);
