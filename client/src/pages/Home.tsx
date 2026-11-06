@@ -8,12 +8,14 @@ import {
   Mail, Eye, MousePointerClick, Bot, Send, Loader2
 } from "lucide-react";
 import { useState } from "react";
+import { useIsMobile } from "@/hooks/useMobile";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
 import { getLoginUrl } from "@/const";
 
 export default function Home() {
   const { user } = useAuth();
+  const isMobile = useIsMobile();
   const [, setLocation] = useLocation();
 
   const enabled = Boolean(user);
@@ -84,9 +86,6 @@ export default function Home() {
         </div>
       </div>
 
-      {/* Klaus AI Copilot — First thing visible on dashboard */}
-      <KlausWidget />
-
       {/* Stats Grid */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
@@ -119,8 +118,18 @@ export default function Home() {
         />
       </div>
 
-      {/* Quick Outreach Stats */}
-      <OutreachQuickStats />
+      {isMobile ? (
+        <details className="rounded-xl border bg-card p-4">
+          <summary className="min-h-11 cursor-pointer font-medium">Ask Klaus</summary>
+          <div className="pt-3"><KlausWidget /></div>
+        </details>
+      ) : <KlausWidget />}
+      {isMobile ? (
+        <details className="rounded-xl border bg-card p-4">
+          <summary className="min-h-11 cursor-pointer font-medium">Outreach performance</summary>
+          <div className="pt-3"><OutreachQuickStats /></div>
+        </details>
+      ) : <OutreachQuickStats />}
 
       {/* Two Column Layout */}
       <div className="grid lg:grid-cols-2 gap-6">
@@ -255,7 +264,7 @@ function KlausWidget() {
             </div>
             <div>
               <p className="font-semibold">Agent Klaus</p>
-              <p className="text-xs text-muted-foreground">Level 4 AI Copilot — live data, actions, memory</p>
+              <p className="text-xs text-muted-foreground">Ask about leads and follow-ups</p>
             </div>
           </div>
           <Button size="sm" variant="outline" className="text-xs gap-1 shrink-0" onClick={() => setLocation("/copilot")}>

@@ -16,7 +16,6 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarProvider,
-  SidebarTrigger,
   useSidebar,
 } from "@/components/ui/sidebar";
 import { getLoginUrl } from "@/const";
@@ -30,10 +29,11 @@ import { CSSProperties, useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from './DashboardLayoutSkeleton';
 import { Button } from "./ui/button";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "./ui/sheet";
 
 // Keep existing URLs so bookmarks and links continue to work.
 const workspaces = [
-  { icon: LayoutDashboard, label: "Overview", path: "/", pages: [
+  { icon: LayoutDashboard, label: "Home", path: "/", pages: [
     { label: "Dashboard", path: "/" },
     { label: "Sales funnel", path: "/north-star" },
     { label: "Analytics", path: "/analytics" },
@@ -140,6 +140,12 @@ function DashboardLayoutContent({
   const { user, logout } = useAuth();
   const [location, setLocation] = useLocation();
   const { state, toggleSidebar, setOpenMobile } = useSidebar();
+  const [moreOpen, setMoreOpen] = useState(false);
+  const moreOpener = useRef<HTMLButtonElement | null>(null);
+  const openMore = (event: React.MouseEvent<HTMLButtonElement>) => {
+    moreOpener.current = event.currentTarget;
+    setMoreOpen(true);
+  };
   const isCollapsed = state === "collapsed";
   const [isResizing, setIsResizing] = useState(false);
   const sidebarRef = useRef<HTMLDivElement>(null);
@@ -156,8 +162,13 @@ function DashboardLayoutContent({
   const navigate = (path: string) => {
     setLocation(path);
     setOpenMobile(false);
+    setMoreOpen(false);
   };
   const isMobile = useIsMobile();
+  useEffect(() => {
+    setMoreOpen(false);
+    setOpenMobile(false);
+  }, [location, setOpenMobile]);
 
   useEffect(() => {
     if (isCollapsed) setIsResizing(false);
@@ -222,7 +233,7 @@ function DashboardLayoutContent({
 
           <SidebarContent className="gap-0">
             <SidebarMenu className="px-2 py-1">
-              {workspaces.slice(0, 5).map(item => {
+              {workspaces.slice(0, 4).map(item => {
                 const isActive = activeWorkspace === item;
                 return (
                   <SidebarMenuItem key={item.path}>
@@ -230,7 +241,7 @@ function DashboardLayoutContent({
                       isActive={isActive}
                       onClick={() => navigate(item.path)}
                       tooltip={item.label}
-                      className="h-10 transition-all font-normal"
+                      className="h-11 transition-all font-normal"
                     >
                       <item.icon
                         className={`h-4 w-4 ${isActive ? "text-primary" : ""}`}
@@ -241,18 +252,14 @@ function DashboardLayoutContent({
                 );
               })}
               <SidebarMenuItem>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <SidebarMenuButton tooltip="More" isActive={activeWorkspace?.label === "Marketing"} className="h-10">
-                      <MoreHorizontal className="h-4 w-4" /><span>More</span>
-                    </SidebarMenuButton>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent side="right" align="start">
-                    <DropdownMenuItem onClick={() => navigate("/campaigns")}>
-                      <Target className="mr-2 h-4 w-4" />Marketing
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                <SidebarMenuButton
+                  tooltip="More" className="h-11"
+                  isActive={activeWorkspace?.label === "Marketing" || activeWorkspace?.label === "Settings"}
+                  onClick={openMore}
+                  aria-haspopup="dialog" aria-expanded={moreOpen} aria-controls="workspace-more-menu"
+                >
+                  <MoreHorizontal className="h-4 w-4" /><span>More</span>
+                </SidebarMenuButton>
               </SidebarMenuItem>
             </SidebarMenu>
           </SidebarContent>
@@ -289,7 +296,7 @@ function DashboardLayoutContent({
           </SidebarFooter>
         </Sidebar>
         <div
-          className={`absolute top-0 right-0 w-1 h-full cursor-col-resize hover:bg-primary/20 transition-colors ${isCollapsed ? "hidden" : ""}`}
+          className={`absolute top-0 right-0 hidden md:block w-1 h-full cursor-col-resize hover:bg-primary/20 transition-colors ${isCollapsed ? "md:hidden" : ""}`}
           onMouseDown={() => {
             if (isCollapsed) return;
             setIsResizing(true);
@@ -298,11 +305,13 @@ function DashboardLayoutContent({
         />
       </div>
 
-      <SidebarInset>
+      <SidebarInset className="min-w-0">
         {isMobile && (
           <div className="flex border-b h-14 items-center justify-between bg-background/95 px-2 backdrop-blur supports-[backdrop-filter]:backdrop-blur sticky top-0 z-40">
             <div className="flex items-center gap-2">
-              <SidebarTrigger className="h-9 w-9 rounded-lg bg-background" />
+              <Button variant="ghost" size="icon" className="h-11 w-11" onClick={openMore} aria-label="Open workspace menu" aria-haspopup="dialog" aria-expanded={moreOpen} aria-controls="workspace-more-menu">
+                <MoreHorizontal className="h-5 w-5" />
+              </Button>
               <div className="flex items-center gap-3">
                 <div className="flex flex-col gap-1">
                   <span className="tracking-tight text-foreground">
@@ -313,10 +322,10 @@ function DashboardLayoutContent({
             </div>
           </div>
         )}
-        <main className="flex-1 min-w-0 p-4 md:p-6">
+        <main className="flex-1 min-w-0 p-4 pb-[calc(5.5rem+env(safe-area-inset-bottom))] md:p-6">
           {activeWorkspace && (
             <div className="mb-6 space-y-3">
-              <p className="text-sm font-medium text-muted-foreground">{activeWorkspace.label}</p>
+              <p className="hidden md:block text-sm font-medium text-muted-foreground">{activeWorkspace.label}</p>
               {activeWorkspace.pages.length > 1 && (
                 <nav aria-label={`${activeWorkspace.label} pages`} className="flex flex-wrap gap-2">
                   {activeWorkspace.pages.map(page => (
@@ -333,6 +342,43 @@ function DashboardLayoutContent({
           {children}
         </main>
       </SidebarInset>
+      <nav aria-label="Mobile navigation" className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-4 border-t bg-background/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden">
+        {workspaces.slice(0, 3).map(item => (
+          <button key={item.path} type="button" onClick={() => navigate(item.path)} aria-current={activeWorkspace === item ? "page" : undefined}
+            className={`flex min-h-16 flex-col items-center justify-center gap-1 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring ${activeWorkspace === item ? "text-primary font-semibold" : "text-muted-foreground"}`}>
+            <item.icon className="h-5 w-5" /><span>{item.label}</span>
+          </button>
+        ))}
+        <button type="button" onClick={openMore} aria-haspopup="dialog" aria-expanded={moreOpen} aria-controls="workspace-more-menu"
+          className={`flex min-h-16 flex-col items-center justify-center gap-1 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring ${activeWorkspace && workspaces.indexOf(activeWorkspace) >= 3 ? "text-primary font-semibold" : "text-muted-foreground"}`}>
+          <MoreHorizontal className="h-5 w-5" /><span>More</span>
+        </button>
+      </nav>
+      <Sheet open={moreOpen} onOpenChange={setMoreOpen}>
+        <SheetContent id="workspace-more-menu" side={isMobile ? "bottom" : "right"}
+          onCloseAutoFocus={event => { event.preventDefault(); moreOpener.current?.focus(); }}
+          className={`gap-0 p-0 [&>button]:flex [&>button]:h-11 [&>button]:w-11 [&>button]:items-center [&>button]:justify-center [&>button]:right-2 [&>button]:top-2 ${isMobile ? "max-h-[85dvh] rounded-t-2xl" : "w-full sm:max-w-sm"}`}>
+          <SheetHeader className="border-b p-5 pr-16">
+            <SheetTitle>Your workspace</SheetTitle>
+            <SheetDescription>Choose a workspace or tool.</SheetDescription>
+          </SheetHeader>
+          <div className="min-h-0 overflow-y-auto p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+            <nav aria-label="More workspaces" className="space-y-1">
+              {workspaces.slice(3, 5).map(item => (
+                <button key={item.path} type="button" onClick={() => navigate(item.path)} className="flex min-h-12 w-full items-center gap-3 rounded-lg px-3 text-left text-sm hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                  <item.icon className="h-5 w-5 text-primary" /><span>{item.label}</span>
+                </button>
+              ))}
+            </nav>
+            <p className="mt-5 mb-2 px-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">Growth tools</p>
+            <nav aria-label="Growth tools" className="space-y-1">
+              {workspaces[5].pages.map(page => (
+                <button key={page.path} type="button" onClick={() => navigate(page.path)} className="flex min-h-12 w-full items-center rounded-lg px-3 text-left text-sm hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">{page.label}</button>
+              ))}
+            </nav>
+          </div>
+        </SheetContent>
+      </Sheet>
     </>
   );
 }
